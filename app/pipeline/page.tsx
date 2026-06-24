@@ -115,14 +115,14 @@ export default async function PipelinePage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <div className="flex gap-4 overflow-x-auto pb-4 md:grid md:grid-cols-3 xl:grid-cols-5">
         {stages.map((stage) => {
           const stageProperties = propertyList.filter(
             (property) => property.status === stage.value
           );
 
           return (
-            <Card key={stage.value} className="min-h-48 border-slate-200 bg-white">
+            <Card key={stage.value} className="min-h-48 min-w-[280px] border-slate-200 bg-white md:min-w-0">
               <CardHeader>
                 <CardTitle className="text-sm font-semibold text-slate-800">
                   {stage.label}{" "}

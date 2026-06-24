@@ -64,7 +64,7 @@ export function PropertyMap({ properties }: PropertyMapProps) {
       : [41.8781, -87.6298];
 
   return (
-    <div className="h-[650px] overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="h-[520px] overflow-hidden rounded-lg border border-slate-200 bg-white md:h-[650px]">
       <MapContainer center={center} zoom={11} className="h-full w-full">
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'
