@@ -15,7 +15,6 @@ const stages = [
   { label: "Rejected", value: "rejected" },
   { label: "Under Contract", value: "under_contract" },
   { label: "Purchased", value: "purchased" },
-  { label: "Passed", value: "passed" },
 ];
 
 type PropertyTag = {
