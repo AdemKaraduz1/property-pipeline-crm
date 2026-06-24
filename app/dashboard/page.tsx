@@ -56,17 +56,11 @@ export default async function DashboardPage() {
       property.status !== "rejected"
   ).length;
 
-  const visitsScheduled = propertyList.filter(
-    (property) => property.status === "visit_scheduled"
-  ).length;
 
   const offersMade = propertyList.filter(
     (property) => property.status === "offer_made"
   ).length;
 
-  const purchased = propertyList.filter(
-    (property) => property.status === "purchased"
-  ).length;
 
   const totalPipelineValue = propertyList.reduce(
     (sum, property) => sum + Number(property.asking_price || 0),
@@ -99,7 +93,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="mb-8 grid gap-4 md:grid-cols-4">
+      <div className="mb-8 grid gap-4 md:grid-cols-2">
         <Card className="border-slate-200 bg-white">
           <CardHeader>
             <CardTitle className="text-sm font-semibold uppercase tracking-wide text-slate-700">
@@ -114,35 +108,11 @@ export default async function DashboardPage() {
         <Card className="border-slate-200 bg-white">
           <CardHeader>
             <CardTitle className="text-sm font-semibold uppercase tracking-wide text-slate-700">
-              Visits Scheduled
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-slate-950">
-              {visitsScheduled}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-slate-700">
               Offers Made
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold text-slate-950">{offersMade}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-slate-700">
-              Purchased
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-slate-950">{purchased}</p>
           </CardContent>
         </Card>
       </div>
