@@ -1,0 +1,135 @@
+<!doctype html>
+<html>
+<head>
+    <title>Property Pipeline Importer</title>
+    <style>
+        body {
+          width: 380px;
+          font-family: Arial, sans-serif;
+          padding: 14px;
+          color: #111827;
+        }
+
+        h1 {
+          font-size: 18px;
+          margin: 0 0 12px;
+        }
+
+        label {
+          font-size: 12px;
+          font-weight: bold;
+          display: block;
+          margin-top: 10px;
+        }
+
+        input,
+        textarea {
+          width: 100%;
+          box-sizing: border-box;
+          margin-top: 4px;
+          padding: 8px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 13px;
+        }
+
+        textarea {
+          min-height: 70px;
+          resize: vertical;
+        }
+
+        button {
+          width: 100%;
+          margin-top: 12px;
+          padding: 10px;
+          border: none;
+          border-radius: 8px;
+          background: #111827;
+          color: white;
+          font-weight: bold;
+          cursor: pointer;
+        }
+
+        button.secondary {
+          background: #e5e7eb;
+          color: #111827;
+        }
+
+        #status {
+          margin-top: 10px;
+          font-size: 13px;
+        }
+
+        #unitPreview {
+          font-size: 12px;
+          margin-top: 6px;
+        }
+
+        .unit-preview-empty {
+          padding: 8px;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+        }
+
+        .unit-preview-list {
+          max-height: 220px;
+          overflow: auto;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background: #ffffff;
+        }
+
+        .unit-preview-item {
+          padding: 8px;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .unit-preview-item:last-child {
+          border-bottom: none;
+        }
+    </style>
+</head>
+
+<body>
+<h1>Save to Property Pipeline</h1>
+
+<label>App URL</label>
+<input id="appUrl" placeholder="http://localhost:3000" />
+
+<button id="captureBtn" class="secondary">Capture Current Page</button>
+
+<label>Address</label>
+<input id="address" />
+
+<label>Price</label>
+<input id="price" />
+
+<label>Beds</label>
+<input id="beds" />
+
+<label>Baths</label>
+<input id="baths" />
+
+<label>Square Feet</label>
+<input id="sqft" />
+
+<label>MLS Number</label>
+<input id="mlsNumber" />
+
+<label>Description</label>
+<textarea id="description"></textarea>
+
+<label>Source URL</label>
+<input id="sourceUrl" />
+
+<label>Unit Information Preview</label>
+<div id="unitPreview"></div>
+
+<button id="saveBtn">Import Deal</button>
+
+<div id="status"></div>
+
+<script src="popup.js"></script>
+</body>
+</html>
