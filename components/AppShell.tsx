@@ -26,7 +26,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="space-y-2">
-          <DesktopNavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" />
           <DesktopNavLink href="/pipeline" icon={<Building2 size={18} />} label="Pipeline" />
           <DesktopNavLink href="/properties/new" icon={<PlusCircle size={18} />} label="Add Property" />
           <DesktopNavLink href="/map" icon={<Map size={18} />} label="Map" />
@@ -60,7 +59,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-2 py-2 md:hidden">
         <div className="grid grid-cols-4 gap-1">
-          <MobileNavLink href="/dashboard" icon={<LayoutDashboard size={20} />} label="Home" />
           <MobileNavLink href="/pipeline" icon={<Building2 size={20} />} label="Pipeline" />
           <MobileNavLink href="/properties/new" icon={<PlusCircle size={20} />} label="Add" />
           <MobileNavLink href="/map" icon={<Map size={20} />} label="Map" />
