@@ -178,13 +178,6 @@ function PropertyCard({ property }: { property: Property }) {
         <p className="font-bold text-slate-950">{formatCurrency(price)}</p>
       </div>
 
-      <p className="mt-3 text-sm text-slate-600">
-        Condition:{" "}
-        <span className="font-medium text-slate-800">
-          {formatStatusLabel(property.condition)}
-        </span>
-      </p>
-
       {property.property_tags && property.property_tags.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1">
           {property.property_tags.slice(0, 4).map((tag) => (

@@ -60,10 +60,7 @@ export async function PATCH(
 
   if (!user) {
     return NextResponse.json(
-      {
-        success: false,
-        message: "Not authenticated.",
-      },
+      { success: false, message: "Not authenticated." },
       { status: 401 }
     );
   }
@@ -75,10 +72,7 @@ export async function PATCH(
 
   if (typeof isMobilityArea !== "boolean") {
     return NextResponse.json(
-      {
-        success: false,
-        message: "isMobilityArea must be true or false.",
-      },
+      { success: false, message: "isMobilityArea must be true or false." },
       { status: 400 }
     );
   }
