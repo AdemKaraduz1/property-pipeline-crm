@@ -11,6 +11,7 @@ import { PropertyEditForm } from "@/components/PropertyEditForm";
 import { PropertyTags } from "@/components/PropertyTags";
 import { DealScoreCard } from "@/components/DealScoreCard";
 import { MobilityFmrCard } from "@/components/MobilityFmrCard";
+import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 
 type PageProps = {
   params: Promise<{
@@ -314,6 +315,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               CHA Mobility Area
             </span>
           )}
+
+          {property.is_archived === true && (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+              Archived
+            </span>
+          )}
         </div>
 
         <h2 className="text-3xl font-bold text-slate-950">
@@ -322,13 +329,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
         {locationLine && <p className="text-slate-600">{locationLine}</p>}
 
-        <div className="mt-2 flex flex-wrap gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
           {property.source_url && (
             <a
               href={property.source_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-block text-sm text-blue-600 hover:underline"
+              className="inline-flex rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Open original listing
             </a>
@@ -339,10 +346,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               href={googleMapsUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-block text-sm text-blue-600 hover:underline"
+              className="inline-flex rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Open in Google Maps
             </a>
+          )}
+
+          {property.is_archived !== true && (
+            <ArchivePropertyButton propertyId={id} />
           )}
         </div>
       </div>

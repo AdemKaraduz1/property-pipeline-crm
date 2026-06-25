@@ -36,6 +36,19 @@ function toNumber(value: number | string | null | undefined) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+async function parseJsonResponse(response: Response) {
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      success: false,
+      message: text || "Server returned a non-JSON response.",
+    };
+  }
+}
+
 function buildMapSrcDoc({
   lat,
   lng,
@@ -195,7 +208,7 @@ export function MobilityFmrCard({
         method: "POST",
       });
 
-      const result = await response.json();
+      const result = await parseJsonResponse(response);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Mobility/FMR check failed.");
@@ -216,6 +229,58 @@ export function MobilityFmrCard({
         error instanceof Error
           ? error.message
           : "Mobility/FMR check failed."
+      );
+    }
+  }
+
+  async function overrideMobilityStatus(nextIsMobilityArea: boolean) {
+    const confirmed = window.confirm(
+      nextIsMobilityArea
+        ? "Mark this property as being in a CHA mobility area and apply mobility FMR?"
+        : "Mark this property as NOT being in a CHA mobility area and apply base FMR?"
+    );
+
+    if (!confirmed) return;
+
+    setMessage(
+      nextIsMobilityArea
+        ? "Manually marking as mobility area..."
+        : "Manually marking as not in a mobility area..."
+    );
+
+    try {
+      const response = await fetch(
+        `/api/properties/${propertyId}/mobility-fmr/override`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            isMobilityArea: nextIsMobilityArea,
+          }),
+        }
+      );
+
+      const result = await parseJsonResponse(response);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Manual override failed.");
+      }
+
+      setMessage(
+        nextIsMobilityArea
+          ? "Manually marked as mobility area. Mobility FMR values applied."
+          : "Manually marked as not in mobility area. Base FMR values applied."
+      );
+
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      console.error(error);
+      setMessage(
+        error instanceof Error ? error.message : "Manual override failed."
       );
     }
   }
@@ -317,6 +382,24 @@ export function MobilityFmrCard({
           className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Checking..." : "Run Mobility / FMR Check"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => overrideMobilityStatus(true)}
+          disabled={isPending}
+          className="rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Mark as Mobility Area
+        </button>
+
+        <button
+          type="button"
+          onClick={() => overrideMobilityStatus(false)}
+          disabled={isPending}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Mark as Not Mobility Area
         </button>
 
         <a

@@ -343,11 +343,62 @@ async function checkChaMobilityArea(lng: number, lat: number) {
       const result = await queryMobilityLayer(candidate, lng, lat);
 
       if (result.features.length > 0) {
+        const attributes = result.features[0]?.attributes || {};
+
+        console.log("Matched CHA layer attributes:", {
+          layerLabel: candidate.label,
+          layerUrl: candidate.url,
+          attributes,
+        });
+
+        const attributeText = Object.entries(attributes)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(" ")
+          .toLowerCase();
+
+        const explicitlyNotMobility =
+          attributeText.includes("not mobility") ||
+          attributeText.includes("non mobility") ||
+          attributeText.includes("non-mobility") ||
+          attributeText.includes("mobility: no") ||
+          attributeText.includes("mobility_area: no") ||
+          attributeText.includes("mobilityarea: no") ||
+          attributeText.includes("false");
+
+        const explicitlyMobility =
+          attributeText.includes("mobility area") ||
+          attributeText.includes("mobility: yes") ||
+          attributeText.includes("mobility_area: yes") ||
+          attributeText.includes("mobilityarea: yes") ||
+          attributeText.includes("eligible") ||
+          attributeText.includes("true");
+
+        if (explicitlyNotMobility) {
+          return {
+            isMobilityArea: false,
+            layerUrl: candidate.url,
+            layerLabel: candidate.label,
+            attributes,
+          };
+        }
+
+        if (explicitlyMobility) {
+          return {
+            isMobilityArea: true,
+            layerUrl: candidate.url,
+            layerLabel: candidate.label,
+            attributes,
+          };
+        }
+
+        // Safety rule:
+        // If the layer only returns a generic community polygon and does not clearly say
+        // the property is mobility-eligible, do not automatically mark it as mobility.
         return {
-          isMobilityArea: true,
+          isMobilityArea: false,
           layerUrl: candidate.url,
           layerLabel: candidate.label,
-          attributes: result.features[0]?.attributes || {},
+          attributes,
         };
       }
     } catch (error) {
