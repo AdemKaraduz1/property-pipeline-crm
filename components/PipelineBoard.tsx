@@ -37,17 +37,50 @@ type PipelineBoardProps = {
   properties: Property[];
 };
 
-const PIPELINE_COLUMNS = [
-  { id: "lead", label: "Lead" },
-  { id: "researching", label: "Researching" },
-  { id: "visit_scheduled", label: "Visit Scheduled" },
-  { id: "visited", label: "Visited" },
-  { id: "analyzing", label: "Analyzing" },
-  { id: "offer_ready", label: "Offer Ready" },
-  { id: "offer_made", label: "Offer Made" },
-  { id: "rejected", label: "Rejected" },
-  { id: "under_contract", label: "Under Contract" },
-  { id: "purchased", label: "Purchased" },
+type PipelineColumnConfig = {
+  id: string;
+  label: string;
+  statuses: string[];
+  targetStatus: string;
+};
+
+const PIPELINE_COLUMNS: PipelineColumnConfig[] = [
+  {
+    id: "lead_researching",
+    label: "Lead / Researching",
+    statuses: ["lead", "researching"],
+    targetStatus: "lead",
+  },
+  {
+    id: "visit_scheduled_visited",
+    label: "Visit Scheduled / Visited",
+    statuses: ["visit_scheduled", "visited"],
+    targetStatus: "visit_scheduled",
+  },
+  {
+    id: "analyzing",
+    label: "Analyzing",
+    statuses: ["analyzing"],
+    targetStatus: "analyzing",
+  },
+  {
+    id: "offer_activity",
+    label: "Offer Activity",
+    statuses: ["offer_ready", "offer_made", "rejected"],
+    targetStatus: "offer_ready",
+  },
+  {
+    id: "under_contract",
+    label: "Under Contract",
+    statuses: ["under_contract"],
+    targetStatus: "under_contract",
+  },
+  {
+    id: "purchased",
+    label: "Purchased",
+    statuses: ["purchased"],
+    targetStatus: "purchased",
+  },
 ];
 
 function formatCurrency(value: number | string | null | undefined) {
@@ -65,12 +98,22 @@ function formatCurrency(value: number | string | null | undefined) {
 }
 
 function formatStatusLabel(value: string | null | undefined) {
-  if (!value) return "Unknown";
+  if (!value) return "Lead";
 
   return value
     .split("_")
     .map((word) => word[0]?.toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function getColumnForStatus(status: string | null | undefined) {
+  const normalizedStatus = status || "lead";
+
+  return (
+    PIPELINE_COLUMNS.find((column) =>
+      column.statuses.includes(normalizedStatus)
+    ) || PIPELINE_COLUMNS[0]
+  );
 }
 
 async function parseJsonResponse(response: Response) {
@@ -90,10 +133,7 @@ function PipelineColumn({
   column,
   properties,
 }: {
-  column: {
-    id: string;
-    label: string;
-  };
+  column: PipelineColumnConfig;
   properties: Property[];
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -103,24 +143,31 @@ function PipelineColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[260px] rounded-sm border border-slate-200 bg-white p-6 shadow-sm transition ${
-        isOver ? "border-slate-400 bg-slate-50" : ""
+      className={`flex min-h-[520px] min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition ${
+        isOver ? "border-slate-400 bg-slate-50 ring-2 ring-slate-200" : ""
       }`}
     >
-      <h3 className="mb-8 font-serif text-lg font-bold uppercase tracking-wide text-slate-800">
-        {column.label}{" "}
-        <span className="text-slate-400">({properties.length})</span>
-      </h3>
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h3 className="break-words font-serif text-sm font-bold uppercase leading-tight tracking-wide text-slate-800">
+          {column.label}
+        </h3>
 
-      {properties.length === 0 ? (
-        <p className="text-slate-500">No properties yet.</p>
-      ) : (
-        <div className="space-y-4">
-          {properties.map((property) => (
+        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+          {properties.length}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-2">
+        {properties.length === 0 ? (
+          <div className="flex min-h-[90px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2 text-center">
+            <p className="text-xs text-slate-500">No properties yet.</p>
+          </div>
+        ) : (
+          properties.map((property) => (
             <DraggablePropertyCard key={property.id} property={property} />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -156,47 +203,112 @@ function PropertyCard({ property }: { property: Property }) {
   return (
     <Link
       href={`/properties/${property.id}`}
-      className="block cursor-grab rounded-xl border border-slate-300 bg-slate-50 p-4 shadow-sm transition hover:border-slate-500 hover:bg-white active:cursor-grabbing"
+      className="block cursor-grab rounded-lg border border-slate-300 bg-slate-50 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-500 hover:bg-white hover:shadow-md active:cursor-grabbing"
     >
-      <p className="mb-1 text-base font-semibold text-slate-950">
+      <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-950">
         {property.address || "Untitled Property"}
       </p>
 
       {(property.city || property.state || property.zip) && (
-        <p className="mb-3 text-sm text-slate-500">
+        <p className="mt-1 line-clamp-1 text-xs text-slate-500">
           {[property.city, property.state, property.zip]
             .filter(Boolean)
             .join(", ")}
         </p>
       )}
 
-      <div className="flex items-start justify-between gap-3 text-sm">
-        <p className="text-slate-600">
+      <div className="mt-3 space-y-1 text-xs">
+        <p className="line-clamp-1 text-slate-600">
           {property.property_type || "No type"}
         </p>
 
         <p className="font-bold text-slate-950">{formatCurrency(price)}</p>
       </div>
 
+      <div className="mt-2">
+        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+          {formatStatusLabel(property.status)}
+        </span>
+      </div>
+
       {property.property_tags && property.property_tags.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {property.property_tags.slice(0, 4).map((tag) => (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {property.property_tags.slice(0, 2).map((tag) => (
             <span
               key={tag.id}
-              className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700"
+              className="max-w-full truncate rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] text-slate-700"
             >
               {tag.tag}
             </span>
           ))}
 
-          {property.property_tags.length > 4 && (
-            <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-500">
-              +{property.property_tags.length - 4}
+          {property.property_tags.length > 2 && (
+            <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] text-slate-500">
+              +{property.property_tags.length - 2}
             </span>
           )}
         </div>
       )}
     </Link>
+  );
+}
+
+function PipelineGrid({
+  propertiesByColumn,
+}: {
+  propertiesByColumn: Record<string, Property[]>;
+}) {
+  return (
+    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {PIPELINE_COLUMNS.map((column) => (
+        <PipelineColumn
+          key={column.id}
+          column={column}
+          properties={propertiesByColumn[column.id] || []}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StaticPipelineGrid({ properties }: { properties: Property[] }) {
+  return (
+    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {PIPELINE_COLUMNS.map((column) => {
+        const columnProperties = properties.filter((property) =>
+          column.statuses.includes(property.status || "lead")
+        );
+
+        return (
+          <div
+            key={column.id}
+            className="flex min-h-[520px] min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+          >
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <h3 className="break-words font-serif text-sm font-bold uppercase leading-tight tracking-wide text-slate-800">
+                {column.label}
+              </h3>
+
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                {columnProperties.length}
+              </span>
+            </div>
+
+            <div className="flex flex-1 flex-col gap-2">
+              {columnProperties.length === 0 ? (
+                <div className="flex min-h-[90px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2 text-center">
+                  <p className="text-xs text-slate-500">No properties yet.</p>
+                </div>
+              ) : (
+                columnProperties.map((property) => (
+                  <PropertyCard key={property.id} property={property} />
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -221,7 +333,7 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
     })
   );
 
-  const propertiesByStatus = useMemo(() => {
+  const propertiesByColumn = useMemo(() => {
     const grouped: Record<string, Property[]> = {};
 
     PIPELINE_COLUMNS.forEach((column) => {
@@ -229,14 +341,8 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
     });
 
     items.forEach((property) => {
-      const status = property.status || "lead";
-
-      if (!grouped[status]) {
-        grouped.lead.push(property);
-        return;
-      }
-
-      grouped[status].push(property);
+      const column = getColumnForStatus(property.status);
+      grouped[column.id].push(property);
     });
 
     return grouped;
@@ -251,17 +357,24 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
     setActiveProperty(null);
 
     const propertyId = String(event.active.id);
-    const newStatus = String(event.over?.id || "");
+    const targetColumnId = String(event.over?.id || "");
 
-    if (!newStatus) return;
+    if (!targetColumnId) return;
 
     const property = items.find((item) => item.id === propertyId);
+    const targetColumn = PIPELINE_COLUMNS.find(
+      (column) => column.id === targetColumnId
+    );
 
-    if (!property) return;
+    if (!property || !targetColumn) return;
 
     const oldStatus = property.status || "lead";
 
-    if (oldStatus === newStatus) return;
+    if (targetColumn.statuses.includes(oldStatus)) {
+      return;
+    }
+
+    const newStatus = targetColumn.targetStatus;
 
     setItems((currentItems) =>
       currentItems.map((item) =>
@@ -313,39 +426,7 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
   }
 
   if (!mounted) {
-    return (
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
-        {PIPELINE_COLUMNS.map((column) => {
-          const columnProperties = properties.filter(
-            (property) => (property.status || "lead") === column.id
-          );
-
-          return (
-            <div
-              key={column.id}
-              className="min-h-[260px] rounded-sm border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <h3 className="mb-8 font-serif text-lg font-bold uppercase tracking-wide text-slate-800">
-                {column.label}{" "}
-                <span className="text-slate-400">
-                  ({columnProperties.length})
-                </span>
-              </h3>
-
-              {columnProperties.length === 0 ? (
-                <p className="text-slate-500">No properties yet.</p>
-              ) : (
-                <div className="space-y-4">
-                  {columnProperties.map((property) => (
-                    <PropertyCard key={property.id} property={property} />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
+    return <StaticPipelineGrid properties={properties} />;
   }
 
   return (
@@ -355,19 +436,11 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
-        {PIPELINE_COLUMNS.map((column) => (
-          <PipelineColumn
-            key={column.id}
-            column={column}
-            properties={propertiesByStatus[column.id] || []}
-          />
-        ))}
-      </div>
+      <PipelineGrid propertiesByColumn={propertiesByColumn} />
 
       <DragOverlay>
         {activeProperty ? (
-          <div className="w-[260px]">
+          <div className="w-[220px]">
             <PropertyCard property={activeProperty} />
           </div>
         ) : null}
