@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { PropertyUnitForm } from "@/components/PropertyUnitForm";
+import { AddUnitModal } from "@/components/AddUnitModal";
+import { EditPropertyModal } from "@/components/EditPropertyModal";
 import { DealAnalyzer } from "@/components/DealAnalyzer";
 import { PropertyStatusUpdater } from "@/components/PropertyStatusUpdater";
 import { createClient } from "@/lib/supabase/server";
@@ -8,8 +10,6 @@ import { redirect } from "next/navigation";
 import { PropertyVisitLog } from "@/components/PropertyVisitLog";
 import { DeleteUnitButton } from "@/components/DeleteUnitButton";
 import { PropertyEditForm } from "@/components/PropertyEditForm";
-import { PropertyTags } from "@/components/PropertyTags";
-import { DealScoreCard } from "@/components/DealScoreCard";
 import { MobilityFmrCard } from "@/components/MobilityFmrCard";
 import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 
@@ -55,11 +55,15 @@ type PropertyUnit = {
 };
 
 function formatCurrency(value: number | string | null | undefined) {
-  if (value === null || value === undefined || value === "") return "Not entered";
+  if (value === null || value === undefined || value === "") {
+    return "Not entered";
+  }
 
   const numberValue = Number(value);
 
-  if (!Number.isFinite(numberValue)) return "Not entered";
+  if (!Number.isFinite(numberValue)) {
+    return "Not entered";
+  }
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -102,6 +106,31 @@ function getGoogleMapsUrl(property: any) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     fullAddress
   )}`;
+}
+
+function getCookCountyTaxUrl(parcelNumber: unknown) {
+  if (!parcelNumber) return null;
+
+  const pin = String(parcelNumber).replace(/\D/g, "");
+
+  if (pin.length !== 14) return null;
+
+  return `https://cookcountypropertyinfo.com/cookviewerpinresults.aspx?pin=${pin}`;
+}
+
+function formatCookCountyPin(parcelNumber: unknown) {
+  if (!parcelNumber) return "-";
+
+  const pin = String(parcelNumber).replace(/\D/g, "");
+
+  if (pin.length !== 14) {
+    return String(parcelNumber);
+  }
+
+  return `${pin.slice(0, 2)}-${pin.slice(2, 4)}-${pin.slice(
+    4,
+    7
+  )}-${pin.slice(7, 10)}-${pin.slice(10)}`;
 }
 
 function getUnitLabel(unit: PropertyUnit) {
@@ -241,7 +270,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const annualCurrentRent = currentMonthlyRent * 12;
 
   const estimatedExpenses =
-    property.operating_expenses !== null && property.operating_expenses !== undefined
+    property.operating_expenses !== null &&
+    property.operating_expenses !== undefined
       ? Number(property.operating_expenses || 0)
       : annualCurrentRent * 0.3 + Number(taxesAnnual || 0);
 
@@ -253,8 +283,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   const estimatedCapRate =
     Number(askingPrice) > 0 ? estimatedNoi / Number(askingPrice) : null;
-
-  const tagList = (tags || []).map((tag) => tag.tag);
 
   const locationLine =
     property.city || property.state || property.zip
@@ -271,12 +299,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     hasValue(property.net_operating_income);
 
   const hasBuildingDetails =
+    hasValue(property.year_built) ||
+    hasValue(property.sqft) ||
+    hasValue(property.lot_size) ||
+    hasValue(property.parcel_number) ||
     hasValue(property.basement) ||
     hasValue(property.roof) ||
     hasValue(property.exterior) ||
     hasValue(property.zoning) ||
     hasValue(property.parking) ||
     hasValue(property.heating) ||
+    hasValue(property.property_type) ||
     hasValue(property.cooling);
 
   const hasListingAgent =
@@ -284,6 +317,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     hasValue(property.listing_agent_phone);
 
   const googleMapsUrl = getGoogleMapsUrl(property);
+  const cookCountyTaxUrl = getCookCountyTaxUrl(property.parcel_number);
 
   return (
     <AppShell>
@@ -351,6 +385,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               Open in Google Maps
             </a>
           )}
+
+          <EditPropertyModal>
+            <PropertyEditForm property={property} />
+          </EditPropertyModal>
 
           {property.is_archived !== true && (
             <ArchivePropertyButton propertyId={id} />
@@ -467,66 +505,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <MobilityFmrCard
-        propertyId={id}
-        isMobilityArea={property.is_mobility_area}
-        mobilityCheckedAt={property.mobility_checked_at}
-        mobilityMatchedAddress={property.mobility_matched_address}
-        mobilityNotes={property.mobility_notes}
-        mobilityLat={property.mobility_lat}
-        mobilityLng={property.mobility_lng}
-      />
-
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <PropertyStatusUpdater
             propertyId={id}
             currentStatus={property.status}
           />
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Condition</p>
-          <p className="text-xl font-bold text-slate-950">
-            {property.condition || "Not entered"}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Property Type</p>
-          <p className="text-xl font-bold text-slate-950">
-            {property.property_type || "Not entered"}
-          </p>
-        </div>
-      </div>
-
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Year Built</p>
-          <p className="text-lg font-bold text-slate-950">
-            {valueOrDash(property.year_built)}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Sq Ft</p>
-          <p className="text-lg font-bold text-slate-950">
-            {formatNumber(property.sqft)}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Lot Size</p>
-          <p className="text-lg font-bold text-slate-950">
-            {valueOrDash(property.lot_size)}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">PIN / Parcel</p>
-          <p className="text-lg font-bold text-slate-950">
-            {valueOrDash(property.parcel_number)}
-          </p>
         </div>
       </div>
 
@@ -536,7 +520,55 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             Building Details
           </h3>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div>
+              <p className="text-sm text-slate-500">Year Built</p>
+              <p className="font-medium text-slate-950">
+                {valueOrDash(property.year_built)}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-500">Property Type</p>
+              <p className="font-medium text-slate-950">
+                {valueOrDash(property.property_type)}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-500">Sq Ft</p>
+              <p className="font-medium text-slate-950">
+                {formatNumber(property.sqft)}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-500">Lot Size</p>
+              <p className="font-medium text-slate-950">
+                {valueOrDash(property.lot_size)}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-slate-500">PIN / Parcel</p>
+
+              {cookCountyTaxUrl ? (
+                <a
+                  href={cookCountyTaxUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open Cook County property tax page"
+                  className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                >
+                  {formatCookCountyPin(property.parcel_number)}
+                </a>
+              ) : (
+                <p className="font-medium text-slate-950">
+                  {valueOrDash(property.parcel_number)}
+                </p>
+              )}
+            </div>
+
             <div>
               <p className="text-sm text-slate-500">Basement</p>
               <p className="font-medium text-slate-950">
@@ -613,22 +645,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <PropertyTags propertyId={id} />
-
-      <DealScoreCard
+      <DealAnalyzer
         askingPrice={askingPrice}
+        taxesAnnual={taxesAnnual}
+        insuranceAnnual={property.insurance_annual}
         projectedMonthlyRent={projectedMonthlyRent}
         totalRehab={totalRehab}
-        condition={property.condition}
-        tags={tagList}
       />
-
-      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-        <p className="mb-2 text-sm font-semibold text-slate-700">Notes</p>
-        <p className="whitespace-pre-wrap text-slate-700">
-          {property.notes || property.description || "No notes yet."}
-        </p>
-      </div>
 
       {property.broker_remarks && (
         <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
@@ -641,10 +664,19 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <PropertyEditForm property={property} />
-
       <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-        <h3 className="mb-4 text-lg font-semibold text-slate-950">Units</h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-950">Units</h3>
+            <p className="text-sm text-slate-500">
+              Track rent, rehab, and condition by unit.
+            </p>
+          </div>
+
+          <AddUnitModal>
+            <PropertyUnitForm propertyId={id} />
+          </AddUnitModal>
+        </div>
 
         {unitsError && (
           <p className="mb-4 text-sm text-red-600">
@@ -745,40 +777,19 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </table>
           </div>
         )}
-
-        {unitList.some((unit) => unit.appliances_features) && (
-          <div className="mt-4 rounded-lg bg-slate-50 p-4">
-            <p className="mb-2 text-sm font-semibold text-slate-700">
-              Appliances / Features
-            </p>
-
-            <div className="space-y-2 text-sm text-slate-700">
-              {unitList
-                .filter((unit) => unit.appliances_features)
-                .map((unit) => (
-                  <p key={`${unit.id}-features`}>
-                    <span className="font-medium">
-                      Unit {getUnitLabel(unit)}:
-                    </span>{" "}
-                    {unit.appliances_features}
-                  </p>
-                ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      <PropertyVisitLog propertyId={id} />
-
-      <DealAnalyzer
-        askingPrice={askingPrice}
-        taxesAnnual={taxesAnnual}
-        insuranceAnnual={property.insurance_annual}
-        projectedMonthlyRent={projectedMonthlyRent}
-        totalRehab={totalRehab}
+      <MobilityFmrCard
+        propertyId={id}
+        isMobilityArea={property.is_mobility_area}
+        mobilityCheckedAt={property.mobility_checked_at}
+        mobilityMatchedAddress={property.mobility_matched_address}
+        mobilityNotes={property.mobility_notes}
+        mobilityLat={property.mobility_lat}
+        mobilityLng={property.mobility_lng}
       />
 
-      <PropertyUnitForm propertyId={id} />
+      <PropertyVisitLog propertyId={id} />
     </AppShell>
   );
 }
