@@ -7,6 +7,7 @@ import { DealAnalyzer } from "@/components/DealAnalyzer";
 import { PropertyStatusUpdater } from "@/components/PropertyStatusUpdater";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { PropertyVisitLog } from "@/components/PropertyVisitLog";
 import { DeleteUnitButton } from "@/components/DeleteUnitButton";
 import { PropertyEditForm } from "@/components/PropertyEditForm";
@@ -51,8 +52,16 @@ type PropertyUnit = {
   appliances_features?: string | null;
   tenant_pays?: string | null;
 
+  water_included?: boolean | null;
+  electricity_included?: boolean | null;
+  gas_included?: boolean | null;
+
   created_at?: string | null;
 };
+
+const WATER_MONTHLY_PER_UNIT = 60;
+const ELECTRICITY_MONTHLY_PER_UNIT = 115;
+const GAS_MONTHLY_PER_UNIT = 115;
 
 function formatCurrency(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") {
@@ -91,6 +100,43 @@ function hasValue(value: unknown) {
   return value !== null && value !== undefined && value !== "";
 }
 
+function parseMoneyInput(value: FormDataEntryValue | null) {
+  const rawValue = String(value ?? "")
+    .replace(/[$,]/g, "")
+    .trim();
+
+  if (!rawValue) return null;
+
+  const numberValue = Number(rawValue);
+
+  if (!Number.isFinite(numberValue)) return null;
+
+  return numberValue;
+}
+
+function parseTextInput(value: FormDataEntryValue | null) {
+  const rawValue = String(value ?? "").trim();
+  return rawValue || null;
+}
+
+function parseDateInput(value: FormDataEntryValue | null) {
+  const rawValue = String(value ?? "").trim();
+  return rawValue || null;
+}
+
+function formatDateInput(value: string | null | undefined) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function getDefaultInsuranceAnnual(unitCount: number) {
+  if (unitCount === 2) return 2500;
+  if (unitCount === 3) return 3000;
+  if (unitCount === 4) return 3500;
+
+  return null;
+}
+
 function getGoogleMapsUrl(property: any) {
   const addressParts = [
     property.address,
@@ -104,7 +150,7 @@ function getGoogleMapsUrl(property: any) {
   if (!fullAddress) return null;
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    fullAddress
+    fullAddress,
   )}`;
 }
 
@@ -129,7 +175,7 @@ function formatCookCountyPin(parcelNumber: unknown) {
 
   return `${pin.slice(0, 2)}-${pin.slice(2, 4)}-${pin.slice(
     4,
-    7
+    7,
   )}-${pin.slice(7, 10)}-${pin.slice(10)}`;
 }
 
@@ -147,7 +193,11 @@ function getUnitBaths(unit: PropertyUnit) {
   const oldBaths = unit.baths;
 
   if (fullBaths !== null && fullBaths !== undefined) {
-    if (halfBaths !== null && halfBaths !== undefined && Number(halfBaths) > 0) {
+    if (
+      halfBaths !== null &&
+      halfBaths !== undefined &&
+      Number(halfBaths) > 0
+    ) {
       return `${fullBaths} full / ${halfBaths} half`;
     }
 
@@ -187,6 +237,24 @@ function getFmrUpside(unit: PropertyUnit) {
   return fmrNumber - currentRentNumber;
 }
 
+function getAnnualUtilityCost(unit: PropertyUnit) {
+  let monthlyCost = 0;
+
+  if (unit.water_included === true) monthlyCost += WATER_MONTHLY_PER_UNIT;
+  if (unit.electricity_included === true) {
+    monthlyCost += ELECTRICITY_MONTHLY_PER_UNIT;
+  }
+  if (unit.gas_included === true) monthlyCost += GAS_MONTHLY_PER_UNIT;
+
+  return monthlyCost * 12;
+}
+
+const inlineInputClass =
+  "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+
+const smallInlineInputClass =
+  "w-20 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+
 export default async function PropertyDetailPage({ params }: PageProps) {
   const supabase = await createClient();
 
@@ -200,6 +268,73 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   const { id } = await params;
 
+  async function updateBuildingFinancials(formData: FormData) {
+    "use server";
+
+    const updateSupabase = await createClient();
+
+    const updatedTaxesAnnual = parseMoneyInput(formData.get("taxes_annual"));
+    const updatedInsuranceAnnual = parseMoneyInput(
+      formData.get("insurance_annual"),
+    );
+
+    await updateSupabase
+      .from("properties")
+      .update({
+        taxes_annual: updatedTaxesAnnual,
+        insurance_annual: updatedInsuranceAnnual,
+      })
+      .eq("id", id);
+
+    revalidatePath(`/properties/${id}`);
+    revalidatePath("/pipeline");
+  }
+
+  async function updateUnitInline(formData: FormData) {
+    "use server";
+
+    const updateSupabase = await createClient();
+    const unitId = String(formData.get("unit_id") ?? "").trim();
+
+    if (!unitId) return;
+
+    const updatedUnitNumber = parseTextInput(formData.get("unit_number"));
+    const updatedCurrentRent = parseMoneyInput(formData.get("current_rent"));
+    const updatedBeds = parseMoneyInput(formData.get("bedrooms"));
+    const updatedFullBaths = parseMoneyInput(formData.get("full_baths"));
+
+    await updateSupabase
+      .from("property_units")
+      .update({
+        unit_number: updatedUnitNumber,
+        unit_label: updatedUnitNumber,
+        floor_number: parseTextInput(formData.get("floor_number")),
+        sqft: parseMoneyInput(formData.get("sqft")),
+        rooms: parseMoneyInput(formData.get("rooms")),
+        bedrooms: updatedBeds,
+        beds: updatedBeds,
+        full_baths: updatedFullBaths,
+        baths: updatedFullBaths,
+        half_baths: parseMoneyInput(formData.get("half_baths")),
+        current_rent: updatedCurrentRent,
+        rent: updatedCurrentRent,
+        projected_rent: parseMoneyInput(formData.get("projected_rent")),
+        fmr_rent: parseMoneyInput(formData.get("fmr_rent")),
+        lease_expiration: parseDateInput(formData.get("lease_expiration")),
+        tenant_pays: parseTextInput(formData.get("tenant_pays")),
+        condition: parseTextInput(formData.get("condition")),
+        rehab_estimate: parseMoneyInput(formData.get("rehab_estimate")),
+        water_included: formData.has("water_included"),
+        electricity_included: formData.has("electricity_included"),
+        gas_included: formData.has("gas_included"),
+      })
+      .eq("id", unitId)
+      .eq("property_id", id);
+
+    revalidatePath(`/properties/${id}`);
+    revalidatePath("/pipeline");
+  }
+
   const { data: property, error: propertyError } = await supabase
     .from("properties")
     .select("*")
@@ -211,11 +346,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     .select("*")
     .eq("property_id", id)
     .order("created_at", { ascending: true });
-
-  const { data: tags } = await supabase
-    .from("property_tags")
-    .select("tag")
-    .eq("property_id", id);
 
   if (propertyError || !property) {
     return (
@@ -241,30 +371,40 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   const askingPrice = property.asking_price ?? property.list_price ?? null;
   const taxesAnnual = property.taxes_annual ?? property.taxes ?? null;
+  const unitCount = unitList.length;
+  const defaultInsuranceAnnual = getDefaultInsuranceAnnual(unitCount);
+  const insuranceAnnual = hasValue(property.insurance_annual)
+    ? property.insurance_annual
+    : defaultInsuranceAnnual;
 
   const projectedMonthlyRent = unitList.reduce(
     (sum, unit) => sum + Number(getProjectedRent(unit) || 0),
-    0
+    0,
   );
 
   const currentMonthlyRent = unitList.reduce(
     (sum, unit) => sum + Number(getCurrentRent(unit) || 0),
-    0
+    0,
   );
 
   const totalRehab = unitList.reduce(
     (sum, unit) => sum + Number(unit.rehab_estimate || 0),
-    0
+    0,
   );
 
   const totalFmrRent = unitList.reduce(
     (sum, unit) => sum + Number(unit.fmr_rent || 0),
-    0
+    0,
   );
 
   const totalFmrUpside = unitList.reduce(
     (sum, unit) => sum + Number(getFmrUpside(unit) || 0),
-    0
+    0,
+  );
+
+  const annualUtilities = unitList.reduce(
+    (sum, unit) => sum + getAnnualUtilityCost(unit),
+    0,
   );
 
   const annualCurrentRent = currentMonthlyRent * 12;
@@ -273,7 +413,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     property.operating_expenses !== null &&
     property.operating_expenses !== undefined
       ? Number(property.operating_expenses || 0)
-      : annualCurrentRent * 0.3 + Number(taxesAnnual || 0);
+      : annualCurrentRent * 0.3 +
+        Number(taxesAnnual || 0) +
+        Number(insuranceAnnual || 0) +
+        Number(annualUtilities || 0);
 
   const estimatedNoi =
     property.net_operating_income !== null &&
@@ -310,7 +453,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     hasValue(property.parking) ||
     hasValue(property.heating) ||
     hasValue(property.property_type) ||
-    hasValue(property.cooling);
+    hasValue(property.cooling) ||
+    hasValue(taxesAnnual) ||
+    hasValue(insuranceAnnual) ||
+    annualUtilities > 0 ||
+    unitCount > 0;
 
   const hasListingAgent =
     hasValue(property.listing_agent_name) ||
@@ -393,6 +540,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           {property.is_archived !== true && (
             <ArchivePropertyButton propertyId={id} />
           )}
+
+          <div className="relative -top-3 min-w-[220px] max-w-xs">
+            <PropertyStatusUpdater
+              propertyId={id}
+              currentStatus={property.status}
+            />
+          </div>
         </div>
       </div>
 
@@ -404,29 +558,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Projected Rent</p>
-          <p className="text-2xl font-bold text-slate-950">
-            {formatCurrency(projectedMonthlyRent)}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Current Rent</p>
-          <p className="text-2xl font-bold text-slate-950">
-            {formatCurrency(currentMonthlyRent)}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Estimated Rehab</p>
-          <p className="text-2xl font-bold text-slate-950">
-            {formatCurrency(totalRehab)}
-          </p>
-        </div>
-      </div>
-
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
           <p className="text-sm text-slate-500">Annual Rent</p>
           <p className="text-xl font-bold text-slate-950">
@@ -447,29 +578,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             {estimatedCapRate !== null
               ? `${(estimatedCapRate * 100).toFixed(2)}%`
               : "Not entered"}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Taxes</p>
-          <p className="text-xl font-bold text-slate-950">
-            {formatCurrency(taxesAnnual)}
-          </p>
-        </div>
-      </div>
-
-      <div className="mb-6 grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Total FMR Rent</p>
-          <p className="text-2xl font-bold text-slate-950">
-            {formatCurrency(totalFmrRent)}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Total FMR Upside</p>
-          <p className="text-2xl font-bold text-slate-950">
-            {formatCurrency(totalFmrUpside)}
           </p>
         </div>
       </div>
@@ -505,20 +613,19 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <PropertyStatusUpdater
-            propertyId={id}
-            currentStatus={property.status}
-          />
-        </div>
-      </div>
-
       {hasBuildingDetails && (
         <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-4 text-lg font-semibold text-slate-950">
-            Building Details
-          </h3>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-950">
+                Building Details
+              </h3>
+            </div>
+
+            <EditPropertyModal>
+              <PropertyEditForm property={property} />
+            </EditPropertyModal>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-4">
             <div>
@@ -618,6 +725,69 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               </p>
             </div>
           </div>
+
+          <div className="mt-6 border-t border-slate-200 pt-5">
+            <form
+              action={updateBuildingFinancials}
+              className="flex flex-wrap items-end gap-4"
+            >
+              <div className="min-w-[180px] flex-1">
+                <label
+                  htmlFor="taxes_annual"
+                  className="mb-1 block text-sm font-medium text-slate-700"
+                >
+                  Annual Taxes
+                </label>
+                <input
+                  id="taxes_annual"
+                  name="taxes_annual"
+                  type="number"
+                  min="0"
+                  step="1"
+                  defaultValue={
+                    hasValue(taxesAnnual) ? Number(taxesAnnual) : ""
+                  }
+                  placeholder="Annual taxes"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                />
+              </div>
+
+              <div className="min-w-[180px] flex-1">
+                <label
+                  htmlFor="insurance_annual"
+                  className="mb-1 block text-sm font-medium text-slate-700"
+                >
+                  Annual Insurance
+                </label>
+                <input
+                  id="insurance_annual"
+                  name="insurance_annual"
+                  type="number"
+                  min="0"
+                  step="1"
+                  defaultValue={
+                    hasValue(insuranceAnnual) ? Number(insuranceAnnual) : ""
+                  }
+                  placeholder="Annual insurance"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                />
+              </div>
+
+              <div className="min-w-[160px] pb-2">
+                <p className="text-sm text-slate-500">Annual Utilities</p>
+                <p className="text-lg font-bold text-slate-950">
+                  {formatCurrency(annualUtilities)}
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Save
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
@@ -648,7 +818,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       <DealAnalyzer
         askingPrice={askingPrice}
         taxesAnnual={taxesAnnual}
-        insuranceAnnual={property.insurance_annual}
+        insuranceAnnual={insuranceAnnual}
         projectedMonthlyRent={projectedMonthlyRent}
         totalRehab={totalRehab}
       />
@@ -669,7 +839,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           <div>
             <h3 className="text-lg font-semibold text-slate-950">Units</h3>
             <p className="text-sm text-slate-500">
-              Track rent, rehab, and condition by unit.
+              Edit rent, rehab, condition, and owner-paid utilities by unit.
             </p>
           </div>
 
@@ -688,91 +858,286 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           <p className="text-sm text-slate-500">No units added yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-left text-sm">
+            <table className="w-full min-w-[1800px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="py-2">Unit</th>
-                  <th className="py-2">Floor</th>
-                  <th className="py-2">Sq Ft</th>
-                  <th className="py-2">Rooms</th>
-                  <th className="py-2">Beds</th>
-                  <th className="py-2">Baths</th>
-                  <th className="py-2">Current Rent</th>
-                  <th className="py-2">Projected Rent</th>
-                  <th className="py-2">FMR</th>
-                  <th className="py-2">FMR Upside</th>
-                  <th className="py-2">Lease Exp.</th>
-                  <th className="py-2">Tenant Pays</th>
-                  <th className="py-2">Condition</th>
-                  <th className="py-2">Rehab</th>
+                  <th className="py-2 pr-2">Unit</th>
+                  <th className="py-2 pr-2">Floor</th>
+                  <th className="py-2 pr-2">Sq Ft</th>
+                  <th className="py-2 pr-2">Rooms</th>
+                  <th className="py-2 pr-2">Beds</th>
+                  <th className="py-2 pr-2">Full</th>
+                  <th className="py-2 pr-2">Half</th>
+                  <th className="py-2 pr-2">Current Rent</th>
+                  <th className="py-2 pr-2">Projected Rent</th>
+                  <th className="py-2 pr-2">FMR</th>
+                  <th className="py-2 pr-2">Lease Exp.</th>
+                  <th className="py-2 pr-2">Condition</th>
+                  <th className="py-2 pr-2">Rehab</th>
+                  <th className="py-2 pr-2 text-center">W</th>
+                  <th className="py-2 pr-2 text-center">E</th>
+                  <th className="py-2 pr-2 text-center">G</th>
+                  <th className="py-2 pr-2">Utilities/Yr</th>
                   <th className="py-2">Actions</th>
                 </tr>
               </thead>
 
               <tbody>
-                {unitList.map((unit) => (
-                  <tr key={unit.id} className="border-b border-slate-100">
-                    <td className="py-3 font-medium text-slate-950">
-                      {getUnitLabel(unit)}
-                    </td>
+                {unitList.map((unit) => {
+                  const formId = `unit-inline-form-${unit.id}`;
+                  const unitAnnualUtilities = getAnnualUtilityCost(unit);
 
-                    <td className="py-3 text-slate-700">
-                      {valueOrDash(unit.floor_number)}
-                    </td>
+                  return (
+                    <tr key={unit.id} className="border-b border-slate-100">
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="unit_number"
+                          defaultValue={getUnitLabel(unit)}
+                          className={smallInlineInputClass}
+                          aria-label="Unit number"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {formatNumber(unit.sqft)}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="floor_number"
+                          defaultValue={unit.floor_number || ""}
+                          className={smallInlineInputClass}
+                          aria-label="Floor number"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {valueOrDash(unit.rooms)}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="sqft"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(unit.sqft) ? Number(unit.sqft) : ""
+                          }
+                          className={smallInlineInputClass}
+                          aria-label="Sq Ft"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {valueOrDash(getUnitBeds(unit))}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="rooms"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(unit.rooms) ? Number(unit.rooms) : ""
+                          }
+                          className={smallInlineInputClass}
+                          aria-label="Rooms"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {getUnitBaths(unit)}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="bedrooms"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(getUnitBeds(unit))
+                              ? Number(getUnitBeds(unit))
+                              : ""
+                          }
+                          className={smallInlineInputClass}
+                          aria-label="Bedrooms"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {formatCurrency(getCurrentRent(unit))}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="full_baths"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(unit.full_baths)
+                              ? Number(unit.full_baths)
+                              : ""
+                          }
+                          className={smallInlineInputClass}
+                          aria-label="Full baths"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {formatCurrency(getProjectedRent(unit))}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="half_baths"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(unit.half_baths)
+                              ? Number(unit.half_baths)
+                              : ""
+                          }
+                          className={smallInlineInputClass}
+                          aria-label="Half baths"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {formatCurrency(unit.fmr_rent)}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="current_rent"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(getCurrentRent(unit))
+                              ? Number(getCurrentRent(unit))
+                              : ""
+                          }
+                          className={inlineInputClass}
+                          aria-label="Current rent"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {formatCurrency(getFmrUpside(unit))}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="projected_rent"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(getProjectedRent(unit))
+                              ? Number(getProjectedRent(unit))
+                              : ""
+                          }
+                          className={inlineInputClass}
+                          aria-label="Projected rent"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {valueOrDash(unit.lease_expiration)}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="fmr_rent"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(unit.fmr_rent) ? Number(unit.fmr_rent) : ""
+                          }
+                          className={inlineInputClass}
+                          aria-label="FMR rent"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {valueOrDash(unit.tenant_pays)}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="lease_expiration"
+                          type="date"
+                          defaultValue={formatDateInput(unit.lease_expiration)}
+                          className={inlineInputClass}
+                          aria-label="Lease expiration"
+                        />
+                      </td>
 
-                    <td className="py-3 text-slate-700">
-                      {unit.condition || "-"}
-                    </td>
+        
 
-                    <td className="py-3 text-slate-700">
-                      {formatCurrency(unit.rehab_estimate)}
-                    </td>
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="condition"
+                          defaultValue={unit.condition || ""}
+                          className={inlineInputClass}
+                          aria-label="Condition"
+                        />
+                      </td>
 
-                    <td className="py-3">
-                      <DeleteUnitButton unitId={unit.id} />
-                    </td>
-                  </tr>
-                ))}
+                      <td className="py-3 pr-2">
+                        <input
+                          form={formId}
+                          name="rehab_estimate"
+                          type="number"
+                          min="0"
+                          step="1"
+                          defaultValue={
+                            hasValue(unit.rehab_estimate)
+                              ? Number(unit.rehab_estimate)
+                              : ""
+                          }
+                          className={inlineInputClass}
+                          aria-label="Rehab estimate"
+                        />
+                      </td>
+
+                      <td className="py-3 pr-2 text-center">
+                        <input
+                          form={formId}
+                          name="water_included"
+                          type="checkbox"
+                          defaultChecked={unit.water_included === true}
+                          className="h-4 w-4 rounded border-slate-300"
+                          aria-label="Owner pays water"
+                        />
+                      </td>
+
+                      <td className="py-3 pr-2 text-center">
+                        <input
+                          form={formId}
+                          name="electricity_included"
+                          type="checkbox"
+                          defaultChecked={unit.electricity_included === true}
+                          className="h-4 w-4 rounded border-slate-300"
+                          aria-label="Owner pays electricity"
+                        />
+                      </td>
+
+                      <td className="py-3 pr-2 text-center">
+                        <input
+                          form={formId}
+                          name="gas_included"
+                          type="checkbox"
+                          defaultChecked={unit.gas_included === true}
+                          className="h-4 w-4 rounded border-slate-300"
+                          aria-label="Owner pays gas"
+                        />
+                      </td>
+
+                      <td className="py-3 pr-2 font-medium text-slate-700">
+                        {formatCurrency(unitAnnualUtilities)}
+                      </td>
+
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <form id={formId} action={updateUnitInline}>
+                            <input
+                              type="hidden"
+                              name="unit_id"
+                              value={unit.id}
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                            >
+                              Save
+                            </button>
+                          </form>
+
+                          <DeleteUnitButton unitId={unit.id} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
