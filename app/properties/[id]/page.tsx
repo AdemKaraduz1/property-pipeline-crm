@@ -864,7 +864,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                   <th className="py-2 pr-2">Unit</th>
                   <th className="py-2 pr-2">Floor</th>
                   <th className="py-2 pr-2">Sq Ft</th>
-                  <th className="py-2 pr-2">Rooms</th>
                   <th className="py-2 pr-2">Beds</th>
                   <th className="py-2 pr-2">Full</th>
                   <th className="py-2 pr-2">Half</th>
@@ -924,20 +923,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </td>
 
-                      <td className="py-3 pr-2">
-                        <input
-                          form={formId}
-                          name="rooms"
-                          type="number"
-                          min="0"
-                          step="1"
-                          defaultValue={
-                            hasValue(unit.rooms) ? Number(unit.rooms) : ""
-                          }
-                          className={smallInlineInputClass}
-                          aria-label="Rooms"
-                        />
-                      </td>
+                 
 
                       <td className="py-3 pr-2">
                         <input
@@ -1050,7 +1036,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </td>
 
-        
+
 
                       <td className="py-3 pr-2">
                         <input
