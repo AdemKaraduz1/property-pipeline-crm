@@ -13,7 +13,7 @@ OPENAI_API_KEY=
 Optional model overrides:
 
 ```bash
-OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
 OPENAI_EXTRACTION_MODEL=gpt-5.4-mini
 ```
 

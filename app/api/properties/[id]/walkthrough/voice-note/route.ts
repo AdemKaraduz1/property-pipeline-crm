@@ -54,6 +54,28 @@ function getResponseOutputText(value: unknown) {
   return null;
 }
 
+function cleanWalkthroughNote(notes: string) {
+  const cleaned = notes
+    .trim()
+    .replace(
+      /\b(?:the\s+)?speaker\s+(?:stated|states|said|says|mentioned|mentions|noted|notes|reported|reports|indicated|indicates)\s+(?:that\s+)?/gi,
+      "",
+    )
+    .replace(
+      /\b(?:the\s+)?(?:transcript|voice note|recording)\s+(?:stated|states|said|says|mentioned|mentions|noted|notes|reported|reports|indicated|indicates)\s+(?:that\s+)?/gi,
+      "",
+    )
+    .replace(
+      /\.\s+(?:a\s+)?(\$[\d,]+(?:\.\d{2})?(?:\s+[A-Za-z][\w-]*){0,3}\.)$/i,
+      " - $1",
+    )
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+
+  return cleaned ? cleaned[0].toUpperCase() + cleaned.slice(1) : "";
+}
+
 function normalizeSuggestion(value: unknown): VoiceSuggestion {
   const suggestion =
     value && typeof value === "object"
@@ -72,7 +94,10 @@ function normalizeSuggestion(value: unknown): VoiceSuggestion {
           : null,
     estimatedCost:
       cost !== null && Number.isFinite(cost) && cost >= 0 ? cost : null,
-    notes: typeof suggestion.notes === "string" ? suggestion.notes.trim() : "",
+    notes:
+      typeof suggestion.notes === "string"
+        ? cleanWalkthroughNote(suggestion.notes)
+        : "",
   };
 }
 
@@ -234,7 +259,7 @@ export async function POST(
   transcriptionBody.append("file", audio, audio.name || "voice-note.webm");
   transcriptionBody.append(
     "model",
-    process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-transcribe",
+    process.env.OPENAI_TRANSCRIPTION_MODEL || "gpt-4o-mini-transcribe",
   );
   transcriptionBody.append(
     "prompt",
@@ -309,7 +334,7 @@ export async function POST(
           {
             role: "system",
             content:
-              "Extract a property walkthrough note. Never invent a repair cost. Set estimatedCost to null unless the speaker states a specific amount or clear numeric range; for a range, use its midpoint and mention the range in notes. Set needsRehab only when the speaker clearly says work is or is not needed. Keep notes concise but preserve observed defects, materials, measurements, and proposed work.",
+              "Extract a property walkthrough note. Write notes as direct property observations, not transcript summaries. Do not refer to the speaker, transcript, recording, or voice note. Never write phrases like \"speaker stated\", \"the speaker said\", or \"the transcript mentions\". If a repair cost is stated, include it inline after a dash or semicolon, for example: \"Gutter needs rehab - $5,000.\" Never invent a repair cost. Set estimatedCost to null unless the speaker states a specific amount or clear numeric range; for a range, use its midpoint and mention the range directly in notes. Set needsRehab only when the speaker clearly says work is or is not needed. Keep notes concise but preserve observed defects, materials, measurements, and proposed work.",
           },
           {
             role: "user",
