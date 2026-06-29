@@ -463,6 +463,56 @@ function extractListingDataFromPage() {
     return "";
   }
 
+  function getExactFromPairs(pairs, labels) {
+    const pairEntries = Object.entries(pairs);
+    const normalizedLabels = labels.map((label) =>
+      label.toLowerCase().replace(/[:*]/g, "").replace(/\s+/g, " ").trim()
+    );
+
+    const found = pairEntries.find(([label]) =>
+      normalizedLabels.includes(
+        label.toLowerCase().replace(/[:*]/g, "").replace(/\s+/g, " ").trim()
+      )
+    );
+
+    return found ? found[1] : "";
+  }
+
+  function findCurrentPriceNearAddress(addressText) {
+    const normalizedAddress = cleanText(addressText);
+
+    if (!normalizedAddress) return "";
+
+    const pricePattern = /\$[\d,]{4,}(?:\.\d{2})?/g;
+    const candidates = [];
+
+    document.querySelectorAll("body *").forEach((element) => {
+      const text = cleanText(element.innerText);
+
+      if (!text || !text.includes(normalizedAddress)) return;
+
+      let container = element;
+
+      for (let depth = 0; depth < 6 && container; depth += 1) {
+        const containerText = cleanText(container.innerText);
+        const prices = containerText.match(pricePattern) || [];
+
+        if (prices.length > 0 && containerText.length < 1500) {
+          candidates.push({
+            price: prices[0],
+            textLength: containerText.length
+          });
+        }
+
+        container = container.parentElement;
+      }
+    });
+
+    candidates.sort((a, b) => a.textLength - b.textLength);
+
+    return candidates[0]?.price || "";
+  }
+
   function parseUnitInformation() {
     function makeEmptyUnit() {
       return {
@@ -646,6 +696,111 @@ function extractListingDataFromPage() {
       );
     }
 
+    function isUnitStart(value) {
+      return /^\d+[A-Z]?$/.test(value);
+    }
+
+    function isMoneyish(value) {
+      return /^\$?[\d,]+(?:\.\d{2})?$/.test(value);
+    }
+
+    function isLeaseDate(value) {
+      return /^(?:M\/M|\d{1,2}\/\d{1,4})$/i.test(value);
+    }
+
+    function isSmallInteger(value) {
+      return /^\d{1,2}$/.test(value);
+    }
+
+    function isLikelySqft(value) {
+      const numericValue = Number(String(value || "").replace(/,/g, ""));
+      return Number.isFinite(numericValue) && numericValue >= 100;
+    }
+
+    function makeUnitsFromColumnMajorLines(lines, tenantPaysIndex) {
+      const values = lines.slice(tenantPaysIndex + 1);
+      const parsedUnits = [];
+      let lineIndex = 0;
+
+      while (lineIndex < values.length) {
+        if (!isUnitStart(values[lineIndex]) || !isSmallInteger(values[lineIndex + 1])) {
+          break;
+        }
+
+        const unit = makeEmptyUnit();
+        unit.unitNumber = values[lineIndex] || "";
+        unit.floorNumber = values[lineIndex + 1] || "";
+        lineIndex += 2;
+
+        if (isLikelySqft(values[lineIndex])) {
+          unit.sqft = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (isSmallInteger(values[lineIndex])) {
+          unit.rooms = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (isSmallInteger(values[lineIndex])) {
+          unit.bedrooms = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (isSmallInteger(values[lineIndex])) {
+          unit.fullBaths = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (isSmallInteger(values[lineIndex])) {
+          unit.halfBaths = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (
+          values[lineIndex] &&
+          !isMoneyish(values[lineIndex]) &&
+          !isLeaseDate(values[lineIndex])
+        ) {
+          unit.masterBedroomBath = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (isMoneyish(values[lineIndex])) {
+          unit.securityDeposit = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (isMoneyish(values[lineIndex])) {
+          unit.rent = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (isLeaseDate(values[lineIndex])) {
+          unit.leaseExpiration = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (values[lineIndex] && !isUnitStart(values[lineIndex])) {
+          unit.appliancesFeatures = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (values[lineIndex] && !isUnitStart(values[lineIndex])) {
+          unit.tenantPays = values[lineIndex] || "";
+          lineIndex += 1;
+        }
+
+        if (unit.unitNumber && hasMeaningfulUnitData(unit)) {
+          parsedUnits.push(unit);
+        }
+
+        if (parsedUnits.length > 50) break;
+      }
+
+      return parsedUnits;
+    }
+
     function makeUnitFromCells(cells) {
       const cleanedCells = cells.map(cleanText);
 
@@ -761,80 +916,22 @@ function extractListingDataFromPage() {
       return transposedLineUnits;
     }
 
+    const tenantPaysIndex = lines.findIndex(
+      (line, index) => index > startIndex && /Tenant Pays/i.test(line)
+    );
+    const columnMajorUnits =
+      tenantPaysIndex === -1 ? [] : makeUnitsFromColumnMajorLines(lines, tenantPaysIndex);
+
+    if (columnMajorUnits.length > 0) {
+      return columnMajorUnits;
+    }
+
     if (units.length > 0) {
       return units;
     }
 
     if (startIndex === -1) return [];
-
-    const tenantPaysIndex = lines.findIndex(
-      (line, index) => index > startIndex && /Tenant Pays/i.test(line)
-    );
-
-    if (tenantPaysIndex === -1) return [];
-
-    let i = tenantPaysIndex + 1;
-
-    function isUnitStart(value) {
-      return /^\d+[A-Z]?$/.test(value);
-    }
-
-    function isMoneyish(value) {
-      return /^\$?[\d,]+(?:\.\d{2})?$/.test(value);
-    }
-
-    function isLeaseDate(value) {
-      return /^\d{1,2}\/\d{1,4}$/.test(value);
-    }
-
-    while (i < lines.length) {
-      if (!isUnitStart(lines[i])) {
-        break;
-      }
-
-      const firstEight = lines.slice(i, i + 8);
-
-      if (firstEight.length < 8) break;
-
-      const unit = {
-        unitNumber: firstEight[0] || "",
-        floorNumber: firstEight[1] || "",
-        sqft: firstEight[2] || "",
-        rooms: firstEight[3] || "",
-        bedrooms: firstEight[4] || "",
-        fullBaths: firstEight[5] || "",
-        halfBaths: firstEight[6] || "",
-        masterBedroomBath: firstEight[7] || "",
-        securityDeposit: "",
-        rent: "",
-        leaseExpiration: "",
-        appliancesFeatures: "",
-        tenantPays: ""
-      };
-
-      i += 8;
-
-      if (isMoneyish(lines[i]) && isMoneyish(lines[i + 1]) && isLeaseDate(lines[i + 2])) {
-        unit.securityDeposit = lines[i];
-        unit.rent = lines[i + 1];
-        unit.leaseExpiration = lines[i + 2];
-        i += 3;
-      } else if (isMoneyish(lines[i]) && isLeaseDate(lines[i + 1])) {
-        unit.rent = lines[i];
-        unit.leaseExpiration = lines[i + 1];
-        i += 2;
-      }
-
-      unit.appliancesFeatures = lines[i] || "";
-      unit.tenantPays = lines[i + 1] || "";
-      i += 2;
-
-      units.push(unit);
-
-      if (units.length > 50) break;
-    }
-
-    return units;
+    return [];
   }
 
   const jsonLdItems = parseJsonLd();
@@ -857,12 +954,6 @@ function extractListingDataFromPage() {
             .join(", ")
         : "";
 
-  const description =
-    getMeta("description") ||
-    getMeta("og:description") ||
-    getFromPairs(labelValuePairs, ["remarks", "description", "public remarks"]) ||
-    "";
-
   const address =
     jsonAddress ||
     getMeta("og:title") ||
@@ -871,7 +962,10 @@ function extractListingDataFromPage() {
       /^(.+\b(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Place|Pl|Court|Ct|Boulevard|Blvd|Lane|Ln|Way|Terrace|Ter|Circle|Cir).*)$/im
     ]);
 
+  const currentPriceNearAddress = findCurrentPriceNearAddress(address);
+
   const listPrice =
+    currentPriceNearAddress ||
     jsonListing.offers?.price ||
     getMeta("product:price:amount") ||
     getFromPairs(labelValuePairs, ["list price", "price"]) ||
@@ -986,6 +1080,13 @@ function extractListingDataFromPage() {
     "private remarks",
     "additional remarks"
   ]);
+
+  const description =
+    brokerRemarks ||
+    getExactFromPairs(labelValuePairs, ["Public Remarks", "Remarks"]) ||
+    getMeta("description") ||
+    getMeta("og:description") ||
+    "";
 
   const listingAgentName = getFromPairs(labelValuePairs, [
     "listing agent",
