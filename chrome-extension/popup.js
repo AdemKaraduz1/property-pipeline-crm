@@ -464,6 +464,110 @@ function extractListingDataFromPage() {
   }
 
   function parseUnitInformation() {
+    function makeEmptyUnit() {
+      return {
+        unitNumber: "",
+        floorNumber: "",
+        sqft: "",
+        rooms: "",
+        bedrooms: "",
+        fullBaths: "",
+        halfBaths: "",
+        masterBedroomBath: "",
+        securityDeposit: "",
+        rent: "",
+        leaseExpiration: "",
+        appliancesFeatures: "",
+        tenantPays: ""
+      };
+    }
+
+    function assignUnitField(unit, label, value) {
+      const normalizedLabel = cleanText(label)
+        .toLowerCase()
+        .replace(/[#$.]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!normalizedLabel) return;
+
+      if (/^unit\b/.test(normalizedLabel)) {
+        unit.unitNumber = value;
+      } else if (/^floor\b/.test(normalizedLabel)) {
+        unit.floorNumber = value;
+      } else if (/^sq ft\b|square feet|sqft/.test(normalizedLabel)) {
+        unit.sqft = value;
+      } else if (/rooms/.test(normalizedLabel)) {
+        unit.rooms = value;
+      } else if (/bdrms|bedrooms|beds/.test(normalizedLabel)) {
+        unit.bedrooms = value;
+      } else if (/full baths/.test(normalizedLabel)) {
+        unit.fullBaths = value;
+      } else if (/half baths/.test(normalizedLabel)) {
+        unit.halfBaths = value;
+      } else if (/master bedroom bath/.test(normalizedLabel)) {
+        unit.masterBedroomBath = value;
+      } else if (/sec deposit|security deposit/.test(normalizedLabel)) {
+        unit.securityDeposit = value;
+      } else if (/^rent\b/.test(normalizedLabel)) {
+        unit.rent = value;
+      } else if (/lease exp/.test(normalizedLabel)) {
+        unit.leaseExpiration = value;
+      } else if (/appliances|features/.test(normalizedLabel)) {
+        unit.appliancesFeatures = value;
+      } else if (/tenant pays/.test(normalizedLabel)) {
+        unit.tenantPays = value;
+      }
+    }
+
+    function hasMeaningfulUnitData(unit) {
+      return Boolean(
+        unit.floorNumber ||
+          unit.sqft ||
+          unit.rooms ||
+          unit.bedrooms ||
+          unit.fullBaths ||
+          unit.halfBaths ||
+          unit.masterBedroomBath ||
+          unit.securityDeposit ||
+          unit.rent ||
+          unit.leaseExpiration ||
+          unit.appliancesFeatures ||
+          unit.tenantPays
+      );
+    }
+
+    function makeUnitsFromTransposedRows(rows) {
+      const rowCells = rows
+        .map((row) => [...row.querySelectorAll("td, th")].map((cell) => cleanText(cell.innerText)))
+        .filter((cells) => cells.length >= 2);
+
+      const hasUnitNumberRow = rowCells.some((cells) => /^Unit\s*#?$/i.test(cells[0]));
+      const hasTenantPaysRow = rowCells.some((cells) => /Tenant Pays/i.test(cells[0]));
+      const hasRentRow = rowCells.some((cells) => /^Rent\s*\$?$/i.test(cells[0]));
+
+      if (!hasUnitNumberRow || (!hasTenantPaysRow && !hasRentRow)) {
+        return [];
+      }
+
+      const maxColumnCount = Math.max(...rowCells.map((cells) => cells.length));
+      const transposedUnits = [];
+
+      for (let columnIndex = 1; columnIndex < maxColumnCount; columnIndex += 1) {
+        const unit = makeEmptyUnit();
+
+        rowCells.forEach((cells) => {
+          assignUnitField(unit, cells[0], cleanText(cells[columnIndex] || ""));
+        });
+
+        if (unit.unitNumber && hasMeaningfulUnitData(unit)) {
+          transposedUnits.push(unit);
+        }
+      }
+
+      return transposedUnits;
+    }
+
     function makeUnitFromCells(cells) {
       const cleanedCells = cells.map(cleanText);
 
@@ -539,6 +643,12 @@ function extractListingDataFromPage() {
       if (!looksLikeUnitTable) return;
 
       const rows = [...table.querySelectorAll("tr")];
+      const transposedUnits = makeUnitsFromTransposedRows(rows);
+
+      if (transposedUnits.length > 0) {
+        units.push(...transposedUnits);
+        return;
+      }
 
       rows.forEach((row) => {
         const cells = [...row.querySelectorAll("td, th")].map((cell) =>
