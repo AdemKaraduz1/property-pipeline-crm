@@ -291,46 +291,50 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     revalidatePath("/pipeline");
   }
 
-  async function updateUnitInline(formData: FormData) {
+  async function updateAllUnits(formData: FormData) {
     "use server";
 
     const updateSupabase = await createClient();
-    const unitId = String(formData.get("unit_id") ?? "").trim();
+    const unitIds = formData
+      .getAll("unit_id")
+      .map((value) => String(value).trim())
+      .filter(Boolean);
 
-    if (!unitId) return;
+    for (const unitId of unitIds) {
+      const field = (name: string) => formData.get(`${unitId}__${name}`);
+      const updatedUnitNumber = parseTextInput(field("unit_number"));
+      const updatedCurrentRent = parseMoneyInput(field("current_rent"));
+      const updatedBeds = parseMoneyInput(field("bedrooms"));
+      const updatedFullBaths = parseMoneyInput(field("full_baths"));
 
-    const updatedUnitNumber = parseTextInput(formData.get("unit_number"));
-    const updatedCurrentRent = parseMoneyInput(formData.get("current_rent"));
-    const updatedBeds = parseMoneyInput(formData.get("bedrooms"));
-    const updatedFullBaths = parseMoneyInput(formData.get("full_baths"));
-
-    await updateSupabase
-      .from("property_units")
-      .update({
-        unit_number: updatedUnitNumber,
-        unit_label: updatedUnitNumber,
-        floor_number: parseTextInput(formData.get("floor_number")),
-        sqft: parseMoneyInput(formData.get("sqft")),
-        rooms: parseMoneyInput(formData.get("rooms")),
-        bedrooms: updatedBeds,
-        beds: updatedBeds,
-        full_baths: updatedFullBaths,
-        baths: updatedFullBaths,
-        half_baths: parseMoneyInput(formData.get("half_baths")),
-        current_rent: updatedCurrentRent,
-        rent: updatedCurrentRent,
-        projected_rent: parseMoneyInput(formData.get("projected_rent")),
-        fmr_rent: parseMoneyInput(formData.get("fmr_rent")),
-        lease_expiration: parseDateInput(formData.get("lease_expiration")),
-        tenant_pays: parseTextInput(formData.get("tenant_pays")),
-        condition: parseTextInput(formData.get("condition")),
-        rehab_estimate: parseMoneyInput(formData.get("rehab_estimate")),
-        water_included: formData.has("water_included"),
-        electricity_included: formData.has("electricity_included"),
-        gas_included: formData.has("gas_included"),
-      })
-      .eq("id", unitId)
-      .eq("property_id", id);
+      await updateSupabase
+        .from("property_units")
+        .update({
+          unit_number: updatedUnitNumber,
+          unit_label: updatedUnitNumber,
+          floor_number: parseTextInput(field("floor_number")),
+          sqft: parseMoneyInput(field("sqft")),
+          bedrooms: updatedBeds,
+          beds: updatedBeds,
+          full_baths: updatedFullBaths,
+          baths: updatedFullBaths,
+          half_baths: parseMoneyInput(field("half_baths")),
+          current_rent: updatedCurrentRent,
+          rent: updatedCurrentRent,
+          projected_rent: parseMoneyInput(field("projected_rent")),
+          fmr_rent: parseMoneyInput(field("fmr_rent")),
+          lease_expiration: parseDateInput(field("lease_expiration")),
+          condition: parseTextInput(field("condition")),
+          rehab_estimate: parseMoneyInput(field("rehab_estimate")),
+          water_included: formData.has(`${unitId}__water_included`),
+          electricity_included: formData.has(
+            `${unitId}__electricity_included`,
+          ),
+          gas_included: formData.has(`${unitId}__gas_included`),
+        })
+        .eq("id", unitId)
+        .eq("property_id", id);
+    }
 
     revalidatePath(`/properties/${id}`);
     revalidatePath("/pipeline");
@@ -828,6 +832,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         insuranceAnnual={insuranceAnnual}
         projectedMonthlyRent={projectedMonthlyRent}
         totalRehab={totalRehab}
+        ownerPaidUtilitiesAnnual={annualUtilities}
       />
 
       {property.broker_remarks && (
@@ -890,7 +895,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
               <tbody>
                 {unitList.map((unit) => {
-                  const formId = `unit-inline-form-${unit.id}`;
+                  const formId = "all-units-form";
                   const unitAnnualUtilities = getAnnualUtilityCost(unit);
 
                   return (
@@ -898,7 +903,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="unit_number"
+                          name={`${unit.id}__unit_number`}
                           defaultValue={getUnitLabel(unit)}
                           className={smallInlineInputClass}
                           aria-label="Unit number"
@@ -908,7 +913,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="floor_number"
+                          name={`${unit.id}__floor_number`}
                           defaultValue={unit.floor_number || ""}
                           className={smallInlineInputClass}
                           aria-label="Floor number"
@@ -918,7 +923,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="sqft"
+                          name={`${unit.id}__sqft`}
                           type="number"
                           min="0"
                           step="1"
@@ -935,7 +940,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="bedrooms"
+                          name={`${unit.id}__bedrooms`}
                           type="number"
                           min="0"
                           step="1"
@@ -952,7 +957,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="full_baths"
+                          name={`${unit.id}__full_baths`}
                           type="number"
                           min="0"
                           step="1"
@@ -969,7 +974,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="half_baths"
+                          name={`${unit.id}__half_baths`}
                           type="number"
                           min="0"
                           step="1"
@@ -986,7 +991,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="current_rent"
+                          name={`${unit.id}__current_rent`}
                           type="number"
                           min="0"
                           step="1"
@@ -1003,7 +1008,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="projected_rent"
+                          name={`${unit.id}__projected_rent`}
                           type="number"
                           min="0"
                           step="1"
@@ -1020,7 +1025,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="fmr_rent"
+                          name={`${unit.id}__fmr_rent`}
                           type="number"
                           min="0"
                           step="1"
@@ -1035,7 +1040,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="lease_expiration"
+                          name={`${unit.id}__lease_expiration`}
                           type="date"
                           defaultValue={formatDateInput(unit.lease_expiration)}
                           className={inlineInputClass}
@@ -1048,7 +1053,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="condition"
+                          name={`${unit.id}__condition`}
                           defaultValue={unit.condition || ""}
                           className={inlineInputClass}
                           aria-label="Condition"
@@ -1058,7 +1063,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2">
                         <input
                           form={formId}
-                          name="rehab_estimate"
+                          name={`${unit.id}__rehab_estimate`}
                           type="number"
                           min="0"
                           step="1"
@@ -1075,7 +1080,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2 text-center">
                         <input
                           form={formId}
-                          name="water_included"
+                          name={`${unit.id}__water_included`}
                           type="checkbox"
                           defaultChecked={unit.water_included === true}
                           className="h-4 w-4 rounded border-slate-300"
@@ -1086,7 +1091,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2 text-center">
                         <input
                           form={formId}
-                          name="electricity_included"
+                          name={`${unit.id}__electricity_included`}
                           type="checkbox"
                           defaultChecked={unit.electricity_included === true}
                           className="h-4 w-4 rounded border-slate-300"
@@ -1097,7 +1102,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       <td className="py-3 pr-2 text-center">
                         <input
                           form={formId}
-                          name="gas_included"
+                          name={`${unit.id}__gas_included`}
                           type="checkbox"
                           defaultChecked={unit.gas_included === true}
                           className="h-4 w-4 rounded border-slate-300"
@@ -1111,19 +1116,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
                       <td className="py-3">
                         <div className="flex items-center gap-2">
-                          <form id={formId} action={updateUnitInline}>
-                            <input
-                              type="hidden"
-                              name="unit_id"
-                              value={unit.id}
-                            />
-                            <button
-                              type="submit"
-                              className="rounded-md bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                            >
-                              Save
-                            </button>
-                          </form>
+                          <input
+                            form={formId}
+                            type="hidden"
+                            name="unit_id"
+                            value={unit.id}
+                          />
 
                           <DeleteUnitButton unitId={unit.id} />
                         </div>
@@ -1133,6 +1131,19 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 })}
               </tbody>
             </table>
+
+            <form
+              id="all-units-form"
+              action={updateAllUnits}
+              className="sticky left-0 mt-4 flex w-full justify-end"
+            >
+              <button
+                type="submit"
+                className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Save All Units
+              </button>
+            </form>
           </div>
         )}
       </div>

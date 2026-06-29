@@ -11,6 +11,7 @@ type DealAnalyzerProps = {
   insuranceAnnual: number | null;
   projectedMonthlyRent: number;
   totalRehab: number;
+  ownerPaidUtilitiesAnnual: number;
 };
 
 type PurchaseMethod = "financed" | "cash";
@@ -133,6 +134,7 @@ export function DealAnalyzer({
   insuranceAnnual,
   projectedMonthlyRent,
   totalRehab,
+  ownerPaidUtilitiesAnnual,
 }: DealAnalyzerProps) {
   const [purchaseMethod, setPurchaseMethod] =
     useState<PurchaseMethod>("financed");
@@ -151,7 +153,9 @@ export function DealAnalyzer({
   const [managementRate, setManagementRate] = useState(8);
   const [repairsRate, setRepairsRate] = useState(8);
   const [capexRate, setCapexRate] = useState(5);
-  const [utilitiesAnnual, setUtilitiesAnnual] = useState(0);
+  const [customUtilitiesAnnual, setCustomUtilitiesAnnual] = useState<
+    number | null
+  >(null);
   const [otherExpensesAnnual, setOtherExpensesAnnual] = useState(0);
   const [targetCapRate, setTargetCapRate] = useState(8);
   const [initialOfferDiscount, setInitialOfferDiscount] = useState(10);
@@ -205,6 +209,8 @@ export function DealAnalyzer({
     customInterestRate ??
     Number(selectedMarketRate?.estimatedInvestmentRate.toFixed(3) || 7.25);
   const hasCustomizedInterestRate = customInterestRate !== null;
+  const utilitiesAnnual =
+    customUtilitiesAnnual ?? ownerPaidUtilitiesAnnual;
 
   const results = useMemo(() => {
     const price = Math.max(0, purchasePrice);
@@ -504,7 +510,7 @@ export function DealAnalyzer({
                 min="0"
                 value={utilitiesAnnual}
                 onChange={(event) =>
-                  setUtilitiesAnnual(Number(event.target.value))
+                  setCustomUtilitiesAnnual(Number(event.target.value))
                 }
               />
             </div>
