@@ -13,8 +13,17 @@ type VoiceSuggestion = {
 
 type OpenAIErrorBody = {
   error?: {
+    code?: string | null;
     message?: string;
+    type?: string;
   };
+};
+
+type OpenAIErrorDetails = {
+  code: string | null;
+  message: string;
+  status: number;
+  type: string | null;
 };
 
 function getResponseOutputText(value: unknown) {
@@ -80,13 +89,61 @@ function transcriptOnlyResponse(transcript: string, warning: string) {
   });
 }
 
-async function openAIErrorMessage(response: Response) {
+async function openAIErrorDetails(
+  response: Response,
+): Promise<OpenAIErrorDetails> {
   try {
     const body = (await response.json()) as OpenAIErrorBody;
-    return body.error?.message || `OpenAI returned ${response.status}.`;
+    return {
+      code: body.error?.code || null,
+      message: body.error?.message || `OpenAI returned ${response.status}.`,
+      status: response.status,
+      type: body.error?.type || null,
+    };
   } catch {
-    return `OpenAI returned ${response.status}.`;
+    return {
+      code: null,
+      message: `OpenAI returned ${response.status}.`,
+      status: response.status,
+      type: null,
+    };
   }
+}
+
+function openAIErrorMessage(details: OpenAIErrorDetails) {
+  return [
+    details.message,
+    details.type ? `type=${details.type}` : null,
+    details.code ? `code=${details.code}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function transcriptionFailureMessage(details: OpenAIErrorDetails) {
+  if (
+    details.code === "insufficient_quota" ||
+    details.type === "insufficient_quota"
+  ) {
+    return "Voice transcription is unavailable because the OpenAI account has no available quota. Check billing and usage, then retry.";
+  }
+
+  if (
+    details.code === "invalid_api_key" ||
+    details.type === "invalid_api_key"
+  ) {
+    return "Voice transcription is not configured correctly. The OpenAI API key was rejected.";
+  }
+
+  if (details.code === "model_not_found") {
+    return "Voice transcription is not configured correctly. The selected OpenAI transcription model is not available for this API key.";
+  }
+
+  if (details.status === 429) {
+    return "The transcription service is rate-limiting requests right now. Please retry in a moment.";
+  }
+
+  return "The voice note could not be transcribed. Please retry.";
 }
 
 export async function POST(
@@ -208,15 +265,14 @@ export async function POST(
   }
 
   if (!transcriptionResponse.ok) {
-    console.error(
-      "Voice transcription failed:",
-      await openAIErrorMessage(transcriptionResponse),
-    );
+    const details = await openAIErrorDetails(transcriptionResponse);
+
+    console.error("Voice transcription failed:", openAIErrorMessage(details));
 
     return NextResponse.json(
       {
         success: false,
-        message: "The voice note could not be transcribed. Please retry.",
+        message: transcriptionFailureMessage(details),
       },
       { status: 502 },
     );
@@ -294,9 +350,11 @@ export async function POST(
   }
 
   if (!extractionResponse.ok) {
+    const details = await openAIErrorDetails(extractionResponse);
+
     console.error(
       "Voice note extraction failed:",
-      await openAIErrorMessage(extractionResponse),
+      openAIErrorMessage(details),
     );
 
     return transcriptOnlyResponse(
