@@ -21,6 +21,17 @@ type ImportedUnit = {
   tenantPays?: unknown;
 };
 
+type ExistingProperty = {
+  id: string;
+  all_extracted_fields: unknown;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
 
@@ -163,12 +174,12 @@ export async function POST(request: Request) {
       raw_import: toText(payload.rawImport),
     };
 
-    let existingProperty: { id: string } | null = null;
+    let existingProperty: ExistingProperty | null = null;
 
     if (mlsNumber) {
       const { data, error } = await supabase
         .from("properties")
-        .select("id")
+        .select("id, all_extracted_fields")
         .eq("user_id", defaultPropertyUserId)
         .eq("mls_number", mlsNumber)
         .maybeSingle();
@@ -192,7 +203,7 @@ export async function POST(request: Request) {
     if (!existingProperty && sourceUrl) {
       const { data, error } = await supabase
         .from("properties")
-        .select("id")
+        .select("id, all_extracted_fields")
         .eq("user_id", defaultPropertyUserId)
         .eq("source_url", sourceUrl)
         .maybeSingle();
@@ -217,9 +228,17 @@ export async function POST(request: Request) {
     let action: "created" | "updated";
 
     if (existingProperty?.id) {
+      const updatePayload = {
+        ...propertyPayload,
+        all_extracted_fields: {
+          ...asRecord(existingProperty.all_extracted_fields),
+          ...asRecord(payload.allExtractedFields),
+        },
+      };
+
       const { data, error } = await supabase
         .from("properties")
-        .update(propertyPayload)
+        .update(updatePayload)
         .eq("id", existingProperty.id)
         .select("id")
         .single();

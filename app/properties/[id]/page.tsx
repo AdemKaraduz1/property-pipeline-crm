@@ -60,6 +60,64 @@ type PropertyUnit = {
   created_at?: string | null;
 };
 
+const COMMON_REHAB_ITEMS = [
+  {
+    id: "exterior_masonry",
+    label: "Brick / Facade",
+    description: "Tuckpointing, masonry, siding, and exterior repairs",
+  },
+  {
+    id: "roof_gutters",
+    label: "Roof / Gutters",
+    description: "Roofing, flashing, gutters, and downspouts",
+  },
+  {
+    id: "landscaping_site",
+    label: "Landscaping / Site",
+    description: "Yard, fencing, walkways, drainage, and exterior cleanup",
+  },
+  {
+    id: "hallways_lobby",
+    label: "Hallways / Lobby",
+    description: "Paint, flooring, lighting, doors, and common finishes",
+  },
+  {
+    id: "stairs_railings",
+    label: "Stairs / Railings",
+    description: "Interior or exterior stairs, porches, and guardrails",
+  },
+  {
+    id: "basement_storage",
+    label: "Basement / Storage",
+    description: "Common basement, laundry, storage, and moisture work",
+  },
+  {
+    id: "building_mechanical",
+    label: "Building Mechanicals",
+    description: "Shared boiler, HVAC, water heater, and ventilation",
+  },
+  {
+    id: "plumbing_electrical",
+    label: "Plumbing / Electrical",
+    description: "Shared supply, waste, panels, service, and common wiring",
+  },
+  {
+    id: "security_fire",
+    label: "Security / Fire Safety",
+    description: "Cameras, access control, alarms, extinguishers, and signage",
+  },
+  {
+    id: "permits_professional",
+    label: "Permits / Professional",
+    description: "Permits, plans, engineering, architecture, and inspections",
+  },
+  {
+    id: "other",
+    label: "Other Common Work",
+    description: "Anything shared that does not fit another category",
+  },
+] as const;
+
 const WATER_MONTHLY_PER_UNIT = 60;
 const ELECTRICITY_MONTHLY_PER_UNIT = 115;
 const GAS_MONTHLY_PER_UNIT = 115;
@@ -99,6 +157,17 @@ function valueOrDash(value: unknown) {
 
 function hasValue(value: unknown) {
   return value !== null && value !== undefined && value !== "";
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function toFiniteNumber(value: unknown, fallback = 0) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
 }
 
 function parseMoneyInput(value: FormDataEntryValue | null) {
@@ -340,6 +409,53 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     revalidatePath("/pipeline");
   }
 
+  async function updateCommonAreaRehab(formData: FormData) {
+    "use server";
+
+    const updateSupabase = await createClient();
+    const {
+      data: { user: updateUser },
+    } = await updateSupabase.auth.getUser();
+
+    if (!updateUser) return;
+
+    const { data: currentProperty } = await updateSupabase
+      .from("properties")
+      .select("all_extracted_fields")
+      .eq("id", id)
+      .eq("user_id", updateUser.id)
+      .single();
+
+    if (!currentProperty) return;
+
+    const currentMetadata = asRecord(currentProperty.all_extracted_fields);
+    const items = Object.fromEntries(
+      COMMON_REHAB_ITEMS.map((item) => [
+        item.id,
+        parseMoneyInput(formData.get(`common_rehab_${item.id}`)) || 0,
+      ]),
+    );
+
+    await updateSupabase
+      .from("properties")
+      .update({
+        all_extracted_fields: {
+          ...currentMetadata,
+          common_area_rehab: {
+            items,
+            contingency_percent:
+              parseMoneyInput(formData.get("common_rehab_contingency")) || 0,
+            notes: parseTextInput(formData.get("common_rehab_notes")),
+          },
+        },
+      })
+      .eq("id", id)
+      .eq("user_id", updateUser.id);
+
+    revalidatePath(`/properties/${id}`);
+    revalidatePath("/pipeline");
+  }
+
   const { data: property, error: propertyError } = await supabase
     .from("properties")
     .select("*")
@@ -392,10 +508,26 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     0,
   );
 
-  const totalRehab = unitList.reduce(
+  const propertyMetadata = asRecord(property.all_extracted_fields);
+  const commonRehab = asRecord(propertyMetadata.common_area_rehab);
+  const commonRehabItems = asRecord(commonRehab.items);
+  const commonRehabContingency = toFiniteNumber(
+    commonRehab.contingency_percent,
+    10,
+  );
+  const commonRehabNotes =
+    typeof commonRehab.notes === "string" ? commonRehab.notes : "";
+  const commonRehabSubtotal = COMMON_REHAB_ITEMS.reduce(
+    (sum, item) => sum + toFiniteNumber(commonRehabItems[item.id]),
+    0,
+  );
+  const commonRehabTotal =
+    commonRehabSubtotal * (1 + commonRehabContingency / 100);
+  const unitRehabTotal = unitList.reduce(
     (sum, unit) => sum + Number(unit.rehab_estimate || 0),
     0,
   );
+  const totalRehab = unitRehabTotal + commonRehabTotal;
 
   const totalFmrRent = unitList.reduce(
     (sum, unit) => sum + Number(unit.fmr_rent || 0),
@@ -1146,6 +1278,113 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </form>
           </div>
         )}
+      </div>
+
+      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-950">
+              Common Area Rehab
+            </h3>
+            <p className="text-sm text-slate-500">
+              Optional building-wide work outside of individual units.
+            </p>
+          </div>
+
+          <div className="rounded-lg bg-slate-100 px-4 py-2 text-right">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Common Rehab Total
+            </p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(commonRehabTotal)}
+            </p>
+          </div>
+        </div>
+
+        <form action={updateCommonAreaRehab}>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {COMMON_REHAB_ITEMS.map((item) => {
+              const storedCost = toFiniteNumber(commonRehabItems[item.id]);
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                >
+                  <label
+                    htmlFor={`common_rehab_${item.id}`}
+                    className="block text-sm font-semibold text-slate-800"
+                  >
+                    {item.label}
+                  </label>
+                  <p className="mb-2 min-h-8 text-xs leading-4 text-slate-500">
+                    {item.description}
+                  </p>
+                  <input
+                    id={`common_rehab_${item.id}`}
+                    name={`common_rehab_${item.id}`}
+                    type="number"
+                    min="0"
+                    step="1"
+                    defaultValue={storedCost > 0 ? storedCost : ""}
+                    placeholder="$0"
+                    className={inlineInputClass}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-[200px_1fr]">
+            <div>
+              <label
+                htmlFor="common_rehab_contingency"
+                className="mb-1 block text-sm font-medium text-slate-700"
+              >
+                Contingency %
+              </label>
+              <input
+                id="common_rehab_contingency"
+                name="common_rehab_contingency"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={commonRehabContingency}
+                className={inlineInputClass}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="common_rehab_notes"
+                className="mb-1 block text-sm font-medium text-slate-700"
+              >
+                Common Rehab Notes
+              </label>
+              <textarea
+                id="common_rehab_notes"
+                name="common_rehab_notes"
+                defaultValue={commonRehabNotes}
+                rows={3}
+                placeholder="Scope details, contractor notes, priorities, or work that may not be needed..."
+                className={inlineInputClass}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-slate-500">
+              Unit rehab: {formatCurrency(unitRehabTotal)} · Combined rehab:{" "}
+              {formatCurrency(totalRehab)}
+            </p>
+            <button
+              type="submit"
+              className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Save Common Area Rehab
+            </button>
+          </div>
+        </form>
       </div>
 
       <MobilityFmrCard
