@@ -103,24 +103,36 @@ function Metric({
     <div
       className={
         emphasis
-          ? "rounded-lg border border-slate-800 bg-slate-900 p-4 text-white"
-          : "rounded-lg border border-slate-200 bg-slate-50 p-4"
+          ? "rounded-md border border-slate-800 bg-slate-900 p-2.5 text-white sm:rounded-lg sm:p-4"
+          : "rounded-md border border-slate-200 bg-slate-50 p-2.5 sm:rounded-lg sm:p-4"
       }
     >
-      <p className={emphasis ? "text-sm text-slate-300" : "text-sm text-slate-500"}>
+      <p
+        className={
+          emphasis
+            ? "text-[11px] leading-tight text-slate-300 sm:text-sm"
+            : "text-[11px] leading-tight text-slate-500 sm:text-sm"
+        }
+      >
         {label}
       </p>
       <p
         className={
           emphasis
-            ? "mt-1 text-2xl font-bold"
-            : "mt-1 text-2xl font-bold text-slate-950"
+            ? "mt-1 text-lg font-bold sm:text-2xl"
+            : "mt-1 text-lg font-bold text-slate-950 sm:text-2xl"
         }
       >
         {value}
       </p>
       {note && (
-        <p className={emphasis ? "mt-1 text-xs text-slate-300" : "mt-1 text-xs text-slate-500"}>
+        <p
+          className={
+            emphasis
+              ? "mt-1 text-[10px] leading-tight text-slate-300 sm:text-xs"
+              : "mt-1 text-[10px] leading-tight text-slate-500 sm:text-xs"
+          }
+        >
           {note}
         </p>
       )}
@@ -129,10 +141,25 @@ function Metric({
 }
 
 const mobileAnalysisRailClass =
-  "-mx-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-8 pb-3 sm:mx-0 sm:block sm:space-y-8 sm:overflow-visible sm:px-0 sm:pb-0";
+  "flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:block sm:space-y-8 sm:overflow-visible sm:pb-0";
 
 const mobileAnalysisPanelClass =
-  "min-w-[calc(100vw-4.5rem)] snap-start rounded-xl border border-slate-200 bg-white p-4 sm:min-w-0 sm:border-0 sm:bg-transparent sm:p-0";
+  "min-w-[74vw] snap-start rounded-lg border border-slate-200 bg-white p-3 text-sm sm:min-w-0 sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-none sm:[&_[data-slot=label]]:text-xs";
+
+const analysisGridClass =
+  "grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4";
+
+const analysisMetricGridClass =
+  "grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4";
+
+const analysisInputClass =
+  "h-8 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm shadow-sm sm:h-10 sm:border-transparent sm:border-b-input sm:bg-transparent sm:px-0 sm:shadow-none";
+
+const analysisSelectClass =
+  "mt-1 flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm sm:h-10 sm:px-3 sm:py-2 sm:shadow-none";
+
+const analysisHintClass =
+  "mt-1 text-[10px] leading-3.5 text-slate-500 sm:text-xs sm:leading-normal";
 
 export function DealAnalyzer({
   askingPrice,
@@ -333,12 +360,15 @@ export function DealAnalyzer({
   const isFinanced = purchaseMethod === "financed";
 
   return (
-    <Card className="mb-6 rounded-xl border-slate-200 bg-white">
+    <Card
+      size="sm"
+      className="mb-6 rounded-xl border-slate-200 bg-white sm:[--card-spacing:--spacing(8)]"
+    >
       <CardHeader>
-        <CardTitle className="font-sans text-lg font-semibold normal-case tracking-normal text-slate-950">
+        <CardTitle className="font-sans text-base font-semibold normal-case tracking-normal text-slate-950 sm:text-lg">
           Deal Analyzer
         </CardTitle>
-        <p className="text-sm text-slate-500">
+        <p className="text-xs leading-5 text-slate-500 sm:text-sm">
           Compare cash and financed acquisitions using editable operating and
           loan assumptions.
         </p>
@@ -347,11 +377,11 @@ export function DealAnalyzer({
       <CardContent>
         <div className={mobileAnalysisRailClass}>
           <section className={mobileAnalysisPanelClass}>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
               Purchase & Financing
             </h3>
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              <div>
+            <div className={analysisGridClass}>
+              <div className="col-span-2 sm:col-span-1">
                 <Label htmlFor="purchase-method">Purchase Method</Label>
                 <select
                   id="purchase-method"
@@ -359,7 +389,7 @@ export function DealAnalyzer({
                   onChange={(event) =>
                     setPurchaseMethod(event.target.value as PurchaseMethod)
                   }
-                  className="mt-1 flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                  className={analysisSelectClass}
                 >
                   <option value="financed">Mortgage</option>
                   <option value="cash">Cash Purchase</option>
@@ -373,6 +403,7 @@ export function DealAnalyzer({
                   type="number"
                   min="0"
                   value={purchasePrice}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setPurchasePrice(Number(event.target.value))
                   }
@@ -391,6 +422,7 @@ export function DealAnalyzer({
                       step="1"
                       list="down-payment-options"
                       value={downPaymentRate}
+                      className={analysisInputClass}
                       onChange={(event) =>
                         setDownPaymentRate(Number(event.target.value))
                       }
@@ -411,11 +443,12 @@ export function DealAnalyzer({
                       min="0"
                       step="0.125"
                       value={interestRate}
+                      className={analysisInputClass}
                       onChange={(event) => {
                         setCustomInterestRate(Number(event.target.value));
                       }}
                     />
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className={analysisHintClass}>
                       {rateStatus === "loading" &&
                         "Loading today’s market estimate..."}
                       {rateStatus === "current" &&
@@ -442,6 +475,7 @@ export function DealAnalyzer({
                       type="number"
                       min="1"
                       value={loanTermYears}
+                      className={analysisInputClass}
                       onChange={(event) =>
                         setLoanTermYears(Number(event.target.value))
                       }
@@ -458,11 +492,12 @@ export function DealAnalyzer({
                   min="0"
                   step="0.25"
                   value={acquisitionCostsRate}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setAcquisitionCostsRate(Number(event.target.value))
                   }
                 />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className={analysisHintClass}>
                   Lender and closing costs combined.
                 </p>
               </div>
@@ -470,16 +505,17 @@ export function DealAnalyzer({
           </section>
 
           <section className={mobileAnalysisPanelClass}>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
               Operating Assumptions
             </h3>
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            <div className={analysisGridClass}>
               <div>
                 <Label htmlFor="vacancy-rate">Vacancy %</Label>
                 <Input
                   id="vacancy-rate"
                   type="number"
                   value={vacancyRate}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setVacancyRate(Number(event.target.value))
                   }
@@ -491,6 +527,7 @@ export function DealAnalyzer({
                   id="management-rate"
                   type="number"
                   value={managementRate}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setManagementRate(Number(event.target.value))
                   }
@@ -502,6 +539,7 @@ export function DealAnalyzer({
                   id="repairs-rate"
                   type="number"
                   value={repairsRate}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setRepairsRate(Number(event.target.value))
                   }
@@ -513,6 +551,7 @@ export function DealAnalyzer({
                   id="capex-rate"
                   type="number"
                   value={capexRate}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setCapexRate(Number(event.target.value))
                   }
@@ -525,6 +564,7 @@ export function DealAnalyzer({
                   type="number"
                   min="0"
                   value={utilitiesAnnual}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setCustomUtilitiesAnnual(Number(event.target.value))
                   }
@@ -537,6 +577,7 @@ export function DealAnalyzer({
                   type="number"
                   min="0"
                   value={otherExpensesAnnual}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setOtherExpensesAnnual(Number(event.target.value))
                   }
@@ -550,6 +591,7 @@ export function DealAnalyzer({
                   min="0"
                   step="0.25"
                   value={targetCapRate}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setTargetCapRate(Number(event.target.value))
                   }
@@ -562,6 +604,7 @@ export function DealAnalyzer({
                   type="number"
                   min="0"
                   value={initialOfferDiscount}
+                  className={analysisInputClass}
                   onChange={(event) =>
                     setInitialOfferDiscount(Number(event.target.value))
                   }
@@ -571,10 +614,10 @@ export function DealAnalyzer({
           </section>
 
           <section className={mobileAnalysisPanelClass}>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
               Returns & Risk
             </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className={analysisMetricGridClass}>
               <Metric
                 label="Monthly Cash Flow"
                 value={formatCurrency(results.monthlyCashFlow)}
@@ -622,10 +665,10 @@ export function DealAnalyzer({
 
           {isFinanced && (
             <section className={mobileAnalysisPanelClass}>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
                 Mortgage Details
               </h3>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className={analysisMetricGridClass}>
                 <Metric
                   label="Down Payment"
                   value={formatCurrency(results.downPayment)}
@@ -670,10 +713,10 @@ export function DealAnalyzer({
           )}
 
           <section className={mobileAnalysisPanelClass}>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
               Income & Offer View
             </h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className={analysisMetricGridClass}>
               <Metric
                 label="Projected Monthly Rent"
                 value={formatCurrency(projectedMonthlyRent)}
@@ -706,10 +749,10 @@ export function DealAnalyzer({
           </section>
 
           <section className={mobileAnalysisPanelClass}>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
               Notes
             </h3>
-            <p className="text-xs leading-relaxed text-slate-500">
+            <p className="text-[11px] leading-relaxed text-slate-500 sm:text-xs">
               Planning estimates only. Mortgage pricing, taxes, insurance,
               reserves, and lender underwriting vary by borrower and property.
             </p>

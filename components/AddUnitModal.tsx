@@ -32,7 +32,7 @@ export function AddUnitModal({ children }: AddUnitModalProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="min-h-11 w-full rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
+        className="min-h-10 w-full rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
       >
         + Add Unit
       </button>

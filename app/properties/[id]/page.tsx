@@ -239,14 +239,14 @@ const dateInlineInputClass =
   "w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
 const mobileFieldClass =
-  "w-full min-w-0 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+  "h-8 w-full min-w-0 appearance-none rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
 const sectionCardClass =
-  "mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
+  "mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
 
-const sectionTitleClass = "text-lg font-semibold text-slate-950";
+const sectionTitleClass = "text-base font-semibold text-slate-950 sm:text-lg";
 
-const sectionDescriptionClass = "text-sm leading-relaxed text-slate-500";
+const sectionDescriptionClass = "text-xs leading-relaxed text-slate-500 sm:text-sm";
 
 export default async function PropertyDetailPage({ params }: PageProps) {
   const supabase = await createClient();
@@ -947,7 +947,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
       <div id="units" className={sectionCardClass}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className={sectionTitleClass}>Units</h3>
             <p className={sectionDescriptionClass}>
               Edit rent, rehab, condition, and owner-paid utilities by unit.
@@ -969,7 +969,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           <p className="text-sm text-slate-500">No units added yet.</p>
         ) : (
           <div>
-            <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-3 md:hidden">
+            <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2 md:hidden">
               {unitList.map((unit) => {
                 const formId = "mobile-units-form";
                 const unitAnnualUtilities = getAnnualUtilityCost(unit);
@@ -977,14 +977,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 return (
                   <div
                     key={unit.id}
-                    className="min-w-[calc(100vw-3.5rem)] snap-start rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    className="min-w-[74vw] snap-start rounded-lg border border-slate-200 bg-slate-50 p-2.5 [&_span]:text-[10px] [&_span]:leading-none"
                   >
-                    <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="mb-2 flex items-start justify-between gap-2">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Unit
                         </p>
-                        <p className="text-lg font-semibold text-slate-950">
+                        <p className="text-sm font-semibold text-slate-950">
                           {getUnitLabel(unit)}
                         </p>
                       </div>
@@ -999,7 +999,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       value={unit.id}
                     />
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-1.5">
                       <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Unit
@@ -1142,7 +1142,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="col-span-2 block min-w-0">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Lease Exp.
                         </span>
@@ -1156,7 +1156,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="col-span-2 block min-w-0">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Rehab
                         </span>
@@ -1177,43 +1177,43 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                       </label>
                     </div>
 
-                    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <div className="mt-2 rounded-md border border-slate-200 bg-white p-2">
+                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                         Owner Pays
                       </p>
-                      <div className="grid grid-cols-3 gap-2 text-sm text-slate-700">
-                        <label className="flex items-center gap-2">
+                      <div className="grid grid-cols-3 gap-1.5 text-[11px] text-slate-700">
+                        <label className="flex items-center gap-1.5">
                           <input
                             form={formId}
                             name={`${unit.id}__water_included`}
                             type="checkbox"
                             defaultChecked={unit.water_included === true}
-                            className="h-4 w-4 rounded border-slate-300"
+                            className="h-3.5 w-3.5 rounded border-slate-300"
                           />
                           Water
                         </label>
-                        <label className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5">
                           <input
                             form={formId}
                             name={`${unit.id}__electricity_included`}
                             type="checkbox"
                             defaultChecked={unit.electricity_included === true}
-                            className="h-4 w-4 rounded border-slate-300"
+                            className="h-3.5 w-3.5 rounded border-slate-300"
                           />
                           Electric
                         </label>
-                        <label className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5">
                           <input
                             form={formId}
                             name={`${unit.id}__gas_included`}
                             type="checkbox"
                             defaultChecked={unit.gas_included === true}
-                            className="h-4 w-4 rounded border-slate-300"
+                            className="h-3.5 w-3.5 rounded border-slate-300"
                           />
                           Gas
                         </label>
                       </div>
-                      <p className="mt-3 text-sm font-medium text-slate-700">
+                      <p className="mt-1.5 text-[11px] font-medium text-slate-700">
                         Utilities / year: {formatCurrency(unitAnnualUtilities)}
                       </p>
                     </div>
@@ -1225,11 +1225,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             <form
               id="mobile-units-form"
               action={updateAllUnits}
-              className="sticky bottom-16 z-10 mt-4 md:hidden"
+              className="mt-2 md:hidden"
             >
               <button
                 type="submit"
-                className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+                className="min-h-9 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
               >
                 Save All Units
               </button>
@@ -1498,41 +1498,41 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       </div>
 
       <div id="rehab" className={sectionCardClass}>
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <h3 className={sectionTitleClass}>Common Area Rehab</h3>
             <p className={sectionDescriptionClass}>
               Optional building-wide work outside of individual units.
             </p>
           </div>
 
-          <div className="rounded-lg bg-slate-100 px-4 py-2 text-right">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
               Common Rehab Total
             </p>
-            <p className="text-xl font-bold text-slate-950">
+            <p className="text-lg font-bold text-slate-950 sm:text-xl">
               {formatCurrency(commonRehabTotal)}
             </p>
           </div>
         </div>
 
         <form action={updateCommonAreaRehab}>
-          <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-3 md:mx-0 md:grid md:snap-none md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3">
+          <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2 md:grid md:snap-none md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-3">
             {COMMON_REHAB_ITEMS.map((item) => {
               const storedCost = toFiniteNumber(commonRehabItems[item.id]);
 
               return (
                 <div
                   key={item.id}
-                  className="min-w-[calc(100vw-3.5rem)] snap-start rounded-lg border border-slate-200 bg-slate-50 p-3 md:min-w-0"
+                  className="min-w-[9.5rem] snap-start rounded-md border border-slate-200 bg-slate-50 p-2 md:min-w-0 md:rounded-lg md:p-3"
                 >
                   <label
                     htmlFor={`common_rehab_${item.id}`}
-                    className="block text-sm font-semibold text-slate-800"
+                    className="block text-xs font-semibold leading-tight text-slate-800 md:text-sm"
                   >
                     {item.label}
                   </label>
-                  <p className="mb-2 min-h-8 text-xs leading-4 text-slate-500">
+                  <p className="mb-1.5 h-6 overflow-hidden text-[10px] leading-3 text-slate-500 md:mb-2 md:min-h-8 md:text-xs md:leading-4">
                     {item.description}
                   </p>
                   <input
@@ -1543,18 +1543,18 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     step="1"
                     defaultValue={storedCost > 0 ? storedCost : ""}
                     placeholder="$0"
-                    className={inlineInputClass}
+                    className={`${inlineInputClass} h-8`}
                   />
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-[200px_1fr]">
+          <div className="mt-3 grid grid-cols-[5.5rem_1fr] gap-3 md:mt-5 md:grid-cols-[200px_1fr] md:gap-4">
             <div>
               <label
                 htmlFor="common_rehab_contingency"
-                className="mb-1 block text-sm font-medium text-slate-700"
+                className="mb-1 block text-xs font-medium text-slate-700 md:text-sm"
               >
                 Contingency %
               </label>
@@ -1565,14 +1565,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 min="0"
                 step="1"
                 defaultValue={commonRehabContingency}
-                className={inlineInputClass}
+                className={`${inlineInputClass} h-8`}
               />
             </div>
 
             <div>
               <label
                 htmlFor="common_rehab_notes"
-                className="mb-1 block text-sm font-medium text-slate-700"
+                className="mb-1 block text-xs font-medium text-slate-700 md:text-sm"
               >
                 Common Rehab Notes
               </label>
@@ -1580,21 +1580,21 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 id="common_rehab_notes"
                 name="common_rehab_notes"
                 defaultValue={commonRehabNotes}
-                rows={3}
+                rows={2}
                 placeholder="Scope details, contractor notes, priorities, or work that may not be needed..."
                 className={inlineInputClass}
               />
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-slate-500">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-500 sm:text-sm">
               Unit rehab: {formatCurrency(unitRehabTotal)} · Combined rehab:{" "}
               {formatCurrency(totalRehab)}
             </p>
             <button
               type="submit"
-              className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="min-h-9 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 sm:px-4 sm:text-sm"
             >
               Save Common Area Rehab
             </button>
