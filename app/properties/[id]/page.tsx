@@ -224,6 +224,9 @@ const inlineInputClass =
 const smallInlineInputClass =
   "w-20 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
+const dateInlineInputClass =
+  "w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+
 export default async function PropertyDetailPage({ params }: PageProps) {
   const supabase = await createClient();
 
@@ -292,7 +295,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           projected_rent: parseMoneyInput(field("projected_rent")),
           fmr_rent: parseMoneyInput(field("fmr_rent")),
           lease_expiration: parseDateInput(field("lease_expiration")),
-          condition: parseTextInput(field("condition")),
           rehab_estimate: parseMoneyInput(field("rehab_estimate")),
           water_included: formData.has(`${unitId}__water_included`),
           electricity_included: formData.has(
@@ -958,25 +960,30 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           <p className="text-sm text-slate-500">No units added yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1800px] text-left text-sm">
+            <table className="w-full min-w-[1180px] text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
-                  <th className="py-2 pr-2">Unit</th>
-                  <th className="py-2 pr-2">Floor</th>
-                  <th className="py-2 pr-2">Sq Ft</th>
-                  <th className="py-2 pr-2">Beds</th>
-                  <th className="py-2 pr-2">Full</th>
-                  <th className="py-2 pr-2">Half</th>
-                  <th className="py-2 pr-2">Current Rent</th>
-                  <th className="py-2 pr-2">Projected Rent</th>
-                  <th className="py-2 pr-2">FMR</th>
-                  <th className="py-2 pr-2">Lease Exp.</th>
-                  <th className="py-2 pr-2">Condition</th>
-                  <th className="py-2 pr-2">Rehab</th>
-                  <th className="py-2 pr-2 text-center">W</th>
-                  <th className="py-2 pr-2 text-center">E</th>
-                  <th className="py-2 pr-2 text-center">G</th>
-                  <th className="py-2 pr-2">Utilities/Yr</th>
+                <tr className="border-b border-slate-200 text-xs text-slate-500">
+                  <th className="py-2 pr-1.5">Unit</th>
+                  <th className="py-2 pr-1.5">Floor</th>
+                  <th className="py-2 pr-1.5">Sq Ft</th>
+                  <th className="py-2 pr-1.5">Beds</th>
+                  <th className="py-2 pr-1.5">Full</th>
+                  <th className="py-2 pr-1.5">Half</th>
+                  <th className="py-2 pr-1.5">Current</th>
+                  <th className="py-2 pr-1.5">Projected</th>
+                  <th className="py-2 pr-1.5">FMR</th>
+                  <th className="py-2 pr-1.5">Lease Exp.</th>
+                  <th className="py-2 pr-1.5">Rehab</th>
+                  <th className="py-2 pr-1.5 text-center" title="Water">
+                    W
+                  </th>
+                  <th className="py-2 pr-1.5 text-center" title="Electricity">
+                    E
+                  </th>
+                  <th className="py-2 pr-1.5 text-center" title="Gas">
+                    G
+                  </th>
+                  <th className="py-2 pr-1.5">Util./Yr</th>
                   <th className="py-2">Actions</th>
                 </tr>
               </thead>
@@ -1088,7 +1095,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                               ? Number(getCurrentRent(unit))
                               : ""
                           }
-                          className={inlineInputClass}
+                          className={smallInlineInputClass}
                           aria-label="Current rent"
                         />
                       </td>
@@ -1105,7 +1112,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                               ? Number(getProjectedRent(unit))
                               : ""
                           }
-                          className={inlineInputClass}
+                          className={smallInlineInputClass}
                           aria-label="Projected rent"
                         />
                       </td>
@@ -1120,7 +1127,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                           defaultValue={
                             hasValue(unit.fmr_rent) ? Number(unit.fmr_rent) : ""
                           }
-                          className={inlineInputClass}
+                          className={smallInlineInputClass}
                           aria-label="FMR rent"
                         />
                       </td>
@@ -1131,20 +1138,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                           name={`${unit.id}__lease_expiration`}
                           type="date"
                           defaultValue={formatDateInput(unit.lease_expiration)}
-                          className={inlineInputClass}
+                          className={dateInlineInputClass}
                           aria-label="Lease expiration"
-                        />
-                      </td>
-
-
-
-                      <td className="py-3 pr-2">
-                        <input
-                          form={formId}
-                          name={`${unit.id}__condition`}
-                          defaultValue={unit.condition || ""}
-                          className={inlineInputClass}
-                          aria-label="Condition"
                         />
                       </td>
 
@@ -1160,7 +1155,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                               ? Number(unit.rehab_estimate)
                               : ""
                           }
-                          className={inlineInputClass}
+                          className={smallInlineInputClass}
                           aria-label="Rehab estimate"
                         />
                       </td>
