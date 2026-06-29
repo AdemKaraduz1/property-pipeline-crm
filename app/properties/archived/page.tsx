@@ -51,7 +51,6 @@ export default async function ArchivedPropertiesPage() {
       property_type,
       asking_price,
       list_price,
-      archive_reason,
       archived_at
     `,
     )
@@ -134,12 +133,6 @@ export default async function ArchivedPropertiesPage() {
                     {formatArchivedDate(property.archived_at)}
                   </p>
                 </div>
-
-                {property.archive_reason && (
-                  <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                    {property.archive_reason}
-                  </p>
-                )}
               </Link>
             );
           })}
