@@ -1,11 +1,5 @@
 import Link from "next/link";
-import {
-  Building2,
-  LayoutDashboard,
-  Map,
-  PlusCircle,
-  Home,
-} from "lucide-react";
+import { Building2, Home } from "lucide-react";
 import { LogoutButton } from "@/components/LogoutButton";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -26,9 +20,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="space-y-2">
-          <DesktopNavLink href="/pipeline" icon={<Building2 size={18} />} label="Pipeline" />
-          <DesktopNavLink href="/properties/new" icon={<PlusCircle size={18} />} label="Add Property" />
-          <DesktopNavLink href="/map" icon={<Map size={18} />} label="Map" />
+          <DesktopNavLink
+            href="/pipeline"
+            icon={<Building2 size={18} />}
+            label="Pipeline"
+          />
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
@@ -58,10 +54,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-2 py-2 md:hidden">
-        <div className="grid grid-cols-4 gap-1">
-          <MobileNavLink href="/pipeline" icon={<Building2 size={20} />} label="Pipeline" />
-          <MobileNavLink href="/properties/new" icon={<PlusCircle size={20} />} label="Add" />
-          <MobileNavLink href="/map" icon={<Map size={20} />} label="Map" />
+        <div className="grid grid-cols-1 gap-1">
+          <MobileNavLink
+            href="/pipeline"
+            icon={<Building2 size={20} />}
+            label="Pipeline"
+          />
         </div>
       </nav>
     </div>
