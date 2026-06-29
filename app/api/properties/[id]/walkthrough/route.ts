@@ -6,13 +6,15 @@ import {
   normalizeInspectionItem,
 } from "@/lib/rehab";
 
-export async function PATCH(
+type WalkthroughRouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+async function updateWalkthrough(
   request: Request,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  },
+  context: WalkthroughRouteContext,
 ) {
   const supabase = await createClient();
   const {
@@ -172,4 +174,23 @@ export async function PATCH(
     propertyId: id,
     savedAt: now,
   });
+}
+
+export async function PATCH(
+  request: Request,
+  context: WalkthroughRouteContext,
+) {
+  try {
+    return await updateWalkthrough(request, context);
+  } catch (error) {
+    console.error("Walkthrough save failed:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "The walkthrough could not be saved. Please try again.",
+      },
+      { status: 500 },
+    );
+  }
 }

@@ -35,6 +35,12 @@ type WalkthroughStep = {
   unitLabel?: string;
 };
 
+type WalkthroughSection = {
+  key: string;
+  label: string;
+  stepIndex: number;
+};
+
 function buildRoomSteps(unit: WalkthroughUnit): WalkthroughStep[] {
   const rooms: Array<{ id: string; label: string }> = [
     { id: "entry_hall", label: "Entry / Hall" },
@@ -96,7 +102,34 @@ export function PropertyWalkthrough({
     [units],
   );
 
+  const sections = useMemo<WalkthroughSection[]>(
+    () => [
+      {
+        key: "common",
+        label: "Outside & Common Areas",
+        stepIndex: 0,
+      },
+      ...units.map((unit, unitIndex) => ({
+        key: `unit:${unit.id}`,
+        label: `Unit ${unit.label}`,
+        stepIndex: COMMON_REHAB_ITEMS.length
+          + units
+              .slice(0, unitIndex)
+              .reduce(
+                (stepCount, previousUnit) =>
+                  stepCount + buildRoomSteps(previousUnit).length,
+                0,
+              ),
+      })),
+    ],
+    [units],
+  );
+
   const currentStep = steps[currentStepIndex];
+  const currentSectionKey =
+    currentStep?.scope === "unit" && currentStep.unitId
+      ? `unit:${currentStep.unitId}`
+      : "common";
 
   function getItem(step: WalkthroughStep) {
     if (step.scope === "common") {
@@ -170,10 +203,25 @@ export function PropertyWalkthrough({
           currentStep: nextStep,
         }),
       });
-      const result = await response.json();
+      const responseText = await response.text();
+      let result: { success?: boolean; message?: string } | null = null;
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Could not save walkthrough.");
+      if (responseText) {
+        try {
+          result = JSON.parse(responseText) as {
+            success?: boolean;
+            message?: string;
+          };
+        } catch {
+          // A proxy or framework error page is not useful to show in full.
+        }
+      }
+
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.message ||
+            `Could not save walkthrough (server returned ${response.status}).`,
+        );
       }
 
       setSaveMessage("Progress saved.");
@@ -242,6 +290,37 @@ export function PropertyWalkthrough({
             className="h-full rounded-full bg-slate-900 transition-all"
             style={{ width: `${progress}%` }}
           />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <label
+            htmlFor="walkthrough-section"
+            className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500"
+          >
+            Jump to section
+          </label>
+          <select
+            id="walkthrough-section"
+            value={currentSectionKey}
+            onChange={(event) => {
+              const section = sections.find(
+                (option) => option.key === event.target.value,
+              );
+
+              if (section) {
+                setCurrentStepIndex(section.stepIndex);
+                setSaveMessage("");
+              }
+            }}
+            disabled={isSaving}
+            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-60"
+          >
+            {sections.map((section) => (
+              <option key={section.key} value={section.key}>
+                {section.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
