@@ -239,7 +239,7 @@ const dateInlineInputClass =
   "w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
 const mobileFieldClass =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+  "w-full min-w-0 rounded-md border border-slate-300 px-3 py-2 text-base text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
 const sectionCardClass =
   "mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
@@ -969,7 +969,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           <p className="text-sm text-slate-500">No units added yet.</p>
         ) : (
           <div>
-            <div className="space-y-4 md:hidden">
+            <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-3 md:hidden">
               {unitList.map((unit) => {
                 const formId = "mobile-units-form";
                 const unitAnnualUtilities = getAnnualUtilityCost(unit);
@@ -977,7 +977,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 return (
                   <div
                     key={unit.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    className="min-w-[calc(100vw-3.5rem)] snap-start rounded-xl border border-slate-200 bg-slate-50 p-4"
                   >
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
@@ -1000,7 +1000,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     />
 
                     <div className="grid grid-cols-2 gap-3">
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Unit
                         </span>
@@ -1013,7 +1013,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Floor
                         </span>
@@ -1026,7 +1026,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Sq Ft
                         </span>
@@ -1044,7 +1044,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Beds
                         </span>
@@ -1064,7 +1064,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Bathrooms
                         </span>
@@ -1084,7 +1084,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Current
                         </span>
@@ -1104,7 +1104,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Projected
                         </span>
@@ -1124,7 +1124,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           FMR
                         </span>
@@ -1142,7 +1142,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="col-span-2 block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Lease Exp.
                         </span>
@@ -1156,7 +1156,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
-                      <label className="block">
+                      <label className="col-span-2 block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Rehab
                         </span>
@@ -1220,20 +1220,20 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                   </div>
                 );
               })}
-
-              <form
-                id="mobile-units-form"
-                action={updateAllUnits}
-                className="sticky bottom-16 z-10 mt-4"
-              >
-                <button
-                  type="submit"
-                  className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-                >
-                  Save All Units
-                </button>
-              </form>
             </div>
+
+            <form
+              id="mobile-units-form"
+              action={updateAllUnits}
+              className="sticky bottom-16 z-10 mt-4 md:hidden"
+            >
+              <button
+                type="submit"
+                className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+              >
+                Save All Units
+              </button>
+            </form>
 
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[1080px] text-left text-sm">
@@ -1517,14 +1517,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
 
         <form action={updateCommonAreaRehab}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-3 md:mx-0 md:grid md:snap-none md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-3">
             {COMMON_REHAB_ITEMS.map((item) => {
               const storedCost = toFiniteNumber(commonRehabItems[item.id]);
 
               return (
                 <div
                   key={item.id}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                  className="min-w-[calc(100vw-3.5rem)] snap-start rounded-lg border border-slate-200 bg-slate-50 p-3 md:min-w-0"
                 >
                   <label
                     htmlFor={`common_rehab_${item.id}`}

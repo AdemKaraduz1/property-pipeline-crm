@@ -128,6 +128,12 @@ function Metric({
   );
 }
 
+const mobileAnalysisRailClass =
+  "-mx-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-8 pb-3 sm:mx-0 sm:block sm:space-y-8 sm:overflow-visible sm:px-0 sm:pb-0";
+
+const mobileAnalysisPanelClass =
+  "min-w-[calc(100vw-4.5rem)] snap-start rounded-xl border border-slate-200 bg-white p-4 sm:min-w-0 sm:border-0 sm:bg-transparent sm:p-0";
+
 export function DealAnalyzer({
   askingPrice,
   taxesAnnual,
@@ -338,363 +344,377 @@ export function DealAnalyzer({
         </p>
       </CardHeader>
 
-      <CardContent className="space-y-8">
-        <section>
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Purchase & Financing
-          </h3>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-            <div>
-              <Label htmlFor="purchase-method">Purchase Method</Label>
-              <select
-                id="purchase-method"
-                value={purchaseMethod}
-                onChange={(event) =>
-                  setPurchaseMethod(event.target.value as PurchaseMethod)
-                }
-                className="mt-1 flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-              >
-                <option value="financed">Mortgage</option>
-                <option value="cash">Cash Purchase</option>
-              </select>
-            </div>
-
-            <div>
-              <Label htmlFor="analysis-price">Purchase Price</Label>
-              <Input
-                id="analysis-price"
-                type="number"
-                min="0"
-                value={purchasePrice}
-                onChange={(event) => setPurchasePrice(Number(event.target.value))}
-              />
-            </div>
-
-            {isFinanced && (
-              <>
-                <div>
-                  <Label htmlFor="down-payment">Down Payment %</Label>
-                  <Input
-                    id="down-payment"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="1"
-                    list="down-payment-options"
-                    value={downPaymentRate}
-                    onChange={(event) =>
-                      setDownPaymentRate(Number(event.target.value))
-                    }
-                  />
-                  <datalist id="down-payment-options">
-                    <option value="15" />
-                    <option value="20" />
-                    <option value="25" />
-                    <option value="30" />
-                  </datalist>
-                </div>
-
-                <div>
-                  <Label htmlFor="interest-rate">Interest Rate %</Label>
-                  <Input
-                    id="interest-rate"
-                    type="number"
-                    min="0"
-                    step="0.125"
-                    value={interestRate}
-                    onChange={(event) => {
-                      setCustomInterestRate(Number(event.target.value));
-                    }}
-                  />
-                  <p className="mt-1 text-xs text-slate-500">
-                    {rateStatus === "loading" &&
-                      "Loading today’s market estimate..."}
-                    {rateStatus === "current" &&
-                      selectedMarketRate &&
-                      `Daily market estimate as of ${selectedMarketRate.observedAt}; cached for 24 hours.`}
-                    {rateStatus === "fallback" &&
-                      "The live feed timed out. Using a fallback estimate; edit as needed."}
-                  </p>
-                  {hasCustomizedInterestRate && marketRates && (
-                    <button
-                      type="button"
-                      onClick={() => setCustomInterestRate(null)}
-                      className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900"
-                    >
-                      Use daily market estimate
-                    </button>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="loan-term">Loan Term (Years)</Label>
-                  <Input
-                    id="loan-term"
-                    type="number"
-                    min="1"
-                    value={loanTermYears}
-                    onChange={(event) =>
-                      setLoanTermYears(Number(event.target.value))
-                    }
-                  />
-                </div>
-
-              </>
-            )}
-
-            <div>
-              <Label htmlFor="acquisition-costs">Acquisition Costs %</Label>
-              <Input
-                id="acquisition-costs"
-                type="number"
-                min="0"
-                step="0.25"
-                value={acquisitionCostsRate}
-                onChange={(event) =>
-                  setAcquisitionCostsRate(Number(event.target.value))
-                }
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Lender and closing costs combined.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Operating Assumptions
-          </h3>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-            <div>
-              <Label htmlFor="vacancy-rate">Vacancy %</Label>
-              <Input
-                id="vacancy-rate"
-                type="number"
-                value={vacancyRate}
-                onChange={(event) => setVacancyRate(Number(event.target.value))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="management-rate">Management %</Label>
-              <Input
-                id="management-rate"
-                type="number"
-                value={managementRate}
-                onChange={(event) =>
-                  setManagementRate(Number(event.target.value))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="repairs-rate">Repairs %</Label>
-              <Input
-                id="repairs-rate"
-                type="number"
-                value={repairsRate}
-                onChange={(event) => setRepairsRate(Number(event.target.value))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="capex-rate">CapEx Reserve %</Label>
-              <Input
-                id="capex-rate"
-                type="number"
-                value={capexRate}
-                onChange={(event) => setCapexRate(Number(event.target.value))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="utilities-annual">Utilities / Year</Label>
-              <Input
-                id="utilities-annual"
-                type="number"
-                min="0"
-                value={utilitiesAnnual}
-                onChange={(event) =>
-                  setCustomUtilitiesAnnual(Number(event.target.value))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="other-expenses">Other Expenses / Year</Label>
-              <Input
-                id="other-expenses"
-                type="number"
-                min="0"
-                value={otherExpensesAnnual}
-                onChange={(event) =>
-                  setOtherExpensesAnnual(Number(event.target.value))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="target-cap-rate">Target Cap Rate %</Label>
-              <Input
-                id="target-cap-rate"
-                type="number"
-                min="0"
-                step="0.25"
-                value={targetCapRate}
-                onChange={(event) =>
-                  setTargetCapRate(Number(event.target.value))
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="offer-discount">Initial Offer Discount %</Label>
-              <Input
-                id="offer-discount"
-                type="number"
-                min="0"
-                value={initialOfferDiscount}
-                onChange={(event) =>
-                  setInitialOfferDiscount(Number(event.target.value))
-                }
-              />
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Returns & Risk
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric
-              label="Monthly Cash Flow"
-              value={formatCurrency(results.monthlyCashFlow)}
-              note="After operating expenses and debt service"
-              emphasis
-            />
-            <Metric
-              label="Cash-on-Cash Return"
-              value={formatPercent(results.cashOnCashReturn)}
-              note={`${formatCurrency(results.cashRequired)} total cash required`}
-              emphasis
-            />
-            <Metric
-              label="NOI"
-              value={formatCurrency(results.noiAnnual)}
-              note={`${formatPercent(results.capRate)} cap rate at purchase price`}
-            />
-            <Metric
-              label="DSCR"
-              value={isFinanced ? formatRatio(results.dscr) : "N/A"}
-              note="NOI ÷ annual debt service"
-            />
-            <Metric
-              label="Debt Yield"
-              value={isFinanced ? formatPercent(results.debtYield) : "N/A"}
-              note="NOI ÷ loan amount"
-            />
-            <Metric
-              label="Break-Even Occupancy"
-              value={formatPercent(results.breakEvenOccupancy)}
-              note="Occupancy needed to cover expenses and debt"
-            />
-            <Metric
-              label="Gross Rent Multiplier"
-              value={formatRatio(results.grossRentMultiplier)}
-              note="Purchase price ÷ annual gross rent"
-            />
-            <Metric
-              label="Operating Expense Ratio"
-              value={formatPercent(results.expenseRatio)}
-              note={`${formatCurrency(results.totalExpenses)} annual operating expenses`}
-            />
-          </div>
-        </section>
-
-        {isFinanced && (
-          <section>
+      <CardContent>
+        <div className={mobileAnalysisRailClass}>
+          <section className={mobileAnalysisPanelClass}>
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
-              Mortgage Details
+              Purchase & Financing
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <div>
+                <Label htmlFor="purchase-method">Purchase Method</Label>
+                <select
+                  id="purchase-method"
+                  value={purchaseMethod}
+                  onChange={(event) =>
+                    setPurchaseMethod(event.target.value as PurchaseMethod)
+                  }
+                  className="mt-1 flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                >
+                  <option value="financed">Mortgage</option>
+                  <option value="cash">Cash Purchase</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="analysis-price">Purchase Price</Label>
+                <Input
+                  id="analysis-price"
+                  type="number"
+                  min="0"
+                  value={purchasePrice}
+                  onChange={(event) =>
+                    setPurchasePrice(Number(event.target.value))
+                  }
+                />
+              </div>
+
+              {isFinanced && (
+                <>
+                  <div>
+                    <Label htmlFor="down-payment">Down Payment %</Label>
+                    <Input
+                      id="down-payment"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      list="down-payment-options"
+                      value={downPaymentRate}
+                      onChange={(event) =>
+                        setDownPaymentRate(Number(event.target.value))
+                      }
+                    />
+                    <datalist id="down-payment-options">
+                      <option value="15" />
+                      <option value="20" />
+                      <option value="25" />
+                      <option value="30" />
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="interest-rate">Interest Rate %</Label>
+                    <Input
+                      id="interest-rate"
+                      type="number"
+                      min="0"
+                      step="0.125"
+                      value={interestRate}
+                      onChange={(event) => {
+                        setCustomInterestRate(Number(event.target.value));
+                      }}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      {rateStatus === "loading" &&
+                        "Loading today’s market estimate..."}
+                      {rateStatus === "current" &&
+                        selectedMarketRate &&
+                        `Daily market estimate as of ${selectedMarketRate.observedAt}; cached for 24 hours.`}
+                      {rateStatus === "fallback" &&
+                        "The live feed timed out. Using a fallback estimate; edit as needed."}
+                    </p>
+                    {hasCustomizedInterestRate && marketRates && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomInterestRate(null)}
+                        className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900"
+                      >
+                        Use daily market estimate
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="loan-term">Loan Term (Years)</Label>
+                    <Input
+                      id="loan-term"
+                      type="number"
+                      min="1"
+                      value={loanTermYears}
+                      onChange={(event) =>
+                        setLoanTermYears(Number(event.target.value))
+                      }
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <Label htmlFor="acquisition-costs">Acquisition Costs %</Label>
+                <Input
+                  id="acquisition-costs"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={acquisitionCostsRate}
+                  onChange={(event) =>
+                    setAcquisitionCostsRate(Number(event.target.value))
+                  }
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Lender and closing costs combined.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className={mobileAnalysisPanelClass}>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Operating Assumptions
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <div>
+                <Label htmlFor="vacancy-rate">Vacancy %</Label>
+                <Input
+                  id="vacancy-rate"
+                  type="number"
+                  value={vacancyRate}
+                  onChange={(event) =>
+                    setVacancyRate(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="management-rate">Management %</Label>
+                <Input
+                  id="management-rate"
+                  type="number"
+                  value={managementRate}
+                  onChange={(event) =>
+                    setManagementRate(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="repairs-rate">Repairs %</Label>
+                <Input
+                  id="repairs-rate"
+                  type="number"
+                  value={repairsRate}
+                  onChange={(event) =>
+                    setRepairsRate(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="capex-rate">CapEx Reserve %</Label>
+                <Input
+                  id="capex-rate"
+                  type="number"
+                  value={capexRate}
+                  onChange={(event) =>
+                    setCapexRate(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="utilities-annual">Utilities / Year</Label>
+                <Input
+                  id="utilities-annual"
+                  type="number"
+                  min="0"
+                  value={utilitiesAnnual}
+                  onChange={(event) =>
+                    setCustomUtilitiesAnnual(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="other-expenses">Other Expenses / Year</Label>
+                <Input
+                  id="other-expenses"
+                  type="number"
+                  min="0"
+                  value={otherExpensesAnnual}
+                  onChange={(event) =>
+                    setOtherExpensesAnnual(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="target-cap-rate">Target Cap Rate %</Label>
+                <Input
+                  id="target-cap-rate"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={targetCapRate}
+                  onChange={(event) =>
+                    setTargetCapRate(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div>
+                <Label htmlFor="offer-discount">Initial Offer Discount %</Label>
+                <Input
+                  id="offer-discount"
+                  type="number"
+                  min="0"
+                  value={initialOfferDiscount}
+                  onChange={(event) =>
+                    setInitialOfferDiscount(Number(event.target.value))
+                  }
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className={mobileAnalysisPanelClass}>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Returns & Risk
             </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Metric
-                label="Down Payment"
-                value={formatCurrency(results.downPayment)}
-                note={`${downPaymentRate}% down`}
+                label="Monthly Cash Flow"
+                value={formatCurrency(results.monthlyCashFlow)}
+                note="After operating expenses and debt service"
+                emphasis
               />
               <Metric
-                label="Loan Amount"
-                value={formatCurrency(results.loanAmount)}
-                note={`${formatPercent(results.loanAmount / Math.max(1, purchasePrice))} LTV`}
+                label="Cash-on-Cash Return"
+                value={formatPercent(results.cashOnCashReturn)}
+                note={`${formatCurrency(results.cashRequired)} total cash required`}
+                emphasis
               />
               <Metric
-                label="Monthly Principal & Interest"
-                value={formatCurrency(results.monthlyPrincipalAndInterest)}
-                note={`${interestRate}% fixed over ${loanTermYears} years`}
+                label="NOI"
+                value={formatCurrency(results.noiAnnual)}
+                note={`${formatPercent(results.capRate)} cap rate at purchase price`}
               />
               <Metric
-                label="Annual Debt Service"
-                value={formatCurrency(results.annualDebtService)}
+                label="DSCR"
+                value={isFinanced ? formatRatio(results.dscr) : "N/A"}
+                note="NOI ÷ annual debt service"
               />
               <Metric
-                label="First-Year Interest"
-                value={formatCurrency(results.firstYearInterest)}
-                note="Estimated from the amortization schedule"
+                label="Debt Yield"
+                value={isFinanced ? formatPercent(results.debtYield) : "N/A"}
+                note="NOI ÷ loan amount"
               />
               <Metric
-                label="Total Interest"
-                value={formatCurrency(results.totalInterest)}
-                note="If held for the full loan term"
+                label="Break-Even Occupancy"
+                value={formatPercent(results.breakEvenOccupancy)}
+                note="Occupancy needed to cover expenses and debt"
               />
               <Metric
-                label="Estimated Acquisition Costs"
-                value={formatCurrency(results.acquisitionCosts)}
-                note={`${acquisitionCostsRate}% of purchase price`}
+                label="Gross Rent Multiplier"
+                value={formatRatio(results.grossRentMultiplier)}
+                note="Purchase price ÷ annual gross rent"
               />
               <Metric
-                label="Annual Cash Flow"
-                value={formatCurrency(results.annualCashFlow)}
-                note="NOI minus annual debt service"
+                label="Operating Expense Ratio"
+                value={formatPercent(results.expenseRatio)}
+                note={`${formatCurrency(results.totalExpenses)} annual operating expenses`}
               />
             </div>
           </section>
-        )}
 
-        <section>
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
-            Income & Offer View
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric
-              label="Projected Monthly Rent"
-              value={formatCurrency(projectedMonthlyRent)}
-            />
-            <Metric
-              label="Annual Gross Rent"
-              value={formatCurrency(results.annualGrossRent)}
-            />
-            <Metric
-              label="Effective Gross Income"
-              value={formatCurrency(results.effectiveGrossIncome)}
-              note={`${formatCurrency(results.vacancyLoss)} vacancy allowance`}
-            />
-            <Metric
-              label="Value by Target Cap Rate"
-              value={formatCurrency(results.valueByCapRate)}
-              note={`${targetCapRate}% target cap rate`}
-            />
-            <Metric
-              label="Max Purchase Price"
-              value={formatCurrency(results.maxPurchasePrice)}
-              note="Cap-rate value less rehab and acquisition costs"
-            />
-            <Metric
-              label="Suggested Initial Offer"
-              value={formatCurrency(results.suggestedInitialOffer)}
-              note={`${initialOfferDiscount}% below max purchase price`}
-            />
-          </div>
-        </section>
+          {isFinanced && (
+            <section className={mobileAnalysisPanelClass}>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+                Mortgage Details
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Metric
+                  label="Down Payment"
+                  value={formatCurrency(results.downPayment)}
+                  note={`${downPaymentRate}% down`}
+                />
+                <Metric
+                  label="Loan Amount"
+                  value={formatCurrency(results.loanAmount)}
+                  note={`${formatPercent(results.loanAmount / Math.max(1, purchasePrice))} LTV`}
+                />
+                <Metric
+                  label="Monthly Principal & Interest"
+                  value={formatCurrency(results.monthlyPrincipalAndInterest)}
+                  note={`${interestRate}% fixed over ${loanTermYears} years`}
+                />
+                <Metric
+                  label="Annual Debt Service"
+                  value={formatCurrency(results.annualDebtService)}
+                />
+                <Metric
+                  label="First-Year Interest"
+                  value={formatCurrency(results.firstYearInterest)}
+                  note="Estimated from the amortization schedule"
+                />
+                <Metric
+                  label="Total Interest"
+                  value={formatCurrency(results.totalInterest)}
+                  note="If held for the full loan term"
+                />
+                <Metric
+                  label="Estimated Acquisition Costs"
+                  value={formatCurrency(results.acquisitionCosts)}
+                  note={`${acquisitionCostsRate}% of purchase price`}
+                />
+                <Metric
+                  label="Annual Cash Flow"
+                  value={formatCurrency(results.annualCashFlow)}
+                  note="NOI minus annual debt service"
+                />
+              </div>
+            </section>
+          )}
 
-        <p className="text-xs leading-relaxed text-slate-500">
-          Planning estimates only. Mortgage pricing, taxes, insurance, reserves,
-          and lender underwriting vary by borrower and property.
-        </p>
+          <section className={mobileAnalysisPanelClass}>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Income & Offer View
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Projected Monthly Rent"
+                value={formatCurrency(projectedMonthlyRent)}
+              />
+              <Metric
+                label="Annual Gross Rent"
+                value={formatCurrency(results.annualGrossRent)}
+              />
+              <Metric
+                label="Effective Gross Income"
+                value={formatCurrency(results.effectiveGrossIncome)}
+                note={`${formatCurrency(results.vacancyLoss)} vacancy allowance`}
+              />
+              <Metric
+                label="Value by Target Cap Rate"
+                value={formatCurrency(results.valueByCapRate)}
+                note={`${targetCapRate}% target cap rate`}
+              />
+              <Metric
+                label="Max Purchase Price"
+                value={formatCurrency(results.maxPurchasePrice)}
+                note="Cap-rate value less rehab and acquisition costs"
+              />
+              <Metric
+                label="Suggested Initial Offer"
+                value={formatCurrency(results.suggestedInitialOffer)}
+                note={`${initialOfferDiscount}% below max purchase price`}
+              />
+            </div>
+          </section>
+
+          <section className={mobileAnalysisPanelClass}>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-600">
+              Notes
+            </h3>
+            <p className="text-xs leading-relaxed text-slate-500">
+              Planning estimates only. Mortgage pricing, taxes, insurance,
+              reserves, and lender underwriting vary by borrower and property.
+            </p>
+          </section>
+        </div>
       </CardContent>
     </Card>
   );
