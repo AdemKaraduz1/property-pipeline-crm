@@ -5,6 +5,22 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const defaultPropertyUserId = process.env.DEFAULT_PROPERTY_USER_ID;
 
+type ImportedUnit = {
+  unitNumber?: unknown;
+  floorNumber?: unknown;
+  sqft?: unknown;
+  rooms?: unknown;
+  bedrooms?: unknown;
+  fullBaths?: unknown;
+  halfBaths?: unknown;
+  masterBedroomBath?: unknown;
+  securityDeposit?: unknown;
+  rent?: unknown;
+  leaseExpiration?: unknown;
+  appliancesFeatures?: unknown;
+  tenantPays?: unknown;
+};
+
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
 
@@ -247,8 +263,8 @@ export async function POST(request: Request) {
       action = "created";
     }
 
-    const units = Array.isArray(payload.unitInformation)
-      ? payload.unitInformation
+    const units: ImportedUnit[] = Array.isArray(payload.unitInformation)
+      ? (payload.unitInformation as ImportedUnit[])
       : [];
 
     const { error: deleteUnitsError } = await supabase
@@ -271,7 +287,7 @@ export async function POST(request: Request) {
     }
 
     if (units.length > 0) {
-      const unitRows = units.map((unit: any) => {
+      const unitRows = units.map((unit) => {
         const rent = toNumber(unit.rent);
         const bedrooms = toNumber(unit.bedrooms);
         const fullBaths = toNumber(unit.fullBaths);

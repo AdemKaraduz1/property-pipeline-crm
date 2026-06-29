@@ -1,17 +1,52 @@
-const DEFAULT_APP_URL = "http://localhost:3000";
+const DEFAULT_APP_URL = "https://property-pipeline-crm.vercel.app";
 
 let capturedData = {};
 let existingDeal = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   const saved = await chrome.storage.local.get(["appUrl"]);
-  document.getElementById("appUrl").value = saved.appUrl || DEFAULT_APP_URL;
+  document.getElementById("appUrl").value =
+    normalizeAppUrl(saved.appUrl || DEFAULT_APP_URL) || DEFAULT_APP_URL;
 
   document.getElementById("captureBtn").addEventListener("click", captureCurrentPage);
   document.getElementById("saveBtn").addEventListener("click", saveToPropertyPipeline);
 
   await captureCurrentPage();
 });
+
+function normalizeAppUrl(value) {
+  const trimmedValue = String(value || "").trim();
+
+  if (!trimmedValue) return "";
+
+  try {
+    const url = new URL(trimmedValue);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "";
+    }
+
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+async function parseApiResponse(response) {
+  const responseText = await response.text();
+
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return {
+      success: false,
+      message:
+        responseText && !responseText.trimStart().startsWith("<")
+          ? responseText
+          : `The app returned an invalid response (${response.status}).`
+    };
+  }
+}
 
 async function captureCurrentPage() {
   setStatus("Capturing page...");
@@ -72,13 +107,20 @@ async function checkExistingDeal() {
   existingDeal = null;
 
   const saveButton = document.getElementById("saveBtn");
-  const appUrl = document.getElementById("appUrl").value.replace(/\/$/, "");
+  const appUrl = normalizeAppUrl(document.getElementById("appUrl").value);
   const mlsNumber = document.getElementById("mlsNumber").value.trim();
   const sourceUrl = document.getElementById("sourceUrl").value.trim();
 
   saveButton.textContent = "Import Deal";
 
-  if (!appUrl || (!mlsNumber && !sourceUrl)) {
+  if (!appUrl) {
+    setStatus("Enter a valid Property Pipeline app URL.");
+    return;
+  }
+
+  document.getElementById("appUrl").value = appUrl;
+
+  if (!mlsNumber && !sourceUrl) {
     return;
   }
 
@@ -97,7 +139,7 @@ async function checkExistingDeal() {
       `${appUrl}/api/listings/check-existing?${params.toString()}`
     );
 
-    const result = await response.json();
+    const result = await parseApiResponse(response);
 
     if (!response.ok || !result.success) {
       console.warn("Existing deal check failed:", result);
@@ -157,7 +199,15 @@ function renderUnitPreview(units) {
 }
 
 async function saveToPropertyPipeline() {
-  const appUrl = document.getElementById("appUrl").value.replace(/\/$/, "");
+  const appUrlInput = document.getElementById("appUrl");
+  const appUrl = normalizeAppUrl(appUrlInput.value);
+
+  if (!appUrl) {
+    setStatus("Import failed: enter a valid Property Pipeline app URL.");
+    return;
+  }
+
+  appUrlInput.value = appUrl;
 
   await chrome.storage.local.set({ appUrl });
 
@@ -213,7 +263,7 @@ async function saveToPropertyPipeline() {
       body: JSON.stringify(payload)
     });
 
-    const result = await response.json();
+    const result = await parseApiResponse(response);
 
     if (!response.ok || !result.success) {
       throw new Error(result.message || `Import failed with status ${response.status}`);
@@ -236,7 +286,13 @@ async function saveToPropertyPipeline() {
     }
   } catch (error) {
     console.error(error);
-    setStatus("Import failed. Check your app URL and API endpoint.");
+    setStatus(
+      `Import failed: ${
+        error instanceof Error
+          ? error.message
+          : "check your app URL and API endpoint."
+      }`
+    );
   }
 }
 
@@ -409,19 +465,39 @@ function extractListingDataFromPage() {
 
   function parseUnitInformation() {
     function makeUnitFromCells(cells) {
-      cells = cells.map(cleanText).filter(Boolean);
+      const cleanedCells = cells.map(cleanText);
 
-      if (cells.length < 10) return null;
+      if (cleanedCells.length >= 13) {
+        return {
+          unitNumber: cleanedCells[0] || "",
+          floorNumber: cleanedCells[1] || "",
+          sqft: cleanedCells[2] || "",
+          rooms: cleanedCells[3] || "",
+          bedrooms: cleanedCells[4] || "",
+          fullBaths: cleanedCells[5] || "",
+          halfBaths: cleanedCells[6] || "",
+          masterBedroomBath: cleanedCells[7] || "",
+          securityDeposit: cleanedCells[8] || "",
+          rent: cleanedCells[9] || "",
+          leaseExpiration: cleanedCells[10] || "",
+          appliancesFeatures: cleanedCells[11] || "",
+          tenantPays: cleanedCells.slice(12).filter(Boolean).join(", ")
+        };
+      }
+
+      const compactCells = cleanedCells.filter(Boolean);
+
+      if (compactCells.length < 10) return null;
 
       const unit = {
-        unitNumber: cells[0] || "",
-        floorNumber: cells[1] || "",
-        sqft: cells[2] || "",
-        rooms: cells[3] || "",
-        bedrooms: cells[4] || "",
-        fullBaths: cells[5] || "",
-        halfBaths: cells[6] || "",
-        masterBedroomBath: cells[7] || "",
+        unitNumber: compactCells[0] || "",
+        floorNumber: compactCells[1] || "",
+        sqft: compactCells[2] || "",
+        rooms: compactCells[3] || "",
+        bedrooms: compactCells[4] || "",
+        fullBaths: compactCells[5] || "",
+        halfBaths: compactCells[6] || "",
+        masterBedroomBath: compactCells[7] || "",
         securityDeposit: "",
         rent: "",
         leaseExpiration: "",
@@ -429,15 +505,18 @@ function extractListingDataFromPage() {
         tenantPays: ""
       };
 
-      const remaining = cells.slice(8);
+      const remaining = compactCells.slice(8);
 
-      if (remaining.length >= 5 && /\d{1,2}\/\d{2,4}/.test(remaining[2])) {
+      if (remaining.length >= 5 && /^\d{1,2}\/\d{1,4}$/.test(remaining[2])) {
         unit.securityDeposit = remaining[0] || "";
         unit.rent = remaining[1] || "";
         unit.leaseExpiration = remaining[2] || "";
         unit.appliancesFeatures = remaining[3] || "";
         unit.tenantPays = remaining.slice(4).join(", ");
-      } else if (remaining.length >= 4 && /\d{1,2}\/\d{2,4}/.test(remaining[1])) {
+      } else if (
+        remaining.length >= 4 &&
+        /^\d{1,2}\/\d{1,4}$/.test(remaining[1])
+      ) {
         unit.rent = remaining[0] || "";
         unit.leaseExpiration = remaining[1] || "";
         unit.appliancesFeatures = remaining[2] || "";
@@ -510,7 +589,7 @@ function extractListingDataFromPage() {
     }
 
     function isLeaseDate(value) {
-      return /^\d{1,2}\/\d{2,4}$/.test(value);
+      return /^\d{1,2}\/\d{1,4}$/.test(value);
     }
 
     while (i < lines.length) {
