@@ -145,7 +145,7 @@ async function updateWalkthrough(
   for (const definition of COMMON_REHAB_ITEMS) {
     const inspection = normalizedCommon[definition.id];
 
-    if (inspection?.needsRehab !== null) {
+    if (inspection && inspection.needsRehab !== null) {
       nextCommonItems[definition.id] =
         inspection.needsRehab === true ? inspection.estimatedCost : 0;
     }
