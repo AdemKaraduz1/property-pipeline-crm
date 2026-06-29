@@ -587,6 +587,43 @@ function extractListingDataFromPage() {
       );
     }
 
+    function getAdvertisedUnitCount() {
+      const matches = [...rawText.matchAll(/\b(\d{1,2})\s+Units\b/gi)]
+        .map((match) => Number(match[1]))
+        .filter((count) => Number.isInteger(count) && count > 0 && count <= 50);
+
+      return matches[0] || 0;
+    }
+
+    function withAdvertisedUnitCount(parsedUnits) {
+      const advertisedUnitCount = getAdvertisedUnitCount();
+
+      if (!advertisedUnitCount || parsedUnits.length >= advertisedUnitCount) {
+        return parsedUnits;
+      }
+
+      const unitsByNumber = new Map(
+        parsedUnits
+          .filter((unit) => unit.unitNumber)
+          .map((unit) => [String(unit.unitNumber), unit])
+      );
+
+      for (let unitNumber = 1; unitNumber <= advertisedUnitCount; unitNumber += 1) {
+        const unitNumberText = String(unitNumber);
+
+        if (!unitsByNumber.has(unitNumberText)) {
+          unitsByNumber.set(unitNumberText, {
+            ...makeEmptyUnit(),
+            unitNumber: unitNumberText
+          });
+        }
+      }
+
+      return [...unitsByNumber.values()].sort(
+        (a, b) => Number(a.unitNumber) - Number(b.unitNumber)
+      );
+    }
+
     function makeUnitsFromTransposedRows(rows) {
       const rowCells = rows
         .map((row) => [...row.querySelectorAll("td, th")].map((cell) => cleanText(cell.innerText)))
@@ -913,7 +950,7 @@ function extractListingDataFromPage() {
       startIndex === -1 ? [] : makeUnitsFromTransposedLines(lines, startIndex);
 
     if (transposedLineUnits.length > 0) {
-      return transposedLineUnits;
+      return withAdvertisedUnitCount(transposedLineUnits);
     }
 
     const tenantPaysIndex = lines.findIndex(
@@ -923,15 +960,14 @@ function extractListingDataFromPage() {
       tenantPaysIndex === -1 ? [] : makeUnitsFromColumnMajorLines(lines, tenantPaysIndex);
 
     if (columnMajorUnits.length > 0) {
-      return columnMajorUnits;
+      return withAdvertisedUnitCount(columnMajorUnits);
     }
 
     if (units.length > 0) {
-      return units;
+      return withAdvertisedUnitCount(units);
     }
 
-    if (startIndex === -1) return [];
-    return [];
+    return withAdvertisedUnitCount([]);
   }
 
   const jsonLdItems = parseJsonLd();
