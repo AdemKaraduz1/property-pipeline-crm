@@ -141,10 +141,10 @@ function Metric({
 }
 
 const mobileAnalysisRailClass =
-  "flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:block sm:space-y-8 sm:overflow-visible sm:pb-0";
+  "flex snap-x snap-mandatory items-start gap-3 overflow-x-auto pb-2 sm:block sm:space-y-8 sm:overflow-visible sm:pb-0";
 
 const mobileAnalysisPanelClass =
-  "min-w-[74vw] snap-start rounded-lg border border-slate-200 bg-white p-3 text-sm sm:min-w-0 sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-none sm:[&_[data-slot=label]]:text-xs";
+  "min-w-[calc(100%-2rem)] shrink-0 snap-start rounded-lg border border-slate-200 bg-white p-3 text-sm sm:min-w-0 sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-none sm:[&_[data-slot=label]]:text-xs";
 
 const analysisGridClass =
   "grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4";

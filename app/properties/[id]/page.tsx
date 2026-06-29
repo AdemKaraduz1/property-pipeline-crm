@@ -248,6 +248,15 @@ const sectionTitleClass = "text-base font-semibold text-slate-950 sm:text-lg";
 
 const sectionDescriptionClass = "text-xs leading-relaxed text-slate-500 sm:text-sm";
 
+const detailLabelClass =
+  "text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-sm sm:normal-case sm:tracking-normal";
+
+const detailValueClass =
+  "truncate text-sm font-medium text-slate-950 sm:text-base";
+
+const compactMoneyInputClass =
+  "h-8 w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:h-10 sm:px-3 sm:py-2";
+
 export default async function PropertyDetailPage({ params }: PageProps) {
   const supabase = await createClient();
 
@@ -737,37 +746,37 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </EditPropertyModal>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 md:grid-cols-4 md:gap-4">
             <div>
-              <p className="text-sm text-slate-500">Year Built</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Year Built</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.year_built)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Property Type</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Property Type</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.property_type)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Sq Ft</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Sq Ft</p>
+              <p className={detailValueClass}>
                 {formatNumber(property.sqft)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Lot Size</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Lot Size</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.lot_size)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">PIN / Parcel</p>
+              <p className={detailLabelClass}>PIN / Parcel</p>
 
               {cookCountyTaxUrl ? (
                 <a
@@ -775,76 +784,76 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                   target="_blank"
                   rel="noreferrer"
                   title="Open Cook County property tax page"
-                  className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                  className={`${detailValueClass} block text-blue-700 underline underline-offset-2 hover:text-blue-900`}
                 >
                   {formatCookCountyPin(property.parcel_number)}
                 </a>
               ) : (
-                <p className="font-medium text-slate-950">
+                <p className={detailValueClass}>
                   {valueOrDash(property.parcel_number)}
                 </p>
               )}
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Basement</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Basement</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.basement)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Roof</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Roof</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.roof)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Exterior</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Exterior</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.exterior)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Zoning</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Zoning</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.zoning)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Parking</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Parking</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.parking)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Heating</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Heating</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.heating)}
               </p>
             </div>
 
             <div>
-              <p className="text-sm text-slate-500">Cooling</p>
-              <p className="font-medium text-slate-950">
+              <p className={detailLabelClass}>Cooling</p>
+              <p className={detailValueClass}>
                 {valueOrDash(property.cooling)}
               </p>
             </div>
           </div>
 
-          <div className="mt-6 border-t border-slate-200 pt-5">
+          <div className="mt-4 border-t border-slate-200 pt-4 md:mt-6 md:pt-5">
             <form
               action={updateBuildingFinancials}
-              className="flex flex-wrap items-end gap-4"
+              className="grid grid-cols-2 items-end gap-2 md:flex md:flex-wrap md:gap-4"
             >
-              <div className="min-w-[180px] flex-1">
+              <div className="min-w-0 md:min-w-[180px] md:flex-1">
                 <label
                   htmlFor="taxes_annual"
-                  className="mb-1 block text-sm font-medium text-slate-700"
+                  className="mb-1 block text-[11px] font-medium text-slate-700 sm:text-sm"
                 >
                   Annual Taxes
                 </label>
@@ -858,14 +867,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     hasValue(taxesAnnual) ? Number(taxesAnnual) : ""
                   }
                   placeholder="Annual taxes"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className={compactMoneyInputClass}
                 />
               </div>
 
-              <div className="min-w-[180px] flex-1">
+              <div className="min-w-0 md:min-w-[180px] md:flex-1">
                 <label
                   htmlFor="insurance_annual"
-                  className="mb-1 block text-sm font-medium text-slate-700"
+                  className="mb-1 block text-[11px] font-medium text-slate-700 sm:text-sm"
                 >
                   Annual Insurance
                 </label>
@@ -879,20 +888,22 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     hasValue(insuranceAnnual) ? Number(insuranceAnnual) : ""
                   }
                   placeholder="Annual insurance"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className={compactMoneyInputClass}
                 />
               </div>
 
-              <div className="min-w-[160px] pb-2">
-                <p className="text-sm text-slate-500">Annual Utilities</p>
-                <p className="text-lg font-bold text-slate-950">
+              <div className="min-w-0 pb-1 md:min-w-[160px] md:pb-2">
+                <p className="text-[11px] text-slate-500 sm:text-sm">
+                  Annual Utilities
+                </p>
+                <p className="text-base font-bold text-slate-950 sm:text-lg">
                   {formatCurrency(annualUtilities)}
                 </p>
               </div>
 
               <button
                 type="submit"
-                className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                className="min-h-8 rounded-md bg-slate-950 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 md:px-4 md:py-2"
               >
                 Save
               </button>
@@ -1517,14 +1528,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
 
         <form action={updateCommonAreaRehab}>
-          <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-2 md:grid md:snap-none md:grid-cols-2 md:overflow-visible md:pb-0 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {COMMON_REHAB_ITEMS.map((item) => {
               const storedCost = toFiniteNumber(commonRehabItems[item.id]);
 
               return (
                 <div
                   key={item.id}
-                  className="min-w-[9.5rem] snap-start rounded-md border border-slate-200 bg-slate-50 p-2 md:min-w-0 md:rounded-lg md:p-3"
+                  className="rounded-md border border-slate-200 bg-slate-50 p-2 md:rounded-lg md:p-3"
                 >
                   <label
                     htmlFor={`common_rehab_${item.id}`}
@@ -1550,7 +1561,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             })}
           </div>
 
-          <div className="mt-3 grid grid-cols-[5.5rem_1fr] gap-3 md:mt-5 md:grid-cols-[200px_1fr] md:gap-4">
+          <div className="mt-3 grid grid-cols-[5.5rem_1fr] gap-2 md:mt-5 md:grid-cols-[200px_1fr] md:gap-4">
             <div>
               <label
                 htmlFor="common_rehab_contingency"
@@ -1582,7 +1593,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 defaultValue={commonRehabNotes}
                 rows={2}
                 placeholder="Scope details, contractor notes, priorities, or work that may not be needed..."
-                className={inlineInputClass}
+                className={`${inlineInputClass} h-16 resize-none`}
               />
             </div>
           </div>
