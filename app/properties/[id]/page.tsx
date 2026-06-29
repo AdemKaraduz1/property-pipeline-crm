@@ -14,6 +14,7 @@ import { PropertyEditForm } from "@/components/PropertyEditForm";
 import { MobilityFmrCard } from "@/components/MobilityFmrCard";
 import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
+import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
 
 type PageProps = {
   params: Promise<{
@@ -60,64 +61,6 @@ type PropertyUnit = {
   created_at?: string | null;
 };
 
-const COMMON_REHAB_ITEMS = [
-  {
-    id: "exterior_masonry",
-    label: "Brick / Facade",
-    description: "Tuckpointing, masonry, siding, and exterior repairs",
-  },
-  {
-    id: "roof_gutters",
-    label: "Roof / Gutters",
-    description: "Roofing, flashing, gutters, and downspouts",
-  },
-  {
-    id: "landscaping_site",
-    label: "Landscaping / Site",
-    description: "Yard, fencing, walkways, drainage, and exterior cleanup",
-  },
-  {
-    id: "hallways_lobby",
-    label: "Hallways / Lobby",
-    description: "Paint, flooring, lighting, doors, and common finishes",
-  },
-  {
-    id: "stairs_railings",
-    label: "Stairs / Railings",
-    description: "Interior or exterior stairs, porches, and guardrails",
-  },
-  {
-    id: "basement_storage",
-    label: "Basement / Storage",
-    description: "Common basement, laundry, storage, and moisture work",
-  },
-  {
-    id: "building_mechanical",
-    label: "Building Mechanicals",
-    description: "Shared boiler, HVAC, water heater, and ventilation",
-  },
-  {
-    id: "plumbing_electrical",
-    label: "Plumbing / Electrical",
-    description: "Shared supply, waste, panels, service, and common wiring",
-  },
-  {
-    id: "security_fire",
-    label: "Security / Fire Safety",
-    description: "Cameras, access control, alarms, extinguishers, and signage",
-  },
-  {
-    id: "permits_professional",
-    label: "Permits / Professional",
-    description: "Permits, plans, engineering, architecture, and inspections",
-  },
-  {
-    id: "other",
-    label: "Other Common Work",
-    description: "Anything shared that does not fit another category",
-  },
-] as const;
-
 const WATER_MONTHLY_PER_UNIT = 60;
 const ELECTRICITY_MONTHLY_PER_UNIT = 115;
 const GAS_MONTHLY_PER_UNIT = 115;
@@ -157,12 +100,6 @@ function valueOrDash(value: unknown) {
 
 function hasValue(value: unknown) {
   return value !== null && value !== undefined && value !== "";
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 function toFiniteNumber(value: unknown, fallback = 0) {
@@ -509,6 +446,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   );
 
   const propertyMetadata = asRecord(property.all_extracted_fields);
+  const hasWalkthroughProgress = Boolean(
+    asRecord(propertyMetadata.walkthrough).updated_at,
+  );
   const commonRehab = asRecord(propertyMetadata.common_area_rehab);
   const commonRehabItems = asRecord(commonRehab.items);
   const commonRehabContingency = toFiniteNumber(
@@ -613,7 +553,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           ← Back to Pipeline
         </Link>
 
-        <DeletePropertyButton propertyId={id} />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href={`/properties/${id}/walkthrough`}
+            className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            {hasWalkthroughProgress ? "Resume Walkthrough" : "Start Walkthrough"}
+          </Link>
+          <DeletePropertyButton propertyId={id} />
+        </div>
       </div>
 
       <div className="mb-8">
