@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -89,6 +89,14 @@ const PIPELINE_COLUMNS: PipelineColumnConfig[] = [
   },
 ];
 
+const pipelineGridClass =
+  "-mx-4 flex w-[calc(100%+2rem)] snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain px-4 pb-4 md:mx-0 md:w-full md:px-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0 xl:grid-cols-6";
+
+const pipelineColumnClass =
+  "flex min-h-[520px] min-w-0 w-[82vw] max-w-[340px] shrink-0 snap-start flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm lg:w-auto lg:max-w-none";
+
+const subscribeToClient = () => () => {};
+
 function formatCurrency(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") return "No price";
 
@@ -164,7 +172,7 @@ function PipelineColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-[520px] min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition ${
+      className={`${pipelineColumnClass} transition ${
         isOver ? "border-slate-400 bg-slate-50 ring-2 ring-slate-200" : ""
       }`}
     >
@@ -280,7 +288,10 @@ function PipelineGrid({
   propertiesByColumn: Record<string, Property[]>;
 }) {
   return (
-    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div
+      className={pipelineGridClass}
+      aria-label="Property pipeline board. Swipe horizontally to view stages."
+    >
       {PIPELINE_COLUMNS.map((column) => (
         <PipelineColumn
           key={column.id}
@@ -298,7 +309,10 @@ function StaticPipelineGrid({ properties }: { properties: Property[] }) {
   );
 
   return (
-    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div
+      className={pipelineGridClass}
+      aria-label="Property pipeline board. Swipe horizontally to view stages."
+    >
       {PIPELINE_COLUMNS.map((column) => {
         const columnProperties = activeProperties.filter((property) =>
           column.statuses.includes(normalizeStatus(property.status))
@@ -307,7 +321,7 @@ function StaticPipelineGrid({ properties }: { properties: Property[] }) {
         return (
           <div
             key={column.id}
-            className="flex min-h-[520px] min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+            className={pipelineColumnClass}
           >
             <div className="mb-3 flex items-start justify-between gap-2">
               <h3 className="break-words font-serif text-sm font-bold uppercase leading-tight tracking-wide text-slate-800">
@@ -343,17 +357,27 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
     [properties]
   );
 
-  const [mounted, setMounted] = useState(false);
-  const [items, setItems] = useState<Property[]>(activeProperties);
+  const mounted = useSyncExternalStore(
+    subscribeToClient,
+    () => true,
+    () => false,
+  );
+  const [statusOverrides, setStatusOverrides] = useState<
+    Record<string, string>
+  >({});
   const [activeProperty, setActiveProperty] = useState<Property | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const items = useMemo(
+    () =>
+      activeProperties.map((property) => {
+        const overriddenStatus = statusOverrides[property.id];
 
-  useEffect(() => {
-    setItems(activeProperties);
-  }, [activeProperties]);
+        return overriddenStatus
+          ? { ...property, status: overriddenStatus }
+          : property;
+      }),
+    [activeProperties, statusOverrides],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -408,16 +432,10 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
 
     const newStatus = targetColumn.targetStatus;
 
-    setItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === propertyId
-          ? {
-              ...item,
-              status: newStatus,
-            }
-          : item
-      )
-    );
+    setStatusOverrides((current) => ({
+      ...current,
+      [propertyId]: newStatus,
+    }));
 
     try {
       const response = await fetch(`/api/properties/${propertyId}/status`, {
@@ -438,16 +456,10 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
     } catch (error) {
       console.error(error);
 
-      setItems((currentItems) =>
-        currentItems.map((item) =>
-          item.id === propertyId
-            ? {
-                ...item,
-                status: oldStatus,
-              }
-            : item
-        )
-      );
+      setStatusOverrides((current) => ({
+        ...current,
+        [propertyId]: oldStatus,
+      }));
 
       alert("Could not update status. The card was moved back.");
     }

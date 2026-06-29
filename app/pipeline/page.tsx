@@ -61,11 +61,14 @@ export default async function PipelinePage() {
 
   return (
     <AppShell>
-      <div className="mb-8 flex items-start justify-between gap-4">
+      <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-950">Pipeline</h2>
           <p className="text-slate-600">
             Drag and drop properties to move them through your deal flow.
+          </p>
+          <p className="mt-2 text-xs font-medium text-slate-500 lg:hidden">
+            Swipe sideways to move through pipeline stages.
           </p>
         </div>
 

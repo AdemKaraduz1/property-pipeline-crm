@@ -8,7 +8,6 @@ import { PropertyStatusUpdater } from "@/components/PropertyStatusUpdater";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { PropertyVisitLog } from "@/components/PropertyVisitLog";
 import { DeleteUnitButton } from "@/components/DeleteUnitButton";
 import { PropertyEditForm } from "@/components/PropertyEditForm";
 import { MobilityFmrCard } from "@/components/MobilityFmrCard";
@@ -144,7 +143,12 @@ function getDefaultInsuranceAnnual(unitCount: number) {
   return null;
 }
 
-function getGoogleMapsUrl(property: any) {
+function getGoogleMapsUrl(property: {
+  address?: unknown;
+  city?: unknown;
+  state?: unknown;
+  zip?: unknown;
+}) {
   const addressParts = [
     property.address,
     property.city,
@@ -194,54 +198,12 @@ function getUnitBeds(unit: PropertyUnit) {
   return unit.bedrooms ?? unit.beds ?? null;
 }
 
-function getUnitBaths(unit: PropertyUnit) {
-  const fullBaths = unit.full_baths;
-  const halfBaths = unit.half_baths;
-  const oldBaths = unit.baths;
-
-  if (fullBaths !== null && fullBaths !== undefined) {
-    if (
-      halfBaths !== null &&
-      halfBaths !== undefined &&
-      Number(halfBaths) > 0
-    ) {
-      return `${fullBaths} full / ${halfBaths} half`;
-    }
-
-    return `${fullBaths}`;
-  }
-
-  if (oldBaths !== null && oldBaths !== undefined) {
-    return String(oldBaths);
-  }
-
-  return "-";
-}
-
 function getCurrentRent(unit: PropertyUnit) {
   return unit.current_rent ?? unit.rent ?? null;
 }
 
 function getProjectedRent(unit: PropertyUnit) {
   return unit.projected_rent ?? unit.rent ?? null;
-}
-
-function getFmrUpside(unit: PropertyUnit) {
-  const fmrRent = unit.fmr_rent;
-  const currentRent = getCurrentRent(unit);
-
-  if (!hasValue(fmrRent) || !hasValue(currentRent)) {
-    return null;
-  }
-
-  const fmrNumber = Number(fmrRent);
-  const currentRentNumber = Number(currentRent);
-
-  if (!Number.isFinite(fmrNumber) || !Number.isFinite(currentRentNumber)) {
-    return null;
-  }
-
-  return fmrNumber - currentRentNumber;
 }
 
 function getAnnualUtilityCost(unit: PropertyUnit) {
@@ -469,16 +431,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   );
   const totalRehab = unitRehabTotal + commonRehabTotal;
 
-  const totalFmrRent = unitList.reduce(
-    (sum, unit) => sum + Number(unit.fmr_rent || 0),
-    0,
-  );
-
-  const totalFmrUpside = unitList.reduce(
-    (sum, unit) => sum + Number(getFmrUpside(unit) || 0),
-    0,
-  );
-
   const annualUtilities = unitList.reduce(
     (sum, unit) => sum + getAnnualUtilityCost(unit),
     0,
@@ -545,127 +497,175 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-4">
         <Link
           href="/pipeline"
-          className="text-sm text-slate-600 hover:text-slate-950"
+          className="inline-flex text-sm font-medium text-slate-600 hover:text-slate-950"
         >
           ← Back to Pipeline
         </Link>
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Link
-            href={`/properties/${id}/walkthrough`}
-            className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            {hasWalkthroughProgress ? "Resume Walkthrough" : "Start Walkthrough"}
-          </Link>
-          <DeletePropertyButton propertyId={id} />
-        </div>
       </div>
 
-      <div className="mb-8">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {property.source === "chrome_extension" && (
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-              Imported from MLS
-            </span>
-          )}
+      <section
+        id="overview"
+        className="mb-6 scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div className="p-5 sm:p-6">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
+            <div className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {property.source === "chrome_extension" && (
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                    Imported from MLS
+                  </span>
+                )}
 
-          {property.mls_number && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-              MLS #{property.mls_number}
-            </span>
-          )}
+                {property.mls_number && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                    MLS #{property.mls_number}
+                  </span>
+                )}
 
-          {property.is_mobility_area === true && (
-            <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
-              CHA Mobility Area
-            </span>
-          )}
+                {property.is_mobility_area === true && (
+                  <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+                    CHA Mobility Area
+                  </span>
+                )}
 
-          {property.is_archived === true && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-              Archived
-            </span>
-          )}
-        </div>
+                {property.is_archived === true && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                    Archived
+                  </span>
+                )}
+              </div>
 
-        <h2 className="text-3xl font-bold text-slate-950">
-          {property.address}
-        </h2>
+              <h2 className="break-words text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                {property.address || "Untitled Property"}
+              </h2>
 
-        {locationLine && <p className="text-slate-600">{locationLine}</p>}
+              {locationLine && (
+                <p className="mt-1 text-sm text-slate-600 sm:text-base">
+                  {locationLine}
+                </p>
+              )}
+            </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          {property.source_url && (
-            <a
-              href={property.source_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            <div className="rounded-xl bg-slate-50 p-4">
+              <PropertyStatusUpdater
+                propertyId={id}
+                currentStatus={
+                  property.is_archived === true || property.archived_at
+                    ? "archived"
+                    : property.status
+                }
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <Link
+              href={`/properties/${id}/walkthrough`}
+              className="col-span-2 inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-950 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-slate-800 sm:col-span-1"
             >
-              Open original listing
-            </a>
-          )}
+              {hasWalkthroughProgress
+                ? "Resume Walkthrough"
+                : "Start Walkthrough"}
+            </Link>
 
-          {googleMapsUrl && (
-            <a
-              href={googleMapsUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Open in Google Maps
-            </a>
-          )}
+            {property.source_url && (
+              <a
+                href={property.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Listing
+              </a>
+            )}
 
-          <EditPropertyModal>
-            <PropertyEditForm property={property} />
-          </EditPropertyModal>
+            {googleMapsUrl && (
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Map
+              </a>
+            )}
 
-          {property.is_archived !== true && (
-            <ArchivePropertyButton propertyId={id} />
-          )}
+            <EditPropertyModal>
+              <PropertyEditForm property={property} />
+            </EditPropertyModal>
 
-          <div className="relative -top-3 min-w-[220px] max-w-xs">
-            <PropertyStatusUpdater
-              propertyId={id}
-              currentStatus={
-                property.is_archived === true || property.archived_at
-                  ? "archived"
-                  : property.status
-              }
-            />
+            {property.is_archived !== true && (
+              <ArchivePropertyButton propertyId={id} />
+            )}
           </div>
         </div>
-      </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Asking Price</p>
-          <p className="text-2xl font-bold text-slate-950">
+        <div className="flex justify-end border-t border-slate-100 bg-slate-50/70 px-5 py-3 sm:px-6">
+          <DeletePropertyButton propertyId={id} />
+        </div>
+      </section>
+
+      <nav
+        aria-label="Property sections"
+        className="-mx-4 mb-6 overflow-x-auto px-4 md:mx-0 md:px-0"
+      >
+        <div className="flex min-w-max gap-2">
+          {[
+            ["#overview", "Overview"],
+            ["#building", "Building"],
+            ["#analysis", "Analysis"],
+            ["#units", `Units (${unitCount})`],
+            ["#rehab", "Rehab"],
+            ["#programs", "Programs"],
+          ].map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-slate-400 hover:text-slate-950"
+            >
+              {label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <p className="text-xs font-medium text-slate-500 sm:text-sm">
+            Asking Price
+          </p>
+          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-2xl">
             {formatCurrency(askingPrice)}
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Annual Rent</p>
-          <p className="text-xl font-bold text-slate-950">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <p className="text-xs font-medium text-slate-500 sm:text-sm">
+            Annual Rent
+          </p>
+          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
             {formatCurrency(annualCurrentRent)}
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Est. NOI</p>
-          <p className="text-xl font-bold text-slate-950">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <p className="text-xs font-medium text-slate-500 sm:text-sm">
+            Est. NOI
+          </p>
+          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
             {formatCurrency(estimatedNoi)}
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Est. Cap Rate</p>
-          <p className="text-xl font-bold text-slate-950">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <p className="text-xs font-medium text-slate-500 sm:text-sm">
+            Est. Cap Rate
+          </p>
+          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
             {estimatedCapRate !== null
               ? `${(estimatedCapRate * 100).toFixed(2)}%`
               : "Not entered"}
@@ -705,7 +705,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       )}
 
       {hasBuildingDetails && (
-        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+        <div
+          id="building"
+          className="mb-6 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4"
+        >
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-slate-950">
@@ -906,14 +909,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <DealAnalyzer
-        askingPrice={askingPrice}
-        taxesAnnual={taxesAnnual}
-        insuranceAnnual={insuranceAnnual}
-        projectedMonthlyRent={projectedMonthlyRent}
-        totalRehab={totalRehab}
-        ownerPaidUtilitiesAnnual={annualUtilities}
-      />
+      <div id="analysis" className="scroll-mt-24">
+        <DealAnalyzer
+          askingPrice={askingPrice}
+          taxesAnnual={taxesAnnual}
+          insuranceAnnual={insuranceAnnual}
+          projectedMonthlyRent={projectedMonthlyRent}
+          totalRehab={totalRehab}
+          ownerPaidUtilitiesAnnual={annualUtilities}
+        />
+      </div>
 
       {property.broker_remarks && (
         <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
@@ -926,7 +931,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+      <div
+        id="units"
+        className="mb-6 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4"
+      >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-slate-950">Units</h3>
@@ -1228,7 +1236,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+      <div
+        id="rehab"
+        className="mb-6 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4"
+      >
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-slate-950">
@@ -1335,15 +1346,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </form>
       </div>
 
-      <MobilityFmrCard
-        propertyId={id}
-        isMobilityArea={property.is_mobility_area}
-        mobilityCheckedAt={property.mobility_checked_at}
-        mobilityMatchedAddress={property.mobility_matched_address}
-        mobilityNotes={property.mobility_notes}
-        mobilityLat={property.mobility_lat}
-        mobilityLng={property.mobility_lng}
-      />
+      <div id="programs" className="scroll-mt-24">
+        <MobilityFmrCard
+          propertyId={id}
+          isMobilityArea={property.is_mobility_area}
+          mobilityCheckedAt={property.mobility_checked_at}
+          mobilityMatchedAddress={property.mobility_matched_address}
+          mobilityNotes={property.mobility_notes}
+          mobilityLat={property.mobility_lat}
+          mobilityLng={property.mobility_lng}
+        />
+      </div>
 
     </AppShell>
   );
