@@ -1345,7 +1345,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         mobilityLng={property.mobility_lng}
       />
 
-      <PropertyVisitLog propertyId={id} />
     </AppShell>
   );
 }
