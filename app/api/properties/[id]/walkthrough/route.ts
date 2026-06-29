@@ -12,6 +12,36 @@ type WalkthroughRouteContext = {
   }>;
 };
 
+class WalkthroughSaveError extends Error {
+  stage: string;
+  originalError: unknown;
+
+  constructor(stage: string, originalError: unknown) {
+    super(`Walkthrough save failed while ${stage}.`);
+    this.name = "WalkthroughSaveError";
+    this.stage = stage;
+    this.originalError = originalError;
+  }
+}
+
+async function runSaveStep<T>(
+  stage: string,
+  operation: () => PromiseLike<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch {
+    // Supabase calls can occasionally fail at the network layer without
+    // returning a structured database error. One retry is safe because every
+    // walkthrough write is idempotent.
+    try {
+      return await operation();
+    } catch (error) {
+      throw new WalkthroughSaveError(stage, error);
+    }
+  }
+}
+
 async function updateWalkthrough(
   request: Request,
   context: WalkthroughRouteContext,
@@ -19,7 +49,9 @@ async function updateWalkthrough(
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await runSaveStep("checking your sign-in", () =>
+    supabase.auth.getUser(),
+  );
 
   if (!user) {
     return NextResponse.json(
@@ -29,12 +61,25 @@ async function updateWalkthrough(
   }
 
   const { id } = await context.params;
-  const body = await request.json();
+  let body: Record<string, unknown>;
+
+  try {
+    body = asRecord(await request.json());
+  } catch {
+    return NextResponse.json(
+      { success: false, message: "The walkthrough data was not valid." },
+      { status: 400 },
+    );
+  }
+
   const submittedCommon = asRecord(body.common);
   const submittedUnits = asRecord(body.units);
 
-  const [{ data: property }, { data: units, error: unitsError }] =
-    await Promise.all([
+  const [
+    { data: property, error: propertyLoadError },
+    { data: units, error: unitsError },
+  ] = await runSaveStep("loading the property", () =>
+    Promise.all([
       supabase
         .from("properties")
         .select("id, all_extracted_fields")
@@ -45,9 +90,14 @@ async function updateWalkthrough(
         .from("property_units")
         .select("id")
         .eq("property_id", id),
-    ]);
+    ]),
+  );
 
   if (!property) {
+    if (propertyLoadError) {
+      console.error("Walkthrough property load failed:", propertyLoadError);
+    }
+
     return NextResponse.json(
       { success: false, message: "Property not found." },
       { status: 404 },
@@ -55,6 +105,8 @@ async function updateWalkthrough(
   }
 
   if (unitsError) {
+    console.error("Walkthrough unit load failed:", unitsError);
+
     return NextResponse.json(
       { success: false, message: "Could not load property units." },
       { status: 500 },
@@ -100,40 +152,51 @@ async function updateWalkthrough(
   }
 
   const now = new Date().toISOString();
-  const { error: propertyError } = await supabase
-    .from("properties")
-    .update({
-      all_extracted_fields: {
-        ...metadata,
-        common_area_rehab: {
-          ...existingCommonRehab,
-          items: nextCommonItems,
-          inspection_notes: Object.fromEntries(
-            Object.entries(normalizedCommon)
-              .filter(([, item]) => item.notes)
-              .map(([key, item]) => [key, item.notes]),
-          ),
-        },
-        walkthrough: {
-          common: normalizedCommon,
-          units: normalizedUnits,
-          completed: body.completed === true,
-          current_step: Number.isFinite(Number(body.currentStep))
-            ? Math.max(0, Math.round(Number(body.currentStep)))
-            : 0,
-          updated_at: now,
-        },
-      },
-    })
-    .eq("id", id)
-    .eq("user_id", user.id);
+  const { error: propertyError } = await runSaveStep(
+    "saving walkthrough progress",
+    () =>
+      supabase
+        .from("properties")
+        .update({
+          all_extracted_fields: {
+            ...metadata,
+            common_area_rehab: {
+              ...existingCommonRehab,
+              items: nextCommonItems,
+              inspection_notes: Object.fromEntries(
+                Object.entries(normalizedCommon)
+                  .filter(([, item]) => item.notes)
+                  .map(([key, item]) => [key, item.notes]),
+              ),
+            },
+            walkthrough: {
+              common: normalizedCommon,
+              units: normalizedUnits,
+              completed: body.completed === true,
+              current_step: Number.isFinite(Number(body.currentStep))
+                ? Math.max(0, Math.round(Number(body.currentStep)))
+                : 0,
+              updated_at: now,
+            },
+          },
+        })
+        .eq("id", id)
+        .eq("user_id", user.id),
+  );
 
   if (propertyError) {
+    console.error("Walkthrough property save failed:", propertyError);
+
     return NextResponse.json(
-      { success: false, message: "Could not save walkthrough." },
+      {
+        success: false,
+        message: "Could not save walkthrough progress to the property.",
+      },
       { status: 500 },
     );
   }
+
+  const unitSaveWarnings: string[] = [];
 
   for (const unit of units || []) {
     const roomEntries = Object.values(normalizedUnits[unit.id]?.rooms || {});
@@ -152,20 +215,22 @@ async function updateWalkthrough(
       0,
     );
 
-    const { error } = await supabase
-      .from("property_units")
-      .update({ rehab_estimate: rehabEstimate })
-      .eq("id", unit.id)
-      .eq("property_id", id);
-
-    if (error) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Walkthrough saved, but a unit rehab total could not update.",
-        },
-        { status: 500 },
+    try {
+      const { error } = await runSaveStep("updating a unit rehab total", () =>
+        supabase
+          .from("property_units")
+          .update({ rehab_estimate: rehabEstimate })
+          .eq("id", unit.id)
+          .eq("property_id", id),
       );
+
+      if (error) {
+        console.error("Walkthrough unit total save failed:", error);
+        unitSaveWarnings.push(unit.id);
+      }
+    } catch (error) {
+      console.error("Walkthrough unit total save threw:", error);
+      unitSaveWarnings.push(unit.id);
     }
   }
 
@@ -173,6 +238,10 @@ async function updateWalkthrough(
     success: true,
     propertyId: id,
     savedAt: now,
+    warning:
+      unitSaveWarnings.length > 0
+        ? "Walkthrough progress saved, but some unit totals will need to be recalculated."
+        : null,
   });
 }
 
@@ -184,11 +253,13 @@ export async function PATCH(
     return await updateWalkthrough(request, context);
   } catch (error) {
     console.error("Walkthrough save failed:", error);
+    const stage =
+      error instanceof WalkthroughSaveError ? error.stage : "preparing the save";
 
     return NextResponse.json(
       {
         success: false,
-        message: "The walkthrough could not be saved. Please try again.",
+        message: `The walkthrough could not be saved while ${stage}. Please try again.`,
       },
       { status: 500 },
     );

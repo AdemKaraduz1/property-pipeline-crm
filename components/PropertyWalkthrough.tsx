@@ -204,13 +204,18 @@ export function PropertyWalkthrough({
         }),
       });
       const responseText = await response.text();
-      let result: { success?: boolean; message?: string } | null = null;
+      let result: {
+        success?: boolean;
+        message?: string;
+        warning?: string | null;
+      } | null = null;
 
       if (responseText) {
         try {
           result = JSON.parse(responseText) as {
             success?: boolean;
             message?: string;
+            warning?: string | null;
           };
         } catch {
           // A proxy or framework error page is not useful to show in full.
@@ -224,7 +229,7 @@ export function PropertyWalkthrough({
         );
       }
 
-      setSaveMessage("Progress saved.");
+      setSaveMessage(result.warning || "Progress saved.");
 
       if (exit || finished) {
         router.push(`/properties/${propertyId}`);
