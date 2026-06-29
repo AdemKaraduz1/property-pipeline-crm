@@ -1,7 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 const CHA_MOBILITY_MAP_URL =
   "https://thecha.maps.arcgis.com/apps/instant/basic/index.html?appid=5ce5a99dad2e4579b2095e514ad64294";
@@ -184,7 +191,9 @@ export function MobilityFmrCard({
 }: MobilityFmrCardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isChecking, setIsChecking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const hasAttemptedAutomaticCheck = useRef(false);
 
   const lat = toNumber(mobilityLat);
   const lng = toNumber(mobilityLng);
@@ -200,7 +209,8 @@ export function MobilityFmrCard({
     });
   }, [hasMapLocation, lat, lng, mobilityMatchedAddress]);
 
-  async function runCheck() {
+  const runCheck = useCallback(async () => {
+    setIsChecking(true);
     setMessage("Checking CHA mobility area and applying FMR values...");
 
     try {
@@ -230,8 +240,17 @@ export function MobilityFmrCard({
           ? error.message
           : "Mobility/FMR check failed."
       );
+    } finally {
+      setIsChecking(false);
     }
-  }
+  }, [propertyId, router]);
+
+  useEffect(() => {
+    if (mobilityCheckedAt || hasAttemptedAutomaticCheck.current) return;
+
+    hasAttemptedAutomaticCheck.current = true;
+    void runCheck();
+  }, [mobilityCheckedAt, runCheck]);
 
   async function overrideMobilityStatus(nextIsMobilityArea: boolean) {
     const confirmed = window.confirm(
@@ -378,10 +397,14 @@ export function MobilityFmrCard({
         <button
           type="button"
           onClick={runCheck}
-          disabled={isPending}
+          disabled={isChecking || isPending}
           className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isPending ? "Checking..." : "Run Mobility / FMR Check"}
+          {isChecking
+            ? "Checking..."
+            : mobilityCheckedAt
+              ? "Re-run Mobility / FMR Check"
+              : "Run Mobility / FMR Check"}
         </button>
 
         <button

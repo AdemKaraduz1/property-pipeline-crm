@@ -51,15 +51,19 @@ export function NewPropertyForm() {
       notes: String(formData.get("notes") || ""),
     };
 
-    const { error } = await supabase.from("properties").insert(property);
+    const { data: createdProperty, error } = await supabase
+      .from("properties")
+      .insert(property)
+      .select("id")
+      .single();
 
-    if (error) {
-      setErrorMessage(error.message);
+    if (error || !createdProperty) {
+      setErrorMessage(error?.message || "Could not create property.");
       setIsSaving(false);
       return;
     }
 
-    router.push("/pipeline");
+    router.push(`/properties/${createdProperty.id}`);
     router.refresh();
   }
 
