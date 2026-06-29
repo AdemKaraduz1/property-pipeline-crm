@@ -46,6 +46,7 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
 
     const currentRent = toNumber(formData.get("rent"));
     const projectedRent = toNumber(formData.get("projected_rent"));
+    const bathrooms = toNumber(formData.get("bathrooms"));
 
     const unit = {
       property_id: propertyId,
@@ -56,8 +57,9 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
       sqft: toNumber(formData.get("sqft")),
       rooms: toNumber(formData.get("rooms")),
       bedrooms: toNumber(formData.get("bedrooms")),
-      full_baths: toNumber(formData.get("full_baths")),
-      half_baths: toNumber(formData.get("half_baths")),
+      baths: bathrooms,
+      full_baths: bathrooms,
+      half_baths: null,
       rent: currentRent,
       lease_expiration: toText(formData.get("lease_expiration")),
       appliances_features: toText(formData.get("appliances_features")),
@@ -88,7 +90,7 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-4"
+      className="space-y-4"
     >
       <div>
         <h3 className="text-lg font-semibold text-slate-950">Add Unit</h3>
@@ -136,24 +138,13 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
         </div>
 
         <div>
-          <Label htmlFor="full_baths">Full Baths</Label>
+          <Label htmlFor="bathrooms">Bathrooms</Label>
           <Input
-            id="full_baths"
-            name="full_baths"
+            id="bathrooms"
+            name="bathrooms"
             type="number"
             step="0.5"
-            placeholder="1"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="half_baths">Half Baths</Label>
-          <Input
-            id="half_baths"
-            name="half_baths"
-            type="number"
-            step="0.5"
-            placeholder="0"
+            placeholder="1.5"
           />
         </div>
 
@@ -241,7 +232,7 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
         </div>
       </div>
 
-      <Button type="submit" disabled={isSaving}>
+      <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
         {isSaving ? "Saving Unit..." : "Add Unit"}
       </Button>
     </form>

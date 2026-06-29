@@ -327,9 +327,11 @@ export function DealAnalyzer({
   const isFinanced = purchaseMethod === "financed";
 
   return (
-    <Card className="mb-6 border-slate-200 bg-white">
+    <Card className="mb-6 rounded-xl border-slate-200 bg-white">
       <CardHeader>
-        <CardTitle className="text-xl text-slate-950">Deal Analyzer</CardTitle>
+        <CardTitle className="font-sans text-lg font-semibold normal-case tracking-normal text-slate-950">
+          Deal Analyzer
+        </CardTitle>
         <p className="text-sm text-slate-500">
           Compare cash and financed acquisitions using editable operating and
           loan assumptions.

@@ -198,6 +198,16 @@ function getUnitBeds(unit: PropertyUnit) {
   return unit.bedrooms ?? unit.beds ?? null;
 }
 
+function getUnitBaths(unit: PropertyUnit) {
+  if (hasValue(unit.baths)) return unit.baths;
+
+  const fullBaths = hasValue(unit.full_baths) ? Number(unit.full_baths) : 0;
+  const halfBaths = hasValue(unit.half_baths) ? Number(unit.half_baths) : 0;
+  const bathrooms = fullBaths + halfBaths * 0.5;
+
+  return bathrooms > 0 ? bathrooms : null;
+}
+
 function getCurrentRent(unit: PropertyUnit) {
   return unit.current_rent ?? unit.rent ?? null;
 }
@@ -226,6 +236,16 @@ const smallInlineInputClass =
 
 const dateInlineInputClass =
   "w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+
+const mobileFieldClass =
+  "w-full rounded-md border border-slate-300 px-3 py-2 text-base text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+
+const sectionCardClass =
+  "mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6";
+
+const sectionTitleClass = "text-lg font-semibold text-slate-950";
+
+const sectionDescriptionClass = "text-sm leading-relaxed text-slate-500";
 
 export default async function PropertyDetailPage({ params }: PageProps) {
   const supabase = await createClient();
@@ -276,7 +296,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       const updatedUnitNumber = parseTextInput(field("unit_number"));
       const updatedCurrentRent = parseMoneyInput(field("current_rent"));
       const updatedBeds = parseMoneyInput(field("bedrooms"));
-      const updatedFullBaths = parseMoneyInput(field("full_baths"));
+      const updatedBathrooms = parseMoneyInput(field("bathrooms"));
 
       await updateSupabase
         .from("property_units")
@@ -287,9 +307,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           sqft: parseMoneyInput(field("sqft")),
           bedrooms: updatedBeds,
           beds: updatedBeds,
-          full_baths: updatedFullBaths,
-          baths: updatedFullBaths,
-          half_baths: parseMoneyInput(field("half_baths")),
+          baths: updatedBathrooms,
+          full_baths: updatedBathrooms,
+          half_baths: null,
           current_rent: updatedCurrentRent,
           rent: updatedCurrentRent,
           projected_rent: parseMoneyInput(field("projected_rent")),
@@ -676,10 +696,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       </div>
 
       {hasMlsFinancials && (
-        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-4 text-lg font-semibold text-slate-950">
-            MLS Financials
-          </h3>
+        <div className={sectionCardClass}>
+          <h3 className={`${sectionTitleClass} mb-4`}>MLS Financials</h3>
 
           <div className="grid gap-4 md:grid-cols-3">
             <div>
@@ -707,15 +725,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       )}
 
       {hasBuildingDetails && (
-        <div
-          id="building"
-          className="mb-6 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4"
-        >
+        <div id="building" className={sectionCardClass}>
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-slate-950">
-                Building Details
-              </h3>
+              <h3 className={sectionTitleClass}>Building Details</h3>
             </div>
 
             <EditPropertyModal>
@@ -888,10 +901,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       )}
 
       {hasListingAgent && (
-        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-4 text-lg font-semibold text-slate-950">
-            Listing Agent
-          </h3>
+        <div className={sectionCardClass}>
+          <h3 className={`${sectionTitleClass} mb-4`}>Listing Agent</h3>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -923,7 +934,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       </div>
 
       {property.broker_remarks && (
-        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+        <div className={sectionCardClass}>
           <p className="mb-2 text-sm font-semibold text-slate-700">
             Broker Remarks
           </p>
@@ -933,14 +944,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <div
-        id="units"
-        className="mb-6 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4"
-      >
+      <div id="units" className={sectionCardClass}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-slate-950">Units</h3>
-            <p className="text-sm text-slate-500">
+            <h3 className={sectionTitleClass}>Units</h3>
+            <p className={sectionDescriptionClass}>
               Edit rent, rehab, condition, and owner-paid utilities by unit.
             </p>
           </div>
@@ -959,63 +967,68 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         {unitList.length === 0 ? (
           <p className="text-sm text-slate-500">No units added yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
-                  <th className="py-2 pr-1.5">Unit</th>
-                  <th className="py-2 pr-1.5">Floor</th>
-                  <th className="py-2 pr-1.5">Sq Ft</th>
-                  <th className="py-2 pr-1.5">Beds</th>
-                  <th className="py-2 pr-1.5">Full</th>
-                  <th className="py-2 pr-1.5">Half</th>
-                  <th className="py-2 pr-1.5">Current</th>
-                  <th className="py-2 pr-1.5">Projected</th>
-                  <th className="py-2 pr-1.5">FMR</th>
-                  <th className="py-2 pr-1.5">Lease Exp.</th>
-                  <th className="py-2 pr-1.5">Rehab</th>
-                  <th className="py-2 pr-1.5 text-center" title="Water">
-                    W
-                  </th>
-                  <th className="py-2 pr-1.5 text-center" title="Electricity">
-                    E
-                  </th>
-                  <th className="py-2 pr-1.5 text-center" title="Gas">
-                    G
-                  </th>
-                  <th className="py-2 pr-1.5">Util./Yr</th>
-                  <th className="py-2">Actions</th>
-                </tr>
-              </thead>
+          <div>
+            <div className="space-y-4 md:hidden">
+              {unitList.map((unit) => {
+                const formId = "mobile-units-form";
+                const unitAnnualUtilities = getAnnualUtilityCost(unit);
 
-              <tbody>
-                {unitList.map((unit) => {
-                  const formId = "all-units-form";
-                  const unitAnnualUtilities = getAnnualUtilityCost(unit);
+                return (
+                  <div
+                    key={unit.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Unit
+                        </p>
+                        <p className="text-lg font-semibold text-slate-950">
+                          {getUnitLabel(unit)}
+                        </p>
+                      </div>
 
-                  return (
-                    <tr key={unit.id} className="border-b border-slate-100">
-                      <td className="py-3 pr-2">
+                      <DeleteUnitButton unitId={unit.id} />
+                    </div>
+
+                    <input
+                      form={formId}
+                      type="hidden"
+                      name="unit_id"
+                      value={unit.id}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Unit
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__unit_number`}
                           defaultValue={getUnitLabel(unit)}
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Unit number"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Floor
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__floor_number`}
                           defaultValue={unit.floor_number || ""}
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Floor number"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Sq Ft
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__sqft`}
@@ -1025,14 +1038,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                           defaultValue={
                             hasValue(unit.sqft) ? Number(unit.sqft) : ""
                           }
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Sq Ft"
                         />
-                      </td>
+                      </label>
 
-
-
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Beds
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__bedrooms`}
@@ -1044,46 +1058,35 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                               ? Number(getUnitBeds(unit))
                               : ""
                           }
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Bedrooms"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Bathrooms
+                        </span>
                         <input
                           form={formId}
-                          name={`${unit.id}__full_baths`}
+                          name={`${unit.id}__bathrooms`}
                           type="number"
                           min="0"
-                          step="1"
+                          step="0.5"
                           defaultValue={
-                            hasValue(unit.full_baths)
-                              ? Number(unit.full_baths)
+                            hasValue(getUnitBaths(unit))
+                              ? Number(getUnitBaths(unit))
                               : ""
                           }
-                          className={smallInlineInputClass}
-                          aria-label="Full baths"
+                          className={mobileFieldClass}
+                          aria-label="Bathrooms"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
-                        <input
-                          form={formId}
-                          name={`${unit.id}__half_baths`}
-                          type="number"
-                          min="0"
-                          step="1"
-                          defaultValue={
-                            hasValue(unit.half_baths)
-                              ? Number(unit.half_baths)
-                              : ""
-                          }
-                          className={smallInlineInputClass}
-                          aria-label="Half baths"
-                        />
-                      </td>
-
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Current
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__current_rent`}
@@ -1095,12 +1098,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                               ? Number(getCurrentRent(unit))
                               : ""
                           }
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Current rent"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Projected
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__projected_rent`}
@@ -1112,12 +1118,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                               ? Number(getProjectedRent(unit))
                               : ""
                           }
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Projected rent"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          FMR
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__fmr_rent`}
@@ -1127,23 +1136,29 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                           defaultValue={
                             hasValue(unit.fmr_rent) ? Number(unit.fmr_rent) : ""
                           }
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="FMR rent"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Lease Exp.
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__lease_expiration`}
                           type="date"
                           defaultValue={formatDateInput(unit.lease_expiration)}
-                          className={dateInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Lease expiration"
                         />
-                      </td>
+                      </label>
 
-                      <td className="py-3 pr-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Rehab
+                        </span>
                         <input
                           form={formId}
                           name={`${unit.id}__rehab_estimate`}
@@ -1155,92 +1170,337 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                               ? Number(unit.rehab_estimate)
                               : ""
                           }
-                          className={smallInlineInputClass}
+                          className={mobileFieldClass}
                           aria-label="Rehab estimate"
                         />
-                      </td>
+                      </label>
+                    </div>
 
-                      <td className="py-3 pr-2 text-center">
-                        <input
-                          form={formId}
-                          name={`${unit.id}__water_included`}
-                          type="checkbox"
-                          defaultChecked={unit.water_included === true}
-                          className="h-4 w-4 rounded border-slate-300"
-                          aria-label="Owner pays water"
-                        />
-                      </td>
-
-                      <td className="py-3 pr-2 text-center">
-                        <input
-                          form={formId}
-                          name={`${unit.id}__electricity_included`}
-                          type="checkbox"
-                          defaultChecked={unit.electricity_included === true}
-                          className="h-4 w-4 rounded border-slate-300"
-                          aria-label="Owner pays electricity"
-                        />
-                      </td>
-
-                      <td className="py-3 pr-2 text-center">
-                        <input
-                          form={formId}
-                          name={`${unit.id}__gas_included`}
-                          type="checkbox"
-                          defaultChecked={unit.gas_included === true}
-                          className="h-4 w-4 rounded border-slate-300"
-                          aria-label="Owner pays gas"
-                        />
-                      </td>
-
-                      <td className="py-3 pr-2 font-medium text-slate-700">
-                        {formatCurrency(unitAnnualUtilities)}
-                      </td>
-
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        Owner Pays
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 text-sm text-slate-700">
+                        <label className="flex items-center gap-2">
                           <input
                             form={formId}
-                            type="hidden"
-                            name="unit_id"
-                            value={unit.id}
+                            name={`${unit.id}__water_included`}
+                            type="checkbox"
+                            defaultChecked={unit.water_included === true}
+                            className="h-4 w-4 rounded border-slate-300"
                           />
+                          Water
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__electricity_included`}
+                            type="checkbox"
+                            defaultChecked={unit.electricity_included === true}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                          Electric
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__gas_included`}
+                            type="checkbox"
+                            defaultChecked={unit.gas_included === true}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                          Gas
+                        </label>
+                      </div>
+                      <p className="mt-3 text-sm font-medium text-slate-700">
+                        Utilities / year: {formatCurrency(unitAnnualUtilities)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
 
-                          <DeleteUnitButton unitId={unit.id} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            <form
-              id="all-units-form"
-              action={updateAllUnits}
-              className="sticky left-0 mt-4 flex w-full justify-end"
-            >
-              <button
-                type="submit"
-                className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              <form
+                id="mobile-units-form"
+                action={updateAllUnits}
+                className="sticky bottom-16 z-10 mt-4"
               >
-                Save All Units
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  className="min-h-11 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+                >
+                  Save All Units
+                </button>
+              </form>
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1080px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs text-slate-500">
+                    <th className="py-2 pr-1.5">Unit</th>
+                    <th className="py-2 pr-1.5">Floor</th>
+                    <th className="py-2 pr-1.5">Sq Ft</th>
+                    <th className="py-2 pr-1.5">Beds</th>
+                    <th className="py-2 pr-1.5">Bathrooms</th>
+                    <th className="py-2 pr-1.5">Current</th>
+                    <th className="py-2 pr-1.5">Projected</th>
+                    <th className="py-2 pr-1.5">FMR</th>
+                    <th className="py-2 pr-1.5">Lease Exp.</th>
+                    <th className="py-2 pr-1.5">Rehab</th>
+                    <th className="py-2 pr-1.5 text-center" title="Water">
+                      W
+                    </th>
+                    <th
+                      className="py-2 pr-1.5 text-center"
+                      title="Electricity"
+                    >
+                      E
+                    </th>
+                    <th className="py-2 pr-1.5 text-center" title="Gas">
+                      G
+                    </th>
+                    <th className="py-2 pr-1.5">Util./Yr</th>
+                    <th className="py-2">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {unitList.map((unit) => {
+                    const formId = "desktop-units-form";
+                    const unitAnnualUtilities = getAnnualUtilityCost(unit);
+
+                    return (
+                      <tr key={unit.id} className="border-b border-slate-100">
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__unit_number`}
+                            defaultValue={getUnitLabel(unit)}
+                            className={smallInlineInputClass}
+                            aria-label="Unit number"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__floor_number`}
+                            defaultValue={unit.floor_number || ""}
+                            className={smallInlineInputClass}
+                            aria-label="Floor number"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__sqft`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={
+                              hasValue(unit.sqft) ? Number(unit.sqft) : ""
+                            }
+                            className={smallInlineInputClass}
+                            aria-label="Sq Ft"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__bedrooms`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={
+                              hasValue(getUnitBeds(unit))
+                                ? Number(getUnitBeds(unit))
+                                : ""
+                            }
+                            className={smallInlineInputClass}
+                            aria-label="Bedrooms"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__bathrooms`}
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            defaultValue={
+                              hasValue(getUnitBaths(unit))
+                                ? Number(getUnitBaths(unit))
+                                : ""
+                            }
+                            className={smallInlineInputClass}
+                            aria-label="Bathrooms"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__current_rent`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={
+                              hasValue(getCurrentRent(unit))
+                                ? Number(getCurrentRent(unit))
+                                : ""
+                            }
+                            className={smallInlineInputClass}
+                            aria-label="Current rent"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__projected_rent`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={
+                              hasValue(getProjectedRent(unit))
+                                ? Number(getProjectedRent(unit))
+                                : ""
+                            }
+                            className={smallInlineInputClass}
+                            aria-label="Projected rent"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__fmr_rent`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={
+                              hasValue(unit.fmr_rent)
+                                ? Number(unit.fmr_rent)
+                                : ""
+                            }
+                            className={smallInlineInputClass}
+                            aria-label="FMR rent"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__lease_expiration`}
+                            type="date"
+                            defaultValue={formatDateInput(
+                              unit.lease_expiration,
+                            )}
+                            className={dateInlineInputClass}
+                            aria-label="Lease expiration"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__rehab_estimate`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={
+                              hasValue(unit.rehab_estimate)
+                                ? Number(unit.rehab_estimate)
+                                : ""
+                            }
+                            className={smallInlineInputClass}
+                            aria-label="Rehab estimate"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2 text-center">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__water_included`}
+                            type="checkbox"
+                            defaultChecked={unit.water_included === true}
+                            className="h-4 w-4 rounded border-slate-300"
+                            aria-label="Owner pays water"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2 text-center">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__electricity_included`}
+                            type="checkbox"
+                            defaultChecked={
+                              unit.electricity_included === true
+                            }
+                            className="h-4 w-4 rounded border-slate-300"
+                            aria-label="Owner pays electricity"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2 text-center">
+                          <input
+                            form={formId}
+                            name={`${unit.id}__gas_included`}
+                            type="checkbox"
+                            defaultChecked={unit.gas_included === true}
+                            className="h-4 w-4 rounded border-slate-300"
+                            aria-label="Owner pays gas"
+                          />
+                        </td>
+
+                        <td className="py-3 pr-2 font-medium text-slate-700">
+                          {formatCurrency(unitAnnualUtilities)}
+                        </td>
+
+                        <td className="py-3">
+                          <div className="flex items-center gap-2">
+                            <input
+                              form={formId}
+                              type="hidden"
+                              name="unit_id"
+                              value={unit.id}
+                            />
+
+                            <DeleteUnitButton unitId={unit.id} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <form
+                id="desktop-units-form"
+                action={updateAllUnits}
+                className="sticky left-0 mt-4 flex w-full justify-end"
+              >
+                <button
+                  type="submit"
+                  className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Save All Units
+                </button>
+              </form>
+            </div>
           </div>
         )}
       </div>
 
-      <div
-        id="rehab"
-        className="mb-6 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-4"
-      >
+      <div id="rehab" className={sectionCardClass}>
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-slate-950">
-              Common Area Rehab
-            </h3>
-            <p className="text-sm text-slate-500">
+            <h3 className={sectionTitleClass}>Common Area Rehab</h3>
+            <p className={sectionDescriptionClass}>
               Optional building-wide work outside of individual units.
             </p>
           </div>

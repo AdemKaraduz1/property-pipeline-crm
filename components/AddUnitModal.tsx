@@ -32,14 +32,14 @@ export function AddUnitModal({ children }: AddUnitModalProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+        className="min-h-11 w-full rounded-md bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto"
       >
         + Add Unit
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center sm:px-4 sm:py-6">
+          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white shadow-xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
               <div>
                 <h2 className="text-xl font-semibold text-slate-950">

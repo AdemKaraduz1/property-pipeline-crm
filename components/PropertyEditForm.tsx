@@ -39,7 +39,7 @@ function numberOrNull(value: FormDataEntryValue | null) {
 }
 
 export function PropertyEditForm({ property }: PropertyEditFormProps) {
-    const supabase = createClient();
+  const supabase = createClient();
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -54,37 +54,37 @@ export function PropertyEditForm({ property }: PropertyEditFormProps) {
 
   const [isGeocoding, setIsGeocoding] = useState(false);
 
-async function handleFindCoordinates() {
-  setIsGeocoding(true);
-  setErrorMessage("");
-  setSuccessMessage("");
+  async function handleFindCoordinates() {
+    setIsGeocoding(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
-  const addressInput = document.getElementById("address") as HTMLInputElement;
-  const cityInput = document.getElementById("city") as HTMLInputElement;
-  const stateInput = document.getElementById("state") as HTMLInputElement;
-  const zipInput = document.getElementById("zip") as HTMLInputElement;
+    const addressInput = document.getElementById("address") as HTMLInputElement;
+    const cityInput = document.getElementById("city") as HTMLInputElement;
+    const stateInput = document.getElementById("state") as HTMLInputElement;
+    const zipInput = document.getElementById("zip") as HTMLInputElement;
 
-  const params = new URLSearchParams({
-    address: addressInput?.value || "",
-    city: cityInput?.value || "",
-    state: stateInput?.value || "",
-    zip: zipInput?.value || "",
-  });
+    const params = new URLSearchParams({
+      address: addressInput?.value || "",
+      city: cityInput?.value || "",
+      state: stateInput?.value || "",
+      zip: zipInput?.value || "",
+    });
 
-  const response = await fetch(`/api/geocode?${params.toString()}`);
-  const result = await response.json();
+    const response = await fetch(`/api/geocode?${params.toString()}`);
+    const result = await response.json();
 
-  if (!response.ok) {
-    setErrorMessage(result.error || "Unable to find coordinates.");
+    if (!response.ok) {
+      setErrorMessage(result.error || "Unable to find coordinates.");
+      setIsGeocoding(false);
+      return;
+    }
+
+    setLatitude(String(result.latitude));
+    setLongitude(String(result.longitude));
+    setSuccessMessage("Coordinates found. Click Save Changes to store them.");
     setIsGeocoding(false);
-    return;
   }
-
-  setLatitude(String(result.latitude));
-  setLongitude(String(result.longitude));
-  setSuccessMessage("Coordinates found. Click Save Changes to store them.");
-  setIsGeocoding(false);
-}
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,9 +130,11 @@ async function handleFindCoordinates() {
   }
 
   return (
-    <Card className="mb-6 border-slate-200 bg-white">
+    <Card className="mb-6 rounded-xl border-slate-200 bg-white">
       <CardHeader>
-        <CardTitle className="text-xl text-slate-950">Edit Property</CardTitle>
+        <CardTitle className="font-sans text-lg font-semibold normal-case tracking-normal text-slate-950">
+          Edit Property
+        </CardTitle>
         <p className="text-sm text-slate-500">
           Update the core property details for this deal.
         </p>
@@ -219,7 +221,9 @@ async function handleFindCoordinates() {
                 onClick={handleFindCoordinates}
                 disabled={isGeocoding}
               >
-                {isGeocoding ? "Finding Coordinates..." : "Find Coordinates from Address"}
+                {isGeocoding
+                  ? "Finding Coordinates..."
+                  : "Find Coordinates from Address"}
               </Button>
             </div>
 

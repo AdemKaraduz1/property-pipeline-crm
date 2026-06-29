@@ -20,6 +20,26 @@ function toCount(value: unknown) {
   return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
 }
 
+function toBathroomCounts(unit: {
+  baths: number | null;
+  full_baths: number | null;
+  half_baths: number | null;
+}) {
+  const totalBathrooms = Number(
+    unit.baths ??
+      (Number(unit.full_baths || 0) + Number(unit.half_baths || 0) * 0.5),
+  );
+
+  if (!Number.isFinite(totalBathrooms) || totalBathrooms <= 0) {
+    return { fullBaths: 0, halfBaths: 0 };
+  }
+
+  return {
+    fullBaths: Math.floor(totalBathrooms),
+    halfBaths: totalBathrooms % 1 >= 0.5 ? 1 : 0,
+  };
+}
+
 export default async function PropertyWalkthroughPage({ params }: PageProps) {
   const supabase = await createClient();
   const {
@@ -88,21 +108,17 @@ export default async function PropertyWalkthroughPage({ params }: PageProps) {
     currentStep: toCount(storedWalkthrough.current_step),
   };
 
-  const walkthroughUnits = (units || []).map((unit) => ({
-    id: unit.id,
-    label: unit.unit_number || unit.unit_label || "Unit",
-    bedrooms: toCount(unit.bedrooms ?? unit.beds),
-    fullBaths:
-      unit.full_baths !== null && unit.full_baths !== undefined
-        ? toCount(unit.full_baths)
-        : Math.floor(Number(unit.baths) || 0),
-    halfBaths:
-      unit.half_baths !== null && unit.half_baths !== undefined
-        ? toCount(unit.half_baths)
-        : (Number(unit.baths) || 0) % 1 >= 0.5
-          ? 1
-          : 0,
-  }));
+  const walkthroughUnits = (units || []).map((unit) => {
+    const { fullBaths, halfBaths } = toBathroomCounts(unit);
+
+    return {
+      id: unit.id,
+      label: unit.unit_number || unit.unit_label || "Unit",
+      bedrooms: toCount(unit.bedrooms ?? unit.beds),
+      fullBaths,
+      halfBaths,
+    };
+  });
 
   return (
     <AppShell>

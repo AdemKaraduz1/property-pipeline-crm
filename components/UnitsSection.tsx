@@ -17,8 +17,7 @@ type Unit = {
   squareFeet: string;
   rooms: string;
   bedrooms: string;
-  fullBaths: string;
-  halfBaths: string;
+  bathrooms: string;
   currentRent: string;
   projectedRent: string;
   fmrRent: string;
@@ -36,8 +35,7 @@ const emptyUnit: Omit<Unit, "id"> = {
   squareFeet: "",
   rooms: "",
   bedrooms: "",
-  fullBaths: "",
-  halfBaths: "",
+  bathrooms: "",
   currentRent: "",
   projectedRent: "",
   fmrRent: "",
@@ -122,7 +120,7 @@ export default function UnitsSection() {
                     Unit {unit.unitNumber || "Unnamed"}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    {unit.bedrooms || "0"} bed / {unit.fullBaths || "0"} bath
+                    {unit.bedrooms || "0"} bed / {unit.bathrooms || "0"} bath
                     {unit.squareFeet ? ` • ${unit.squareFeet} sq ft` : ""}
                   </p>
                 </div>
@@ -209,15 +207,9 @@ export default function UnitsSection() {
                 />
 
                 <FormInput
-                  label="Full Baths"
-                  value={formData.fullBaths}
-                  onChange={(value) => updateField("fullBaths", value)}
-                />
-
-                <FormInput
-                  label="Half Baths"
-                  value={formData.halfBaths}
-                  onChange={(value) => updateField("halfBaths", value)}
+                  label="Bathrooms"
+                  value={formData.bathrooms}
+                  onChange={(value) => updateField("bathrooms", value)}
                 />
 
                 <FormInput
