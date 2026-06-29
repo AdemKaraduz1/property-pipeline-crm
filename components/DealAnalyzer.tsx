@@ -17,10 +17,11 @@ type PurchaseMethod = "financed" | "cash";
 
 type MarketRateOption = {
   estimatedInvestmentRate: number;
-  observedAt: string;
+  observedAt: string | null;
 };
 
 type MarketRates = {
+  fallback?: boolean;
   lowLtv: MarketRateOption;
   highLtv: MarketRateOption;
   investmentPropertyPremium: number;
@@ -145,23 +146,26 @@ export function DealAnalyzer({
     "loading",
   );
   const [loanTermYears, setLoanTermYears] = useState(30);
-  const [loanCostsRate, setLoanCostsRate] = useState(1);
+  const [acquisitionCostsRate, setAcquisitionCostsRate] = useState(3);
   const [vacancyRate, setVacancyRate] = useState(5);
   const [managementRate, setManagementRate] = useState(8);
   const [repairsRate, setRepairsRate] = useState(8);
   const [capexRate, setCapexRate] = useState(5);
   const [utilitiesAnnual, setUtilitiesAnnual] = useState(0);
   const [otherExpensesAnnual, setOtherExpensesAnnual] = useState(0);
-  const [closingCosts, setClosingCosts] = useState(10000);
   const [targetCapRate, setTargetCapRate] = useState(8);
   const [initialOfferDiscount, setInitialOfferDiscount] = useState(10);
 
   useEffect(() => {
     let isActive = true;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
 
     async function loadMarketRate() {
       try {
-        const response = await fetch("/api/mortgage-rate");
+        const response = await fetch("/api/mortgage-rate", {
+          signal: controller.signal,
+        });
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -170,7 +174,7 @@ export function DealAnalyzer({
 
         if (isActive) {
           setMarketRates(result);
-          setRateStatus("current");
+          setRateStatus(result.fallback ? "fallback" : "current");
         }
       } catch (error) {
         console.error(error);
@@ -178,6 +182,8 @@ export function DealAnalyzer({
         if (isActive) {
           setRateStatus("fallback");
         }
+      } finally {
+        window.clearTimeout(timeoutId);
       }
     }
 
@@ -185,6 +191,8 @@ export function DealAnalyzer({
 
     return () => {
       isActive = false;
+      window.clearTimeout(timeoutId);
+      controller.abort();
     };
   }, []);
 
@@ -218,7 +226,7 @@ export function DealAnalyzer({
     const isFinanced = purchaseMethod === "financed";
     const downPayment = isFinanced ? price * (downPaymentRate / 100) : price;
     const loanAmount = isFinanced ? Math.max(0, price - downPayment) : 0;
-    const loanCosts = isFinanced ? loanAmount * (loanCostsRate / 100) : 0;
+    const acquisitionCosts = price * (acquisitionCostsRate / 100);
     const monthlyPrincipalAndInterest = isFinanced
       ? getMonthlyPayment(loanAmount, interestRate, loanTermYears)
       : 0;
@@ -237,8 +245,7 @@ export function DealAnalyzer({
     const cashRequired =
       downPayment +
       Math.max(0, totalRehab) +
-      Math.max(0, closingCosts) +
-      loanCosts;
+      acquisitionCosts;
     const annualCashFlow = noiAnnual - annualDebtService;
     const monthlyCashFlow = annualCashFlow / 12;
     const cashOnCashReturn =
@@ -258,7 +265,8 @@ export function DealAnalyzer({
     const valueByCapRate =
       targetCapRate > 0 ? noiAnnual / (targetCapRate / 100) : 0;
     const maxPurchasePrice =
-      valueByCapRate - Math.max(0, totalRehab) - Math.max(0, closingCosts);
+      (valueByCapRate - Math.max(0, totalRehab)) /
+      (1 + acquisitionCostsRate / 100);
     const suggestedInitialOffer =
       maxPurchasePrice * (1 - initialOfferDiscount / 100);
 
@@ -270,7 +278,7 @@ export function DealAnalyzer({
       noiAnnual,
       downPayment,
       loanAmount,
-      loanCosts,
+      acquisitionCosts,
       monthlyPrincipalAndInterest,
       annualDebtService,
       firstYearInterest,
@@ -302,11 +310,10 @@ export function DealAnalyzer({
     otherExpensesAnnual,
     purchaseMethod,
     downPaymentRate,
-    loanCostsRate,
+    acquisitionCostsRate,
     interestRate,
     loanTermYears,
     totalRehab,
-    closingCosts,
     targetCapRate,
     initialOfferDiscount,
   ]);
@@ -398,7 +405,7 @@ export function DealAnalyzer({
                       selectedMarketRate &&
                       `Daily market estimate as of ${selectedMarketRate.observedAt}; cached for 24 hours.`}
                     {rateStatus === "fallback" &&
-                      "Using the 7.25% fallback estimate; edit as needed."}
+                      "The live feed timed out. Using a fallback estimate; edit as needed."}
                   </p>
                   {hasCustomizedInterestRate && marketRates && (
                     <button
@@ -424,33 +431,24 @@ export function DealAnalyzer({
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="loan-costs">Loan Costs %</Label>
-                  <Input
-                    id="loan-costs"
-                    type="number"
-                    min="0"
-                    step="0.25"
-                    value={loanCostsRate}
-                    onChange={(event) =>
-                      setLoanCostsRate(Number(event.target.value))
-                    }
-                  />
-                </div>
               </>
             )}
 
             <div>
-              <Label htmlFor="closing-costs">Closing Costs</Label>
+              <Label htmlFor="acquisition-costs">Acquisition Costs %</Label>
               <Input
-                id="closing-costs"
+                id="acquisition-costs"
                 type="number"
                 min="0"
-                value={closingCosts}
+                step="0.25"
+                value={acquisitionCostsRate}
                 onChange={(event) =>
-                  setClosingCosts(Number(event.target.value))
+                  setAcquisitionCostsRate(Number(event.target.value))
                 }
               />
+              <p className="mt-1 text-xs text-slate-500">
+                Lender and closing costs combined.
+              </p>
             </div>
           </div>
         </section>
@@ -636,9 +634,9 @@ export function DealAnalyzer({
                 note="If held for the full loan term"
               />
               <Metric
-                label="Estimated Loan Costs"
-                value={formatCurrency(results.loanCosts)}
-                note={`${loanCostsRate}% of loan amount`}
+                label="Estimated Acquisition Costs"
+                value={formatCurrency(results.acquisitionCosts)}
+                note={`${acquisitionCostsRate}% of purchase price`}
               />
               <Metric
                 label="Annual Cash Flow"
@@ -675,7 +673,7 @@ export function DealAnalyzer({
             <Metric
               label="Max Purchase Price"
               value={formatCurrency(results.maxPurchasePrice)}
-              note="Cap-rate value less rehab and closing costs"
+              note="Cap-rate value less rehab and acquisition costs"
             />
             <Metric
               label="Suggested Initial Offer"

@@ -17,6 +17,7 @@ async function getLatestFredObservation(
   url.searchParams.set("cosd", "2025-01-01");
 
   const response = await fetch(url, {
+    signal: AbortSignal.timeout(8000),
     next: {
       revalidate: 86400,
       tags: [`mortgage-rate-${seriesId}`],
@@ -82,10 +83,30 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        success: false,
-        message: "Could not load the daily mortgage rate.",
+        success: true,
+        fallback: true,
+        investmentPropertyPremium: INVESTMENT_PROPERTY_PREMIUM,
+        lowLtv: {
+          ltv: "80% or less",
+          baseRate: 6.5,
+          estimatedInvestmentRate: 7.25,
+          observedAt: null,
+          seriesId: LOW_LTV_SERIES,
+        },
+        highLtv: {
+          ltv: "More than 80%",
+          baseRate: 6.75,
+          estimatedInvestmentRate: 7.5,
+          observedAt: null,
+          seriesId: HIGH_LTV_SERIES,
+        },
+        source: "Fallback investment-property estimate",
       },
-      { status: 502 },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
+        },
+      },
     );
   }
 }
