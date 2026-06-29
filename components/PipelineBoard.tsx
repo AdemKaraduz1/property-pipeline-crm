@@ -30,6 +30,12 @@ type Property = {
   list_price?: number | null;
   condition?: string | null;
   status?: string | null;
+
+  // Archive fields - this covers whichever one your app/database is using
+  archived?: boolean | null;
+  is_archived?: boolean | null;
+  archived_at?: string | null;
+
   property_tags?: PropertyTag[];
 };
 
@@ -97,6 +103,10 @@ function formatCurrency(value: number | string | null | undefined) {
   }).format(numberValue);
 }
 
+function normalizeStatus(status: string | null | undefined) {
+  return status?.trim().toLowerCase() || "lead";
+}
+
 function formatStatusLabel(value: string | null | undefined) {
   if (!value) return "Lead";
 
@@ -106,8 +116,19 @@ function formatStatusLabel(value: string | null | undefined) {
     .join(" ");
 }
 
+function isArchivedProperty(property: Property) {
+  const status = normalizeStatus(property.status);
+
+  return (
+    status === "archived" ||
+    property.archived === true ||
+    property.is_archived === true ||
+    Boolean(property.archived_at)
+  );
+}
+
 function getColumnForStatus(status: string | null | undefined) {
-  const normalizedStatus = status || "lead";
+  const normalizedStatus = normalizeStatus(status);
 
   return (
     PIPELINE_COLUMNS.find((column) =>
@@ -272,11 +293,15 @@ function PipelineGrid({
 }
 
 function StaticPipelineGrid({ properties }: { properties: Property[] }) {
+  const activeProperties = properties.filter(
+    (property) => !isArchivedProperty(property)
+  );
+
   return (
     <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {PIPELINE_COLUMNS.map((column) => {
-        const columnProperties = properties.filter((property) =>
-          column.statuses.includes(property.status || "lead")
+        const columnProperties = activeProperties.filter((property) =>
+          column.statuses.includes(normalizeStatus(property.status))
         );
 
         return (
@@ -313,8 +338,13 @@ function StaticPipelineGrid({ properties }: { properties: Property[] }) {
 }
 
 export function PipelineBoard({ properties }: PipelineBoardProps) {
+  const activeProperties = useMemo(
+    () => properties.filter((property) => !isArchivedProperty(property)),
+    [properties]
+  );
+
   const [mounted, setMounted] = useState(false);
-  const [items, setItems] = useState<Property[]>(properties);
+  const [items, setItems] = useState<Property[]>(activeProperties);
   const [activeProperty, setActiveProperty] = useState<Property | null>(null);
 
   useEffect(() => {
@@ -322,8 +352,8 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
   }, []);
 
   useEffect(() => {
-    setItems(properties);
-  }, [properties]);
+    setItems(activeProperties);
+  }, [activeProperties]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -340,10 +370,12 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
       grouped[column.id] = [];
     });
 
-    items.forEach((property) => {
-      const column = getColumnForStatus(property.status);
-      grouped[column.id].push(property);
-    });
+    items
+      .filter((property) => !isArchivedProperty(property))
+      .forEach((property) => {
+        const column = getColumnForStatus(property.status);
+        grouped[column.id].push(property);
+      });
 
     return grouped;
   }, [items]);
@@ -368,7 +400,7 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
 
     if (!property || !targetColumn) return;
 
-    const oldStatus = property.status || "lead";
+    const oldStatus = normalizeStatus(property.status);
 
     if (targetColumn.statuses.includes(oldStatus)) {
       return;
@@ -426,7 +458,7 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
   }
 
   if (!mounted) {
-    return <StaticPipelineGrid properties={properties} />;
+    return <StaticPipelineGrid properties={activeProperties} />;
   }
 
   return (

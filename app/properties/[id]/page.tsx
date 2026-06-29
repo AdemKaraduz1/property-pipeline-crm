@@ -544,7 +544,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           <div className="relative -top-3 min-w-[220px] max-w-xs">
             <PropertyStatusUpdater
               propertyId={id}
-              currentStatus={property.status}
+              currentStatus={
+                property.is_archived === true || property.archived_at
+                  ? "archived"
+                  : property.status
+              }
             />
           </div>
         </div>
@@ -923,7 +927,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </td>
 
-                 
+
 
                       <td className="py-3 pr-2">
                         <input

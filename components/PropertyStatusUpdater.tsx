@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Label } from "@/components/ui/label";
 
 type PropertyStatusUpdaterProps = {
@@ -21,39 +20,49 @@ const statuses = [
   { label: "Rejected", value: "rejected" },
   { label: "Under Contract", value: "under_contract" },
   { label: "Purchased", value: "purchased" },
+  { label: "Archive", value: "archived" },
 ];
 
 export function PropertyStatusUpdater({
   propertyId,
   currentStatus,
 }: PropertyStatusUpdaterProps) {
-    const supabase = createClient();
   const router = useRouter();
   const [status, setStatus] = useState(currentStatus || "lead");
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function handleStatusChange(newStatus: string) {
+    const previousStatus = status;
+
     setStatus(newStatus);
     setIsSaving(true);
     setErrorMessage("");
 
-    const { error } = await supabase
-      .from("properties")
-      .update({
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", propertyId);
+    try {
+      const response = await fetch(`/api/properties/${propertyId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
 
-    if (error) {
-      setErrorMessage(error.message);
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Could not update status.");
+      }
+
+      router.refresh();
+    } catch (error) {
+      setStatus(previousStatus);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not update status.",
+      );
+    } finally {
       setIsSaving(false);
-      return;
     }
-
-    setIsSaving(false);
-    router.refresh();
   }
 
   return (

@@ -42,6 +42,7 @@ export async function PATCH(
   const { error } = await supabase
     .from("properties")
     .update({
+      status: "archived",
       is_archived: true,
       archived_at: new Date().toISOString(),
       archive_reason: archiveReason,

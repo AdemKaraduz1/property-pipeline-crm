@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Archive } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PipelineBoard } from "@/components/PipelineBoard";
 import { createClient } from "@/lib/supabase/server";
@@ -30,6 +31,7 @@ export default async function PipelinePage() {
       list_price,
       condition,
       created_at,
+      archived_at,
       property_tags (
         id,
         tag
@@ -37,7 +39,14 @@ export default async function PipelinePage() {
     `
     )
     .eq("user_id", user.id)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
+
+  const { count: archivedPropertyCount } = await supabase
+    .from("properties")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .not("archived_at", "is", null);
 
   if (error) {
     return (
@@ -62,13 +71,33 @@ export default async function PipelinePage() {
 
         <Link
           href="/properties/new"
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          className="shrink-0 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
         >
           Add Property
         </Link>
       </div>
 
       <PipelineBoard properties={properties || []} />
+
+      <Link
+        href="/properties/archived"
+        className="mt-6 flex max-w-sm items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-400 hover:shadow"
+      >
+        <span className="rounded-md bg-slate-100 p-2 text-slate-600">
+          <Archive className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-950">
+            Archived properties
+          </span>
+          <span className="block text-xs text-slate-500">
+            View properties removed from your pipeline
+          </span>
+        </span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+          {archivedPropertyCount ?? 0}
+        </span>
+      </Link>
     </AppShell>
   );
 }

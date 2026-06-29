@@ -12,6 +12,7 @@ const VALID_STATUSES = new Set([
   "rejected",
   "under_contract",
   "purchased",
+  "archived",
 ]);
 
 export async function PATCH(
@@ -52,11 +53,17 @@ export async function PATCH(
     );
   }
 
+  const isArchived = status === "archived";
+  const now = new Date().toISOString();
+
   const { error } = await supabase
     .from("properties")
     .update({
       status,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
+      is_archived: isArchived,
+      archived_at: isArchived ? now : null,
+      archive_reason: isArchived ? "Status changed to Archive" : null,
     })
     .eq("id", id)
     .eq("user_id", user.id);
