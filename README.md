@@ -1,5 +1,22 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Voice walkthrough notes
+
+Voice notes are recorded temporarily in the browser, transcribed on the server,
+and discarded after the suggested walkthrough update is returned. Configure the
+server-side API key in `.env.local` and in the deployment environment:
+
+```bash
+OPENAI_API_KEY=
+```
+
+Optional model overrides:
+
+```bash
+OPENAI_TRANSCRIPTION_MODEL=gpt-4o-transcribe
+OPENAI_EXTRACTION_MODEL=gpt-5.4-mini
+```
+
 ## Getting Started
 
 First, run the development server:

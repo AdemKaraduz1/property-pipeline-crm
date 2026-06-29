@@ -1,8 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, ClipboardCheck } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  LoaderCircle,
+  Mic,
+  Square,
+} from "lucide-react";
 import {
   COMMON_REHAB_ITEMS,
   InspectionItem,
@@ -39,6 +47,16 @@ type WalkthroughSection = {
   key: string;
   label: string;
   stepIndex: number;
+};
+
+type VoiceNoteStatus = "idle" | "recording" | "processing";
+
+type VoiceNoteSuggestion = {
+  transcript: string;
+  needsRehab: boolean | null;
+  estimatedCost: number | null;
+  notes: string;
+  warning?: string | null;
 };
 
 function buildRoomSteps(unit: WalkthroughUnit): WalkthroughStep[] {
@@ -87,6 +105,14 @@ export function PropertyWalkthrough({
   );
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [voiceStatus, setVoiceStatus] = useState<VoiceNoteStatus>("idle");
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [voiceError, setVoiceError] = useState("");
+  const [voiceSuggestion, setVoiceSuggestion] =
+    useState<VoiceNoteSuggestion | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const steps = useMemo<WalkthroughStep[]>(
     () => [
@@ -130,6 +156,29 @@ export function PropertyWalkthrough({
     currentStep?.scope === "unit" && currentStep.unitId
       ? `unit:${currentStep.unitId}`
       : "common";
+
+  useEffect(() => {
+    if (voiceStatus !== "recording") return;
+
+    const timer = window.setInterval(() => {
+      setRecordingSeconds((seconds) => seconds + 1);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [voiceStatus]);
+
+  useEffect(
+    () => () => {
+      const recorder = mediaRecorderRef.current;
+
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
 
   function getItem(step: WalkthroughStep) {
     if (step.scope === "common") {
@@ -179,6 +228,185 @@ export function PropertyWalkthrough({
         },
       };
     });
+  }
+
+  async function startVoiceNote() {
+    setVoiceError("");
+    setVoiceSuggestion(null);
+
+    if (
+      typeof window === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      setVoiceError("Voice recording is not supported in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      const preferredMimeType = [
+        "audio/webm;codecs=opus",
+        "audio/mp4",
+        "audio/webm",
+      ].find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+      const recorder = preferredMimeType
+        ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+        : new MediaRecorder(stream);
+
+      audioChunksRef.current = [];
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      });
+
+      recorder.start(1000);
+      setRecordingSeconds(0);
+      setVoiceStatus("recording");
+    } catch (error) {
+      console.error(error);
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      setVoiceError(
+        error instanceof DOMException && error.name === "NotAllowedError"
+          ? "Microphone access was denied. Allow microphone access and try again."
+          : "Could not start the microphone. Please try again.",
+      );
+    }
+  }
+
+  async function stopAndProcessVoiceNote() {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder || recorder.state === "inactive") return;
+
+    setVoiceStatus("processing");
+    setVoiceError("");
+
+    try {
+      const audioBlob = await new Promise<Blob>((resolve) => {
+        recorder.addEventListener(
+          "stop",
+          () => {
+            resolve(
+              new Blob(audioChunksRef.current, {
+                type: recorder.mimeType || "audio/webm",
+              }),
+            );
+          },
+          { once: true },
+        );
+        recorder.stop();
+      });
+
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+
+      if (audioBlob.size === 0) {
+        throw new Error("No audio was captured. Please record the note again.");
+      }
+
+      const extension = audioBlob.type.includes("mp4") ? "mp4" : "webm";
+      const formData = new FormData();
+      formData.append("audio", audioBlob, `voice-note.${extension}`);
+      formData.append("stepLabel", currentStep.label);
+      formData.append("stepDescription", currentStep.description);
+
+      const response = await fetch(
+        `/api/properties/${propertyId}/walkthrough/voice-note`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+      const responseText = await response.text();
+      const result = responseText
+        ? (JSON.parse(responseText) as {
+            success?: boolean;
+            message?: string;
+            transcript?: string;
+            warning?: string | null;
+            suggestion?: {
+              needsRehab?: boolean | null;
+              estimatedCost?: number | null;
+              notes?: string;
+            };
+          })
+        : null;
+
+      if (!response.ok || !result?.success || !result.suggestion) {
+        throw new Error(
+          result?.message || "The voice note could not be processed.",
+        );
+      }
+
+      setVoiceSuggestion({
+        transcript: result.transcript || "",
+        needsRehab:
+          result.suggestion.needsRehab === true
+            ? true
+            : result.suggestion.needsRehab === false
+              ? false
+              : null,
+        estimatedCost:
+          typeof result.suggestion.estimatedCost === "number"
+            ? result.suggestion.estimatedCost
+            : null,
+        notes: result.suggestion.notes || result.transcript || "",
+        warning: result.warning,
+      });
+    } catch (error) {
+      console.error(error);
+      setVoiceError(
+        error instanceof Error
+          ? error.message
+          : "The voice note could not be processed.",
+      );
+    } finally {
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      audioChunksRef.current = [];
+      setVoiceStatus("idle");
+    }
+  }
+
+  function applyVoiceSuggestion() {
+    if (!voiceSuggestion) return;
+
+    const update: Partial<InspectionItem> = {};
+
+    if (voiceSuggestion.needsRehab !== null) {
+      update.needsRehab = voiceSuggestion.needsRehab;
+
+      if (voiceSuggestion.needsRehab === false) {
+        update.estimatedCost = 0;
+      }
+    }
+
+    if (voiceSuggestion.estimatedCost !== null) {
+      update.estimatedCost = voiceSuggestion.estimatedCost;
+    }
+
+    if (voiceSuggestion.notes) {
+      update.notes = currentItem.notes.trim()
+        ? `${currentItem.notes.trim()}\n${voiceSuggestion.notes}`
+        : voiceSuggestion.notes;
+    }
+
+    updateItem(currentStep, update);
+    setVoiceSuggestion(null);
+    setSaveMessage("Voice note applied. Save this step to keep it.");
   }
 
   async function saveWalkthrough({
@@ -258,6 +486,8 @@ export function PropertyWalkthrough({
 
     if (saved) {
       setCurrentStepIndex(nextStep);
+      setVoiceSuggestion(null);
+      setVoiceError("");
     }
   }
 
@@ -315,9 +545,11 @@ export function PropertyWalkthrough({
               if (section) {
                 setCurrentStepIndex(section.stepIndex);
                 setSaveMessage("");
+                setVoiceSuggestion(null);
+                setVoiceError("");
               }
             }}
-            disabled={isSaving}
+            disabled={isSaving || voiceStatus !== "idle"}
             className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-60"
           >
             {sections.map((section) => (
@@ -341,6 +573,111 @@ export function PropertyWalkthrough({
         <p className="mt-1 text-sm text-slate-500">
           {currentStep.description}
         </p>
+
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Voice note</p>
+              <p className="text-xs text-slate-500">
+                Describe the condition, needed work, and any cost you want
+                recorded.
+              </p>
+            </div>
+
+            {voiceStatus === "recording" ? (
+              <button
+                type="button"
+                onClick={stopAndProcessVoiceNote}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                <Square className="h-4 w-4 fill-current" />
+                Stop · {Math.floor(recordingSeconds / 60)}:
+                {String(recordingSeconds % 60).padStart(2, "0")}
+              </button>
+            ) : voiceStatus === "processing" ? (
+              <button
+                type="button"
+                disabled
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+              >
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Transcribing...
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startVoiceNote}
+                disabled={isSaving}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:opacity-60"
+              >
+                <Mic className="h-4 w-4" />
+                Record Note
+              </button>
+            )}
+          </div>
+
+          {voiceError && (
+            <p className="mt-3 text-sm font-medium text-red-700">
+              {voiceError}
+            </p>
+          )}
+
+          {voiceSuggestion && (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+              <p className="text-sm font-semibold text-slate-900">
+                Suggested walkthrough update
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {voiceSuggestion.needsRehab !== null && (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+                    {voiceSuggestion.needsRehab
+                      ? "Needs rehab"
+                      : "No rehab needed"}
+                  </span>
+                )}
+                {voiceSuggestion.estimatedCost !== null && (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-800">
+                    ${voiceSuggestion.estimatedCost.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              {voiceSuggestion.notes && (
+                <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
+                  {voiceSuggestion.notes}
+                </p>
+              )}
+              {voiceSuggestion.warning && (
+                <p className="mt-2 text-xs text-amber-700">
+                  {voiceSuggestion.warning}
+                </p>
+              )}
+              <details className="mt-3 text-xs text-slate-500">
+                <summary className="cursor-pointer font-medium">
+                  View transcript
+                </summary>
+                <p className="mt-2 whitespace-pre-wrap">
+                  {voiceSuggestion.transcript}
+                </p>
+              </details>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={applyVoiceSuggestion}
+                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Apply to This Step
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVoiceSuggestion(null)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
@@ -426,9 +763,15 @@ export function PropertyWalkthrough({
           <button
             type="button"
             onClick={() =>
-              setCurrentStepIndex((index) => Math.max(0, index - 1))
+              setCurrentStepIndex((index) => {
+                setVoiceSuggestion(null);
+                setVoiceError("");
+                return Math.max(0, index - 1);
+              })
             }
-            disabled={currentStepIndex === 0 || isSaving}
+            disabled={
+              currentStepIndex === 0 || isSaving || voiceStatus !== "idle"
+            }
             className="inline-flex h-11 items-center gap-1 rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -438,7 +781,7 @@ export function PropertyWalkthrough({
           <button
             type="button"
             onClick={moveNext}
-            disabled={isSaving}
+            disabled={isSaving || voiceStatus !== "idle"}
             className="inline-flex h-11 items-center gap-1 rounded-lg bg-slate-950 px-5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
           >
             {isSaving
@@ -456,7 +799,7 @@ export function PropertyWalkthrough({
       <button
         type="button"
         onClick={() => saveWalkthrough({ exit: true })}
-        disabled={isSaving}
+        disabled={isSaving || voiceStatus !== "idle"}
         className="mt-4 w-full rounded-lg px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
       >
         Save Progress & Exit
