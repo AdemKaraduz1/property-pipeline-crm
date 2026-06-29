@@ -513,6 +513,49 @@ function extractListingDataFromPage() {
     return candidates[0]?.price || "";
   }
 
+  function extractStreetAddress(value) {
+    const text = cleanText(value);
+
+    if (!text || /virtually staged|photos may be|received:|back to list/i.test(text)) {
+      return "";
+    }
+
+    const streetSuffix =
+      "Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Place|Pl|Court|Ct|Boulevard|Blvd|Lane|Ln|Way|Terrace|Ter|Circle|Cir";
+    const addressPattern = new RegExp(
+      `\\b\\d{1,6}\\s+(?:(?:N|S|E|W|North|South|East|West)\\s+)?[A-Za-z0-9'.-]+(?:\\s+[A-Za-z0-9'.-]+){0,6}\\s+(?:${streetSuffix})\\b`,
+      "i"
+    );
+    const match = text.match(addressPattern);
+
+    return match ? cleanText(match[0]) : "";
+  }
+
+  function findVisibleStreetAddress() {
+    const candidates = [];
+
+    document.querySelectorAll("body *").forEach((element) => {
+      const text = cleanText(element.innerText);
+
+      if (!text || text.length > 600) return;
+
+      const address = extractStreetAddress(text);
+
+      if (!address) return;
+
+      const hasLocationContext = /\b[A-Z][a-z]+,\s*[A-Z]{2}\b|\b\d{5}(?:-\d{4})?\b/.test(text);
+
+      candidates.push({
+        address,
+        score: (hasLocationContext ? 0 : 1000) + text.length
+      });
+    });
+
+    candidates.sort((a, b) => a.score - b.score);
+
+    return candidates[0]?.address || "";
+  }
+
   function parseUnitInformation() {
     function makeEmptyUnit() {
       return {
@@ -990,13 +1033,23 @@ function extractListingDataFromPage() {
             .join(", ")
         : "";
 
-  const address =
-    jsonAddress ||
-    getMeta("og:title") ||
-    getFromPairs(labelValuePairs, ["address", "property address"]) ||
+  const visibleStreetAddress = findVisibleStreetAddress();
+  const pairStreetAddress = extractStreetAddress(
+    getFromPairs(labelValuePairs, ["address", "property address"])
+  );
+  const metaTitleStreetAddress = extractStreetAddress(getMeta("og:title"));
+  const matchedStreetAddress = extractStreetAddress(
     firstMatch([
       /^(.+\b(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Place|Pl|Court|Ct|Boulevard|Blvd|Lane|Ln|Way|Terrace|Ter|Circle|Cir).*)$/im
-    ]);
+    ])
+  );
+
+  const address =
+    jsonAddress ||
+    visibleStreetAddress ||
+    pairStreetAddress ||
+    metaTitleStreetAddress ||
+    matchedStreetAddress;
 
   const currentPriceNearAddress = findCurrentPriceNearAddress(address);
 
