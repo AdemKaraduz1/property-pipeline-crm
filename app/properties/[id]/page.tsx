@@ -13,6 +13,7 @@ import { DeleteUnitButton } from "@/components/DeleteUnitButton";
 import { PropertyEditForm } from "@/components/PropertyEditForm";
 import { MobilityFmrCard } from "@/components/MobilityFmrCard";
 import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
+import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 
 type PageProps = {
   params: Promise<{
@@ -468,13 +469,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   return (
     <AppShell>
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <Link
           href="/pipeline"
           className="text-sm text-slate-600 hover:text-slate-950"
         >
           ← Back to Pipeline
         </Link>
+
+        <DeletePropertyButton propertyId={id} />
       </div>
 
       <div className="mb-8">
