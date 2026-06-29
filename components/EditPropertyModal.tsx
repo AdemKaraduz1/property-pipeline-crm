@@ -32,7 +32,7 @@ export function EditPropertyModal({ children }: EditPropertyModalProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-medium leading-none text-slate-700 hover:bg-slate-50"
       >
         Edit Property
       </button>
