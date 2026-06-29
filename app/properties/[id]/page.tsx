@@ -170,6 +170,7 @@ function getCookCountyTaxUrl(parcelNumber: unknown) {
 
   const pin = String(parcelNumber).replace(/\D/g, "");
 
+  
   if (pin.length !== 14) return null;
 
   return `https://cookcountypropertyinfo.com/cookviewerpinresults.aspx?pin=${pin}`;
