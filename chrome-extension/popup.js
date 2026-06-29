@@ -568,6 +568,84 @@ function extractListingDataFromPage() {
       return transposedUnits;
     }
 
+    function makeUnitsFromTransposedLines(lines, startIndex) {
+      const unitFieldLabels = [
+        /^Unit\s*#?$/i,
+        /^Floor\s*#?$/i,
+        /^Sq\.?\s*Ft\.?$/i,
+        /^#?\s*Of\s*Rooms$/i,
+        /^#?\s*Of\s*Bdrms$/i,
+        /^#?\s*Full Baths$/i,
+        /^#?\s*Half Baths$/i,
+        /^Master Bedroom Bath$/i,
+        /^Sec Deposit\s*\$?$/i,
+        /^Rent\s*\$?$/i,
+        /^Lease Exp Date/i,
+        /^Appliances\/Features$/i,
+        /^Tenant Pays$/i
+      ];
+
+      function isUnitFieldLabel(value) {
+        return unitFieldLabels.some((pattern) => pattern.test(value));
+      }
+
+      const labelRows = [];
+
+      for (let lineIndex = startIndex + 1; lineIndex < lines.length; lineIndex += 1) {
+        const line = lines[lineIndex];
+
+        if (!isUnitFieldLabel(line)) continue;
+
+        const nextLabelIndex = lines.findIndex(
+          (candidate, candidateIndex) =>
+            candidateIndex > lineIndex && isUnitFieldLabel(candidate)
+        );
+        const valueEndIndex = nextLabelIndex === -1 ? lines.length : nextLabelIndex;
+        const values = lines.slice(lineIndex + 1, valueEndIndex);
+
+        labelRows.push({
+          label: line,
+          values
+        });
+
+        if (/^Tenant Pays$/i.test(line)) break;
+      }
+
+      const unitNumberRow = labelRows.find((row) => /^Unit\s*#?$/i.test(row.label));
+
+      if (!unitNumberRow) return [];
+
+      const unitNumbers = unitNumberRow.values.filter((value) => /^\d+[A-Z]?$/.test(value));
+
+      if (unitNumbers.length === 0) return [];
+
+      const transposedUnits = unitNumbers.map((unitNumber) => ({
+        ...makeEmptyUnit(),
+        unitNumber
+      }));
+
+      labelRows.forEach((row) => {
+        const values = row.values.slice(0, transposedUnits.length);
+        const minimumAlignedValueCount = Math.max(1, transposedUnits.length - 1);
+
+        if (
+          !/^Unit\s*#?$/i.test(row.label) &&
+          transposedUnits.length > 1 &&
+          values.length < minimumAlignedValueCount
+        ) {
+          return;
+        }
+
+        values.forEach((value, unitIndex) => {
+          assignUnitField(transposedUnits[unitIndex], row.label, value);
+        });
+      });
+
+      return transposedUnits.filter(
+        (unit) => unit.unitNumber && hasMeaningfulUnitData(unit)
+      );
+    }
+
     function makeUnitFromCells(cells) {
       const cleanedCells = cells.map(cleanText);
 
@@ -670,16 +748,23 @@ function extractListingDataFromPage() {
       });
     });
 
-    if (units.length > 0) {
-      return units;
-    }
-
     const lines = rawText
       .split("\n")
       .map(cleanText)
       .filter(Boolean);
 
     const startIndex = lines.findIndex((line) => /Unit Information/i.test(line));
+    const transposedLineUnits =
+      startIndex === -1 ? [] : makeUnitsFromTransposedLines(lines, startIndex);
+
+    if (transposedLineUnits.length > 0) {
+      return transposedLineUnits;
+    }
+
+    if (units.length > 0) {
+      return units;
+    }
+
     if (startIndex === -1) return [];
 
     const tenantPaysIndex = lines.findIndex(
