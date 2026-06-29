@@ -103,15 +103,15 @@ function Metric({
     <div
       className={
         emphasis
-          ? "rounded-md border border-slate-800 bg-slate-900 p-2.5 text-white sm:rounded-lg sm:p-4"
-          : "rounded-md border border-slate-200 bg-slate-50 p-2.5 sm:rounded-lg sm:p-4"
+          ? "min-w-0 rounded-md border border-slate-800 bg-slate-900 p-2.5 text-white sm:rounded-lg sm:p-4"
+          : "min-w-0 rounded-md border border-slate-200 bg-slate-50 p-2.5 sm:rounded-lg sm:p-4"
       }
     >
       <p
         className={
           emphasis
-            ? "text-[11px] leading-tight text-slate-300 sm:text-sm"
-            : "text-[11px] leading-tight text-slate-500 sm:text-sm"
+            ? "break-words text-[11px] leading-tight text-slate-300 sm:text-sm"
+            : "break-words text-[11px] leading-tight text-slate-500 sm:text-sm"
         }
       >
         {label}
@@ -119,8 +119,8 @@ function Metric({
       <p
         className={
           emphasis
-            ? "mt-1 text-lg font-bold sm:text-2xl"
-            : "mt-1 text-lg font-bold text-slate-950 sm:text-2xl"
+            ? "mt-1 break-words text-lg font-bold sm:text-2xl"
+            : "mt-1 break-words text-lg font-bold text-slate-950 sm:text-2xl"
         }
       >
         {value}
@@ -129,8 +129,8 @@ function Metric({
         <p
           className={
             emphasis
-              ? "mt-1 text-[10px] leading-tight text-slate-300 sm:text-xs"
-              : "mt-1 text-[10px] leading-tight text-slate-500 sm:text-xs"
+              ? "mt-1 break-words text-[10px] leading-tight text-slate-300 sm:text-xs"
+              : "mt-1 break-words text-[10px] leading-tight text-slate-500 sm:text-xs"
           }
         >
           {note}
@@ -144,13 +144,13 @@ const mobileAnalysisRailClass =
   "flex snap-x snap-mandatory items-start gap-3 overflow-x-auto pb-2 sm:block sm:space-y-8 sm:overflow-visible sm:pb-0";
 
 const mobileAnalysisPanelClass =
-  "min-w-[calc(100%-2rem)] shrink-0 snap-start rounded-lg border border-slate-200 bg-white p-3 text-sm sm:min-w-0 sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-none sm:[&_[data-slot=label]]:text-xs";
+  "w-full min-w-full max-w-full shrink-0 snap-start overflow-hidden rounded-lg border border-slate-200 bg-white p-3 text-sm sm:min-w-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-none sm:[&_[data-slot=label]]:text-xs";
 
 const analysisGridClass =
-  "grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4";
+  "grid min-w-0 grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4";
 
 const analysisMetricGridClass =
-  "grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4";
+  "grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4";
 
 const analysisInputClass =
   "h-8 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm shadow-sm sm:h-10 sm:border-transparent sm:border-b-input sm:bg-transparent sm:px-0 sm:shadow-none";
