@@ -55,16 +55,24 @@ export async function PATCH(
 
   const isArchived = status === "archived";
   const now = new Date().toISOString();
+  const propertyUpdate = isArchived
+    ? {
+        updated_at: now,
+        is_archived: true,
+        archived_at: now,
+        archive_reason: "Status changed to Archive",
+      }
+    : {
+        status,
+        updated_at: now,
+        is_archived: false,
+        archived_at: null,
+        archive_reason: null,
+      };
 
   const { error } = await supabase
     .from("properties")
-    .update({
-      status,
-      updated_at: now,
-      is_archived: isArchived,
-      archived_at: isArchived ? now : null,
-      archive_reason: isArchived ? "Status changed to Archive" : null,
-    })
+    .update(propertyUpdate)
     .eq("id", id)
     .eq("user_id", user.id);
 

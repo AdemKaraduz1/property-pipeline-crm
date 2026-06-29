@@ -45,7 +45,11 @@ export function ArchivePropertyButton({
       router.refresh();
     } catch (error) {
       console.error(error);
-      alert("Could not remove property from pipeline.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not remove property from pipeline.",
+      );
     } finally {
       setIsArchiving(false);
     }
