@@ -13,6 +13,7 @@ export type DealAnalyzerSettings = {
   managementRate: number;
   repairsRate: number;
   capexRate: number;
+  customOperatingExpensesAnnual: number | null;
   customUtilitiesAnnual: number | null;
   otherExpensesAnnual: number;
   targetCapRate: number;
@@ -35,6 +36,7 @@ const NUMBER_KEYS = [
 
 const NULLABLE_NUMBER_KEYS = [
   "customInterestRate",
+  "customOperatingExpensesAnnual",
   "customUtilitiesAnnual",
 ] as const;
 
@@ -58,6 +60,10 @@ export function parseDealAnalyzerSettings(
   }
 
   for (const key of NULLABLE_NUMBER_KEYS) {
+    if (key === "customOperatingExpensesAnnual" && settings[key] === undefined) {
+      settings[key] = null;
+    }
+
     if (
       settings[key] !== null &&
       (typeof settings[key] !== "number" ||

@@ -441,8 +441,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   );
 
   const propertyMetadata = asRecord(property.all_extracted_fields);
+  const rawDealAnalyzerSettings = asRecord(propertyMetadata.deal_analyzer);
+  const hasSavedOperatingExpenses = Object.prototype.hasOwnProperty.call(
+    rawDealAnalyzerSettings,
+    "customOperatingExpensesAnnual",
+  );
   const dealAnalyzerSettings = parseDealAnalyzerSettings(
-    propertyMetadata.deal_analyzer,
+    rawDealAnalyzerSettings,
   );
   const hasWalkthroughProgress = Boolean(
     asRecord(propertyMetadata.walkthrough).updated_at,
@@ -944,6 +949,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           askingPrice={askingPrice}
           taxesAnnual={taxesAnnual}
           insuranceAnnual={insuranceAnnual}
+          operatingExpensesAnnual={
+            hasValue(property.operating_expenses)
+              ? Number(property.operating_expenses)
+              : null
+          }
+          hasSavedOperatingExpenses={hasSavedOperatingExpenses}
           projectedMonthlyRent={projectedMonthlyRent}
           totalRehab={totalRehab}
           ownerPaidUtilitiesAnnual={annualUtilities}

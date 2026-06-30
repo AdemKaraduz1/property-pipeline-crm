@@ -15,6 +15,8 @@ type DealAnalyzerProps = {
   askingPrice: number | null;
   taxesAnnual: number | null;
   insuranceAnnual: number | null;
+  operatingExpensesAnnual: number | null;
+  hasSavedOperatingExpenses: boolean;
   projectedMonthlyRent: number;
   totalRehab: number;
   ownerPaidUtilitiesAnnual: number;
@@ -177,6 +179,8 @@ export function DealAnalyzer({
   askingPrice,
   taxesAnnual,
   insuranceAnnual,
+  operatingExpensesAnnual,
+  hasSavedOperatingExpenses,
   projectedMonthlyRent,
   totalRehab,
   ownerPaidUtilitiesAnnual,
@@ -215,6 +219,12 @@ export function DealAnalyzer({
   const [capexRate, setCapexRate] = useState(
     initialSettings?.capexRate ?? 5,
   );
+  const [customOperatingExpensesAnnual, setCustomOperatingExpensesAnnual] =
+    useState<number | null>(
+      initialSettings && hasSavedOperatingExpenses
+        ? initialSettings.customOperatingExpensesAnnual
+        : operatingExpensesAnnual,
+    );
   const [customUtilitiesAnnual, setCustomUtilitiesAnnual] = useState<
     number | null
   >(initialSettings?.customUtilitiesAnnual ?? null);
@@ -244,6 +254,7 @@ export function DealAnalyzer({
       managementRate,
       repairsRate,
       capexRate,
+      customOperatingExpensesAnnual,
       customUtilitiesAnnual,
       otherExpensesAnnual,
       targetCapRate,
@@ -253,6 +264,7 @@ export function DealAnalyzer({
       acquisitionCostsRate,
       capexRate,
       customInterestRate,
+      customOperatingExpensesAnnual,
       customUtilitiesAnnual,
       downPaymentRate,
       initialOfferDiscount,
@@ -283,9 +295,21 @@ export function DealAnalyzer({
       }
     }
 
-    const propertySettings = parseDealAnalyzerSettings(
-      readStoredSettings(getPropertyDealAnalyzerStorageKey(propertyId)),
+    const rawPropertySettings = readStoredSettings(
+      getPropertyDealAnalyzerStorageKey(propertyId),
     );
+    const hasStoredOperatingExpenses =
+      rawPropertySettings !== null &&
+      typeof rawPropertySettings === "object" &&
+      Object.prototype.hasOwnProperty.call(
+        rawPropertySettings,
+        "customOperatingExpensesAnnual",
+      );
+    const propertySettings = parseDealAnalyzerSettings(rawPropertySettings);
+    if (propertySettings && !hasStoredOperatingExpenses) {
+      propertySettings.customOperatingExpensesAnnual =
+        operatingExpensesAnnual;
+    }
     const lastUsedSettings = parseDealAnalyzerSettings(
       readStoredSettings(dealAnalyzerStorageKey),
     );
@@ -308,6 +332,9 @@ export function DealAnalyzer({
 
         if (propertySettings) {
           setPurchasePrice(storedSettings.purchasePrice);
+          setCustomOperatingExpensesAnnual(
+            storedSettings.customOperatingExpensesAnnual,
+          );
           setCustomUtilitiesAnnual(storedSettings.customUtilitiesAnnual);
           setOtherExpensesAnnual(storedSettings.otherExpensesAnnual);
         }
@@ -317,7 +344,7 @@ export function DealAnalyzer({
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [initialSettings, propertyId]);
+  }, [initialSettings, operatingExpensesAnnual, propertyId]);
 
   useEffect(() => {
     if (!hasRestoredSettings) return;
@@ -464,7 +491,7 @@ export function DealAnalyzer({
     const annualGrossRent = projectedMonthlyRent * 12;
     const vacancyLoss = annualGrossRent * (vacancyRate / 100);
     const effectiveGrossIncome = annualGrossRent - vacancyLoss;
-    const managementExpense = annualGrossRent * (managementRate / 100);
+    const managementExpense = effectiveGrossIncome * (managementRate / 100);
     const repairsExpense = annualGrossRent * (repairsRate / 100);
     const capexExpense = annualGrossRent * (capexRate / 100);
     const fixedExpenses =
@@ -472,9 +499,14 @@ export function DealAnalyzer({
       Number(insuranceAnnual || 0) +
       Math.max(0, utilitiesAnnual) +
       Math.max(0, otherExpensesAnnual);
-    const totalExpenses =
-      managementExpense + repairsExpense + capexExpense + fixedExpenses;
-    const noiAnnual = effectiveGrossIncome - totalExpenses;
+    const itemizedOperatingExpenses =
+      managementExpense + repairsExpense + fixedExpenses;
+    const operatingExpenses =
+      customOperatingExpensesAnnual === null
+        ? itemizedOperatingExpenses
+        : Math.max(0, customOperatingExpensesAnnual);
+    const noiAnnual = effectiveGrossIncome - operatingExpenses;
+    const netCashFlowBeforeDebt = noiAnnual - capexExpense;
 
     const isFinanced = purchaseMethod === "financed";
     const downPayment = isFinanced ? price * (downPaymentRate / 100) : price;
@@ -499,7 +531,7 @@ export function DealAnalyzer({
       downPayment +
       Math.max(0, totalRehab) +
       acquisitionCosts;
-    const annualCashFlow = noiAnnual - annualDebtService;
+    const annualCashFlow = netCashFlowBeforeDebt - annualDebtService;
     const monthlyCashFlow = annualCashFlow / 12;
     const cashOnCashReturn =
       cashRequired > 0 ? annualCashFlow / cashRequired : 0;
@@ -509,12 +541,15 @@ export function DealAnalyzer({
     const debtYield = loanAmount > 0 ? noiAnnual / loanAmount : 0;
     const breakEvenOccupancy =
       annualGrossRent > 0
-        ? (totalExpenses + annualDebtService) / annualGrossRent
+        ? (operatingExpenses + capexExpense + annualDebtService) /
+          annualGrossRent
         : 0;
     const grossRentMultiplier =
       annualGrossRent > 0 ? price / annualGrossRent : 0;
     const expenseRatio =
-      effectiveGrossIncome > 0 ? totalExpenses / effectiveGrossIncome : 0;
+      effectiveGrossIncome > 0
+        ? operatingExpenses / effectiveGrossIncome
+        : 0;
     const valueByCapRate =
       targetCapRate > 0 ? noiAnnual / (targetCapRate / 100) : 0;
     const maxPurchasePrice =
@@ -527,7 +562,8 @@ export function DealAnalyzer({
       annualGrossRent,
       effectiveGrossIncome,
       vacancyLoss,
-      totalExpenses,
+      operatingExpenses,
+      capexExpense,
       noiAnnual,
       downPayment,
       loanAmount,
@@ -557,6 +593,7 @@ export function DealAnalyzer({
     managementRate,
     repairsRate,
     capexRate,
+    customOperatingExpensesAnnual,
     taxesAnnual,
     insuranceAnnual,
     utilitiesAnnual,
@@ -736,6 +773,40 @@ export function DealAnalyzer({
               Operating Assumptions
             </h3>
             <div className={analysisGridClass}>
+              <div className="col-span-2">
+                <Label htmlFor="operating-expenses">
+                  Operating Expenses / Year
+                </Label>
+                <Input
+                  id="operating-expenses"
+                  type="number"
+                  min="0"
+                  value={customOperatingExpensesAnnual ?? ""}
+                  placeholder={formatCurrency(results.operatingExpenses)}
+                  className={analysisInputClass}
+                  onChange={(event) =>
+                    setCustomOperatingExpensesAnnual(
+                      event.target.value === ""
+                        ? null
+                        : Number(event.target.value),
+                    )
+                  }
+                />
+                <p className={analysisHintClass}>
+                  {customOperatingExpensesAnnual === null
+                    ? "Calculated from the itemized assumptions below."
+                    : "Using the entered annual total instead of itemized operating expenses. CapEx remains separate."}
+                </p>
+                {customOperatingExpensesAnnual !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomOperatingExpensesAnnual(null)}
+                    className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900"
+                  >
+                    Use itemized assumptions
+                  </button>
+                )}
+              </div>
               <div>
                 <Label htmlFor="vacancy-rate">Vacancy %</Label>
                 <Input
@@ -848,7 +919,7 @@ export function DealAnalyzer({
               <Metric
                 label="Monthly Cash Flow"
                 value={formatCurrency(results.monthlyCashFlow)}
-                note="After operating expenses and debt service"
+                note="After operating expenses, CapEx, and debt service"
                 emphasis
               />
               <Metric
@@ -885,7 +956,7 @@ export function DealAnalyzer({
               <Metric
                 label="Operating Expense Ratio"
                 value={formatPercent(results.expenseRatio)}
-                note={`${formatCurrency(results.totalExpenses)} annual operating expenses`}
+                note={`${formatCurrency(results.operatingExpenses)} annual operating expenses; CapEx excluded`}
               />
             </div>
           </section>
@@ -933,7 +1004,7 @@ export function DealAnalyzer({
                 <Metric
                   label="Annual Cash Flow"
                   value={formatCurrency(results.annualCashFlow)}
-                  note="NOI minus annual debt service"
+                  note={`NOI minus ${formatCurrency(results.capexExpense)} CapEx reserve and annual debt service`}
                 />
               </div>
             </section>
