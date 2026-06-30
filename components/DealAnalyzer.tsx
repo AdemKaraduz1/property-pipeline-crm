@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type {
+  DealAnalyzerSettings,
+  PurchaseMethod,
+} from "@/lib/deal-analyzer";
 
 type DealAnalyzerProps = {
+  propertyId: string;
   askingPrice: number | null;
   taxesAnnual: number | null;
   insuranceAnnual: number | null;
   projectedMonthlyRent: number;
   totalRehab: number;
   ownerPaidUtilitiesAnnual: number;
+  initialSettings: DealAnalyzerSettings | null;
 };
-
-type PurchaseMethod = "financed" | "cash";
 
 type MarketRateOption = {
   estimatedInvestmentRate: number;
@@ -162,36 +166,137 @@ const analysisHintClass =
   "mt-1 text-[10px] leading-3.5 text-slate-500 sm:text-xs sm:leading-normal";
 
 export function DealAnalyzer({
+  propertyId,
   askingPrice,
   taxesAnnual,
   insuranceAnnual,
   projectedMonthlyRent,
   totalRehab,
   ownerPaidUtilitiesAnnual,
+  initialSettings,
 }: DealAnalyzerProps) {
   const [purchaseMethod, setPurchaseMethod] =
-    useState<PurchaseMethod>("financed");
-  const [purchasePrice, setPurchasePrice] = useState(askingPrice || 0);
-  const [downPaymentRate, setDownPaymentRate] = useState(20);
+    useState<PurchaseMethod>(initialSettings?.purchaseMethod ?? "financed");
+  const [purchasePrice, setPurchasePrice] = useState(
+    initialSettings?.purchasePrice ?? askingPrice ?? 0,
+  );
+  const [downPaymentRate, setDownPaymentRate] = useState(
+    initialSettings?.downPaymentRate ?? 20,
+  );
   const [customInterestRate, setCustomInterestRate] = useState<number | null>(
-    null,
+    initialSettings?.customInterestRate ?? null,
   );
   const [marketRates, setMarketRates] = useState<MarketRates | null>(null);
   const [rateStatus, setRateStatus] = useState<"loading" | "current" | "fallback">(
     "loading",
   );
-  const [loanTermYears, setLoanTermYears] = useState(30);
-  const [acquisitionCostsRate, setAcquisitionCostsRate] = useState(3);
-  const [vacancyRate, setVacancyRate] = useState(5);
-  const [managementRate, setManagementRate] = useState(8);
-  const [repairsRate, setRepairsRate] = useState(8);
-  const [capexRate, setCapexRate] = useState(5);
+  const [loanTermYears, setLoanTermYears] = useState(
+    initialSettings?.loanTermYears ?? 30,
+  );
+  const [acquisitionCostsRate, setAcquisitionCostsRate] = useState(
+    initialSettings?.acquisitionCostsRate ?? 3,
+  );
+  const [vacancyRate, setVacancyRate] = useState(
+    initialSettings?.vacancyRate ?? 5,
+  );
+  const [managementRate, setManagementRate] = useState(
+    initialSettings?.managementRate ?? 8,
+  );
+  const [repairsRate, setRepairsRate] = useState(
+    initialSettings?.repairsRate ?? 8,
+  );
+  const [capexRate, setCapexRate] = useState(
+    initialSettings?.capexRate ?? 5,
+  );
   const [customUtilitiesAnnual, setCustomUtilitiesAnnual] = useState<
     number | null
-  >(null);
-  const [otherExpensesAnnual, setOtherExpensesAnnual] = useState(0);
-  const [targetCapRate, setTargetCapRate] = useState(8);
-  const [initialOfferDiscount, setInitialOfferDiscount] = useState(10);
+  >(initialSettings?.customUtilitiesAnnual ?? null);
+  const [otherExpensesAnnual, setOtherExpensesAnnual] = useState(
+    initialSettings?.otherExpensesAnnual ?? 0,
+  );
+  const [targetCapRate, setTargetCapRate] = useState(
+    initialSettings?.targetCapRate ?? 8,
+  );
+  const [initialOfferDiscount, setInitialOfferDiscount] = useState(
+    initialSettings?.initialOfferDiscount ?? 10,
+  );
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+
+  const settings = useMemo<DealAnalyzerSettings>(
+    () => ({
+      purchaseMethod,
+      purchasePrice,
+      downPaymentRate,
+      customInterestRate,
+      loanTermYears,
+      acquisitionCostsRate,
+      vacancyRate,
+      managementRate,
+      repairsRate,
+      capexRate,
+      customUtilitiesAnnual,
+      otherExpensesAnnual,
+      targetCapRate,
+      initialOfferDiscount,
+    }),
+    [
+      acquisitionCostsRate,
+      capexRate,
+      customInterestRate,
+      customUtilitiesAnnual,
+      downPaymentRate,
+      initialOfferDiscount,
+      loanTermYears,
+      managementRate,
+      otherExpensesAnnual,
+      purchaseMethod,
+      purchasePrice,
+      repairsRate,
+      targetCapRate,
+      vacancyRate,
+    ],
+  );
+  const lastSavedSettings = useRef(JSON.stringify(settings));
+
+  useEffect(() => {
+    const serializedSettings = JSON.stringify(settings);
+    if (serializedSettings === lastSavedSettings.current) return;
+
+    setSaveStatus("saving");
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `/api/properties/${propertyId}/deal-analyzer`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settings }),
+            signal: controller.signal,
+          },
+        );
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Could not save deal analysis.");
+        }
+
+        lastSavedSettings.current = serializedSettings;
+        setSaveStatus("saved");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error(error);
+        setSaveStatus("error");
+      }
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [propertyId, settings]);
 
   useEffect(() => {
     let isActive = true;
@@ -365,9 +470,22 @@ export function DealAnalyzer({
       className="mb-6 rounded-xl border-slate-200 bg-white sm:[--card-spacing:--spacing(8)]"
     >
       <CardHeader>
-        <CardTitle className="font-sans text-base font-semibold normal-case tracking-normal text-slate-950 sm:text-lg">
-          Deal Analyzer
-        </CardTitle>
+        <div className="flex items-center justify-between gap-4">
+          <CardTitle className="font-sans text-base font-semibold normal-case tracking-normal text-slate-950 sm:text-lg">
+            Deal Analyzer
+          </CardTitle>
+          <p
+            className={`text-xs ${
+              saveStatus === "error" ? "text-red-600" : "text-slate-500"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {saveStatus === "saving" && "Saving..."}
+            {saveStatus === "saved" && "Saved"}
+            {saveStatus === "error" && "Could not save"}
+          </p>
+        </div>
         <p className="text-xs leading-5 text-slate-500 sm:text-sm">
           Compare cash and financed acquisitions using editable operating and
           loan assumptions.

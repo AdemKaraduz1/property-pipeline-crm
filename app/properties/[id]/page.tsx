@@ -14,6 +14,7 @@ import { MobilityFmrCard } from "@/components/MobilityFmrCard";
 import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
+import { parseDealAnalyzerSettings } from "@/lib/deal-analyzer";
 
 type PageProps = {
   params: Promise<{
@@ -440,6 +441,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   );
 
   const propertyMetadata = asRecord(property.all_extracted_fields);
+  const dealAnalyzerSettings = parseDealAnalyzerSettings(
+    propertyMetadata.deal_analyzer,
+  );
   const hasWalkthroughProgress = Boolean(
     asRecord(propertyMetadata.walkthrough).updated_at,
   );
@@ -936,12 +940,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
       <div id="analysis" className="scroll-mt-24">
         <DealAnalyzer
+          propertyId={id}
           askingPrice={askingPrice}
           taxesAnnual={taxesAnnual}
           insuranceAnnual={insuranceAnnual}
           projectedMonthlyRent={projectedMonthlyRent}
           totalRehab={totalRehab}
           ownerPaidUtilitiesAnnual={annualUtilities}
+          initialSettings={dealAnalyzerSettings}
         />
       </div>
 
