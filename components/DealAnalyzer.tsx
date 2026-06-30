@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { parseDealAnalyzerSettings } from "@/lib/deal-analyzer";
 import type {
   DealAnalyzerSettings,
   PurchaseMethod,
@@ -32,6 +33,12 @@ type MarketRates = {
   investmentPropertyPremium: number;
   source: string;
 };
+
+const dealAnalyzerStorageKey = "property-pipeline:deal-analyzer:last-used";
+
+function getPropertyDealAnalyzerStorageKey(propertyId: string) {
+  return `property-pipeline:deal-analyzer:${propertyId}`;
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -223,6 +230,7 @@ export function DealAnalyzer({
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  const [hasRestoredSettings, setHasRestoredSettings] = useState(false);
 
   const settings = useMemo<DealAnalyzerSettings>(
     () => ({
@@ -259,8 +267,76 @@ export function DealAnalyzer({
     ],
   );
   const lastSavedSettings = useRef(JSON.stringify(settings));
+  const latestSettings = useRef(settings);
 
   useEffect(() => {
+    latestSettings.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    function readStoredSettings(key: string) {
+      try {
+        const value = window.localStorage.getItem(key);
+        return value ? JSON.parse(value) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    const propertySettings = parseDealAnalyzerSettings(
+      readStoredSettings(getPropertyDealAnalyzerStorageKey(propertyId)),
+    );
+    const lastUsedSettings = parseDealAnalyzerSettings(
+      readStoredSettings(dealAnalyzerStorageKey),
+    );
+    const storedSettings =
+      propertySettings ?? (initialSettings ? null : lastUsedSettings);
+
+    const timeoutId = window.setTimeout(() => {
+      if (storedSettings) {
+        setPurchaseMethod(storedSettings.purchaseMethod);
+        setDownPaymentRate(storedSettings.downPaymentRate);
+        setCustomInterestRate(storedSettings.customInterestRate);
+        setLoanTermYears(storedSettings.loanTermYears);
+        setAcquisitionCostsRate(storedSettings.acquisitionCostsRate);
+        setVacancyRate(storedSettings.vacancyRate);
+        setManagementRate(storedSettings.managementRate);
+        setRepairsRate(storedSettings.repairsRate);
+        setCapexRate(storedSettings.capexRate);
+        setTargetCapRate(storedSettings.targetCapRate);
+        setInitialOfferDiscount(storedSettings.initialOfferDiscount);
+
+        if (propertySettings) {
+          setPurchasePrice(storedSettings.purchasePrice);
+          setCustomUtilitiesAnnual(storedSettings.customUtilitiesAnnual);
+          setOtherExpensesAnnual(storedSettings.otherExpensesAnnual);
+        }
+      }
+
+      setHasRestoredSettings(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [initialSettings, propertyId]);
+
+  useEffect(() => {
+    if (!hasRestoredSettings) return;
+
+    try {
+      const serializedSettings = JSON.stringify(settings);
+      window.localStorage.setItem(
+        getPropertyDealAnalyzerStorageKey(propertyId),
+        serializedSettings,
+      );
+      window.localStorage.setItem(dealAnalyzerStorageKey, serializedSettings);
+    } catch {
+      // Database autosave remains the durable fallback when storage is blocked.
+    }
+  }, [hasRestoredSettings, propertyId, settings]);
+
+  useEffect(() => {
+    if (!hasRestoredSettings) return;
+
     const serializedSettings = JSON.stringify(settings);
     if (serializedSettings === lastSavedSettings.current) return;
 
@@ -275,6 +351,7 @@ export function DealAnalyzer({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ settings }),
             signal: controller.signal,
+            keepalive: true,
           },
         );
         const result = await response.json();
@@ -296,7 +373,39 @@ export function DealAnalyzer({
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [propertyId, settings]);
+  }, [hasRestoredSettings, propertyId, settings]);
+
+  useEffect(() => {
+    function flushPendingSave() {
+      const pendingSettings = latestSettings.current;
+      const serializedSettings = JSON.stringify(pendingSettings);
+
+      if (serializedSettings === lastSavedSettings.current) return;
+
+      lastSavedSettings.current = serializedSettings;
+      void fetch(`/api/properties/${propertyId}/deal-analyzer`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: pendingSettings }),
+        keepalive: true,
+      }).catch(() => {
+        lastSavedSettings.current = "";
+      });
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") flushPendingSave();
+    }
+
+    window.addEventListener("pagehide", flushPendingSave);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", flushPendingSave);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      flushPendingSave();
+    };
+  }, [propertyId]);
 
   useEffect(() => {
     let isActive = true;
