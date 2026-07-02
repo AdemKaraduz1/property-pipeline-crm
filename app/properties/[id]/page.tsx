@@ -435,6 +435,19 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     0,
   );
 
+  const fmrMonthlyRent = unitList.reduce(
+    (sum, unit) => sum + Number(unit.fmr_rent || 0),
+    0,
+  );
+  const baseFmrMonthlyRent = unitList.reduce(
+    (sum, unit) => sum + Number(unit.base_fmr_rent || 0),
+    0,
+  );
+  const mobilityFmrMonthlyRent = unitList.reduce(
+    (sum, unit) => sum + Number(unit.mobility_fmr_rent || 0),
+    0,
+  );
+
   const currentMonthlyRent = unitList.reduce(
     (sum, unit) => sum + Number(getCurrentRent(unit) || 0),
     0,
@@ -956,6 +969,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           }
           hasSavedOperatingExpenses={hasSavedOperatingExpenses}
           projectedMonthlyRent={projectedMonthlyRent}
+          baseFmrMonthlyRent={baseFmrMonthlyRent}
+          mobilityFmrMonthlyRent={mobilityFmrMonthlyRent}
+          fmrMonthlyRent={fmrMonthlyRent}
+          isMobilityArea={property.is_mobility_area ?? null}
           totalRehab={totalRehab}
           ownerPaidUtilitiesAnnual={annualUtilities}
           initialSettings={dealAnalyzerSettings}
@@ -1152,9 +1169,25 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         />
                       </label>
 
+                      <div className="block min-w-0">
+                        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                          Base FMR
+                        </span>
+                        <div
+                          className={`${mobileFieldClass} flex items-center bg-slate-100 font-medium text-slate-700`}
+                          title="HUD Fair Market Rent before any mobility-area adjustment"
+                        >
+                          {hasValue(unit.base_fmr_rent)
+                            ? formatCurrency(unit.base_fmr_rent)
+                            : "—"}
+                        </div>
+                      </div>
+
                       <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                          FMR
+                          {property.is_mobility_area === true
+                            ? "Applied FMR (150%)"
+                            : "Applied FMR (Base)"}
                         </span>
                         <input
                           form={formId}
@@ -1168,6 +1201,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                           className={mobileFieldClass}
                           aria-label="FMR rent"
                         />
+                        <span className="mt-1 block text-[10px] leading-tight text-slate-500">
+                          {property.is_mobility_area === true
+                            ? `150% of ${formatCurrency(unit.base_fmr_rent)} base FMR`
+                            : `Mobility potential: ${formatCurrency(unit.mobility_fmr_rent)}`}
+                        </span>
                       </label>
 
                       <label className="block min-w-0">
@@ -1264,7 +1302,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </form>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[1080px] text-left text-sm">
+              <table className="w-full min-w-[1180px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-xs text-slate-500">
                     <th className="py-2 pr-1.5">Unit</th>
@@ -1274,7 +1312,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     <th className="py-2 pr-1.5">Bathrooms</th>
                     <th className="py-2 pr-1.5">Current</th>
                     <th className="py-2 pr-1.5">Projected</th>
-                    <th className="py-2 pr-1.5">FMR</th>
+                    <th className="py-2 pr-1.5">Base FMR</th>
+                    <th className="py-2 pr-1.5">
+                      {property.is_mobility_area === true
+                        ? "Applied FMR (150%)"
+                        : "Applied FMR (Base)"}
+                    </th>
                     <th className="py-2 pr-1.5">Lease Exp.</th>
                     <th className="py-2 pr-1.5">Rehab</th>
                     <th className="py-2 pr-1.5 text-center" title="Water">
@@ -1402,6 +1445,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                             className={smallInlineInputClass}
                             aria-label="Projected rent"
                           />
+                        </td>
+
+                        <td className="py-3 pr-2">
+                          <div
+                            className="w-20 rounded-md bg-slate-50 px-2 py-1.5 text-sm font-medium text-slate-700"
+                            title="HUD Fair Market Rent before any mobility-area adjustment"
+                          >
+                            {hasValue(unit.base_fmr_rent)
+                              ? formatCurrency(unit.base_fmr_rent)
+                              : "—"}
+                          </div>
                         </td>
 
                         <td className="py-3 pr-2">

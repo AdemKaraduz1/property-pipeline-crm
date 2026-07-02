@@ -372,6 +372,147 @@ function extractListingDataFromPage() {
     return results;
   }
 
+  function getRedfinListingData(jsonLdItems) {
+    if (!/(^|\.)redfin\.com$/i.test(window.location.hostname)) {
+      return null;
+    }
+
+    function getTestIdText(testId) {
+      return cleanText(
+        document.querySelector(`[data-rf-test-id="${testId}"]`)?.innerText
+      );
+    }
+
+    function getJsonLdTypes(item) {
+      return Array.isArray(item?.["@type"])
+        ? item["@type"]
+        : [item?.["@type"]].filter(Boolean);
+    }
+
+    const listing =
+      jsonLdItems.find((item) => item?.url === sourceUrl) ||
+      jsonLdItems.find((item) =>
+        getJsonLdTypes(item).includes("RealEstateListing")
+      ) ||
+      {};
+    const residence = listing.mainEntity || {};
+    const structuredAddress = residence.address || {};
+    const cityStateZip = [
+      structuredAddress.addressLocality,
+      structuredAddress.addressRegion
+    ]
+      .filter(Boolean)
+      .join(", ");
+    const address =
+      [
+        structuredAddress.streetAddress,
+        [cityStateZip, structuredAddress.postalCode]
+          .filter(Boolean)
+          .join(" ")
+      ]
+        .filter(Boolean)
+        .join(", ") ||
+      getTestIdText("abp-homeinfo-homeaddress") ||
+      getMeta("og:title").split(" - ")[0];
+    const mainSummary = [...document.querySelectorAll(
+      '[data-rf-test-id="mhi-housesummary"]'
+    )]
+      .map((element) => element.innerText || "")
+      .join("\n");
+    const detailsRoot = document.querySelector(
+      '[data-rf-test-id="propertyDetails"]'
+    );
+    const detailItems = detailsRoot
+      ? [...detailsRoot.querySelectorAll("li.entryItem")]
+          .map((element) => cleanText(element.innerText))
+          .filter(Boolean)
+      : [];
+    const detailText = detailItems.join("\n");
+    const publicFactsText =
+      document.querySelector(
+        '[data-rf-test-id="public-facts-and-zoning-v2-expandable-preview"]'
+      )?.innerText || "";
+    const pageDescription =
+      listing.description ||
+      getTestIdText("listingRemarks") ||
+      getMeta("description") ||
+      getMeta("og:description");
+    const mlsMatch =
+      pageTitle.match(/\bMLS#\s*([A-Z0-9-]+)/i) ||
+      mainSummary.match(/\bMLS Grid\s*#\s*([A-Z0-9-]+)/i) ||
+      rawText.match(/\bMLS(?:\s*#|\s*Number|\s*ID)?\s*[:#]?\s*([A-Z0-9-]+)/i);
+    const propertyTypeMatch =
+      mainSummary.match(/([^\n]+)\s*\n?\s*Property Type/i) ||
+      detailText.match(/(Multi-family property \([^)]+\))/i);
+    const lotSizeMatch =
+      mainSummary.match(/([\d,.]+\s*(?:sq\.?\s*ft\.?|acres?))\s*\n?\s*Lot Size/i) ||
+      detailText.match(/([\d,.]+\s*x\s*[\d,.]+\s*lot dimensions)/i);
+    const summaryParkingMatch = mainSummary.match(
+      /([^\n]+)\s*\n?\s*Parking/i
+    );
+    const detailParking = detailItems.find((item) =>
+      /garage|parking spaces?/i.test(item)
+    );
+    const daysOnMarketMatch = rawText.match(
+      /\b(\d+)\s+days?\s+on\s+Redfin\b/i
+    );
+    const agentMatch =
+      getTestIdText("agentInfoItem-agentDisplay").match(
+        /Listed by\s+(.+?)(?:\s*•|$)/i
+      ) || mainSummary.match(/Listed by\s+(.+?)(?:\s*•|$)/im);
+    const heating =
+      detailItems.find((item) => /\bheating\b/i.test(item)) || "";
+    const basement =
+      detailItems.find((item) => /\bbasement\b/i.test(item)) || "";
+    const roof =
+      detailItems.find((item) => /\broof\b/i.test(item)) || "";
+    const exterior =
+      detailItems.find((item) => /\b(?:siding|brick)\b.*\bexterior\b/i.test(item)) ||
+      "";
+    const parcelMatch =
+      publicFactsText.match(/\bAPN\s*([A-Z0-9-]+)/i) ||
+      rawText.match(/\bAPN\s*[:#]?\s*([A-Z0-9-]+)/i);
+    const zoningMatch = rawText.match(/\b(RS-\d+)\b/i);
+
+    return {
+      sourceSite: "redfin",
+      address,
+      listPrice: listing.offers?.price || getTestIdText("abp-price"),
+      beds: residence.numberOfBedrooms || getTestIdText("abp-beds"),
+      baths:
+        residence.numberOfBathroomsTotal || getTestIdText("abp-baths"),
+      sqft:
+        residence.floorSize?.value ||
+        getTestIdText("abp-sqFt").replace(/[—-]/g, ""),
+      mlsNumber: mlsMatch?.[1] || "",
+      propertyType: propertyTypeMatch?.[1] || "",
+      yearBuilt: residence.yearBuilt || "",
+      lotSize: lotSizeMatch?.[1] || "",
+      daysOnMarket: daysOnMarketMatch?.[1] || "",
+      parking: summaryParkingMatch?.[1] || detailParking || "",
+      heating,
+      cooling: "",
+      parcelNumber: parcelMatch?.[1] || "",
+      basement,
+      roof,
+      exterior,
+      zoning: zoningMatch?.[1] || "",
+      description: pageDescription,
+      brokerRemarks: listing.description || getTestIdText("listingRemarks"),
+      listingAgentName: agentMatch?.[1] || "",
+      listingAgentPhone: "",
+      allExtractedFields: {
+        import_source: "redfin",
+        redfin_url: sourceUrl,
+        redfin_date_posted: listing.datePosted || "",
+        redfin_last_reviewed: listing.lastReviewed || "",
+        redfin_latitude: residence.geo?.latitude || "",
+        redfin_longitude: residence.geo?.longitude || "",
+        redfin_property_details: detailItems
+      }
+    };
+  }
+
   function collectLabelValuePairs() {
     const pairs = {};
 
@@ -631,11 +772,66 @@ function extractListingDataFromPage() {
     }
 
     function getAdvertisedUnitCount() {
-      const matches = [...rawText.matchAll(/\b(\d{1,2})\s+Units\b/gi)]
+      const matches = [
+        ...rawText.matchAll(/\b(\d{1,2})\s*(?:-\s*)?Units?\b/gi)
+      ]
         .map((match) => Number(match[1]))
         .filter((count) => Number.isInteger(count) && count > 0 && count <= 50);
 
       return matches[0] || 0;
+    }
+
+    function makeRedfinUnits() {
+      if (!/(^|\.)redfin\.com$/i.test(window.location.hostname)) {
+        return [];
+      }
+
+      const detailsRoot = document.querySelector(
+        '[data-rf-test-id="propertyDetails"]'
+      );
+
+      if (!detailsRoot) return [];
+
+      const detailItems = [...detailsRoot.querySelectorAll("li.entryItem")]
+        .map((element) => cleanText(element.innerText))
+        .filter(Boolean);
+      const detailText = detailItems.join("\n");
+      const countMatch =
+        detailText.match(/\b(\d{1,2})\s*(?:-\s*)?unit building\b/i) ||
+        rawText.match(/\b(?:legal\s+)?(\d{1,2})\s*(?:-\s*)?unit\b/i);
+      const bedroomMatch = detailText.match(
+        /\bunits?\s*:\s*([\d,\sand]+?)\s+bedrooms?\b/i
+      );
+      const rentLine = detailItems.find((item) =>
+        /^Unit rents?\s*\(current\)\s*:/i.test(item)
+      );
+      const applianceLine = detailItems.find((item) =>
+        /Each unit includes/i.test(item)
+      );
+      const tenantPaysLine = detailItems.find((item) =>
+        /tenants?\s+pay|tenants?\s+pay utilities/i.test(item)
+      );
+      const unitCount = Number(countMatch?.[1] || 0);
+      const bedrooms = bedroomMatch
+        ? [...bedroomMatch[1].matchAll(/\d+/g)].map((match) => match[0])
+        : [];
+      const rents = rentLine
+        ? [...rentLine.matchAll(/\$([\d,]+)/g)].map((match) =>
+            match[1].replace(/,/g, "")
+          )
+        : [];
+      const parsedUnitCount = Math.max(unitCount, bedrooms.length, rents.length);
+
+      if (parsedUnitCount === 0) return [];
+
+      return Array.from({ length: parsedUnitCount }, (_, index) => ({
+        ...makeEmptyUnit(),
+        unitNumber: String(index + 1),
+        bedrooms: bedrooms[index] || "",
+        rent: rents[index] || "",
+        appliancesFeatures: applianceLine || "",
+        tenantPays: tenantPaysLine || ""
+      }));
     }
 
     function withAdvertisedUnitCount(parsedUnits) {
@@ -983,6 +1179,12 @@ function extractListingDataFromPage() {
       });
     });
 
+    const redfinUnits = makeRedfinUnits();
+
+    if (redfinUnits.length > 0) {
+      return redfinUnits;
+    }
+
     const lines = rawText
       .split("\n")
       .map(cleanText)
@@ -1014,10 +1216,20 @@ function extractListingDataFromPage() {
   }
 
   const jsonLdItems = parseJsonLd();
+  const redfinListing = getRedfinListingData(jsonLdItems);
   const labelValuePairs = collectLabelValuePairs();
 
   const jsonListing =
-    jsonLdItems.find((item) => item.address || item.offers || item.floorSize || item.name) || {};
+    jsonLdItems.find((item) => item?.url === sourceUrl) ||
+    jsonLdItems.find((item) => {
+      const itemTypes = Array.isArray(item?.["@type"])
+        ? item["@type"]
+        : [item?.["@type"]];
+
+      return itemTypes.includes("RealEstateListing");
+    }) ||
+    jsonLdItems.find((item) => item.address || item.offers || item.floorSize) ||
+    {};
 
   const jsonAddress =
     typeof jsonListing.address === "string"
@@ -1045,6 +1257,7 @@ function extractListingDataFromPage() {
   );
 
   const address =
+    redfinListing?.address ||
     jsonAddress ||
     visibleStreetAddress ||
     pairStreetAddress ||
@@ -1054,6 +1267,7 @@ function extractListingDataFromPage() {
   const currentPriceNearAddress = findCurrentPriceNearAddress(address);
 
   const listPrice =
+    redfinListing?.listPrice ||
     currentPriceNearAddress ||
     jsonListing.offers?.price ||
     getMeta("product:price:amount") ||
@@ -1065,6 +1279,7 @@ function extractListingDataFromPage() {
     ]);
 
   const beds =
+    redfinListing?.beds ||
     getFromPairs(labelValuePairs, ["bedrooms", "beds", "bed"]) ||
     firstMatch([
       /(\d+(?:\.\d+)?)\s*(?:beds|bedrooms|bd)\b/i,
@@ -1072,6 +1287,7 @@ function extractListingDataFromPage() {
     ]);
 
   const baths =
+    redfinListing?.baths ||
     getFromPairs(labelValuePairs, ["bathrooms", "baths", "bath"]) ||
     firstMatch([
       /(\d+(?:\.\d+)?)\s*(?:baths|bathrooms|ba)\b/i,
@@ -1079,6 +1295,7 @@ function extractListingDataFromPage() {
     ]);
 
   const sqft =
+    redfinListing?.sqft ||
     getFromPairs(labelValuePairs, ["living area", "square feet", "sqft", "sq ft"]) ||
     firstMatch([
       /([\d,]+)\s*(?:sq\.?\s*ft\.?|square feet|sqft)\b/i,
@@ -1086,41 +1303,61 @@ function extractListingDataFromPage() {
     ]);
 
   const mlsNumber =
+    redfinListing?.mlsNumber ||
     getFromPairs(labelValuePairs, ["mls", "mls number", "listing id"]) ||
     firstMatch([
       /MLS(?:\s*#|\s*Number|\s*ID)?\s*[:#]?\s*([A-Z0-9-]+)/i,
       /Listing ID\s*[:#]?\s*([A-Z0-9-]+)/i
     ]);
 
-  const propertyType = getFromPairs(labelValuePairs, ["property type", "type", "style"]);
+  const propertyType =
+    redfinListing?.propertyType ||
+    getFromPairs(labelValuePairs, ["property type", "type", "style"]);
 
   const yearBuilt =
+    redfinListing?.yearBuilt ||
     getFromPairs(labelValuePairs, ["year built", "built"]) ||
     firstMatch([
       /Year Built\s*[:\n]?\s*(\d{4})/i,
       /Built\s*[:\n]?\s*(\d{4})/i
     ]);
 
-  const lotSize = getFromPairs(labelValuePairs, ["lot size", "lot dimensions", "acres"]);
+  const lotSize =
+    redfinListing?.lotSize ||
+    getFromPairs(labelValuePairs, ["lot size", "lot dimensions", "acres"]);
 
-  const taxes = getFromPairs(labelValuePairs, [
-    "taxes",
-    "tax amount",
-    "property tax",
-    "annual tax"
-  ]);
+  const taxes = redfinListing
+    ? ""
+    : getFromPairs(labelValuePairs, [
+        "taxes",
+        "tax amount",
+        "property tax",
+        "annual tax"
+      ]);
 
-  const hoa = getFromPairs(labelValuePairs, [
-    "hoa",
-    "association fee",
-    "monthly assessment"
-  ]);
+  const hoa = redfinListing
+    ? ""
+    : getFromPairs(labelValuePairs, [
+        "hoa",
+        "association fee",
+        "monthly assessment"
+      ]);
 
-  const daysOnMarket = getFromPairs(labelValuePairs, ["days on market", "dom"]);
-  const parking = getFromPairs(labelValuePairs, ["parking", "garage"]);
-  const heating = getFromPairs(labelValuePairs, ["heating", "heat"]);
-  const cooling = getFromPairs(labelValuePairs, ["cooling", "air conditioning"]);
-  const parcelNumber = getFromPairs(labelValuePairs, ["pin", "parcel", "apn", "tax id"]);
+  const daysOnMarket =
+    redfinListing?.daysOnMarket ||
+    getFromPairs(labelValuePairs, ["days on market", "dom"]);
+  const parking =
+    redfinListing?.parking ||
+    getFromPairs(labelValuePairs, ["parking", "garage"]);
+  const heating =
+    redfinListing?.heating ||
+    getFromPairs(labelValuePairs, ["heating", "heat"]);
+  const cooling = redfinListing
+    ? redfinListing.cooling
+    : getFromPairs(labelValuePairs, ["cooling", "air conditioning"]);
+  const parcelNumber =
+    redfinListing?.parcelNumber ||
+    getFromPairs(labelValuePairs, ["pin", "parcel", "apn", "tax id"]);
 
   const grossIncome = getFromPairs(labelValuePairs, [
     "gross income",
@@ -1142,54 +1379,61 @@ function extractListingDataFromPage() {
     "net income"
   ]);
 
-  const basement = getFromPairs(labelValuePairs, [
-    "basement",
-    "basement description"
-  ]);
+  const basement =
+    redfinListing?.basement ||
+    getFromPairs(labelValuePairs, ["basement", "basement description"]);
 
-  const roof = getFromPairs(labelValuePairs, [
-    "roof",
-    "roof type"
-  ]);
+  const roof =
+    redfinListing?.roof ||
+    getFromPairs(labelValuePairs, ["roof", "roof type"]);
 
-  const exterior = getFromPairs(labelValuePairs, [
-    "exterior",
-    "exterior building type",
-    "exterior features"
-  ]);
+  const exterior =
+    redfinListing?.exterior ||
+    getFromPairs(labelValuePairs, [
+      "exterior",
+      "exterior building type",
+      "exterior features"
+    ]);
 
-  const zoning = getFromPairs(labelValuePairs, [
-    "zoning",
-    "zoning type"
-  ]);
+  const zoning =
+    redfinListing
+      ? redfinListing.zoning
+      : getFromPairs(labelValuePairs, ["zoning", "zoning type"]);
 
-  const brokerRemarks = getFromPairs(labelValuePairs, [
-    "broker remarks",
-    "agent remarks",
-    "private remarks",
-    "additional remarks"
-  ]);
+  const brokerRemarks =
+    redfinListing?.brokerRemarks ||
+    getFromPairs(labelValuePairs, [
+      "broker remarks",
+      "agent remarks",
+      "private remarks",
+      "additional remarks"
+    ]);
 
   const description =
+    redfinListing?.description ||
     brokerRemarks ||
     getExactFromPairs(labelValuePairs, ["Public Remarks", "Remarks"]) ||
     getMeta("description") ||
     getMeta("og:description") ||
     "";
 
-  const listingAgentName = getFromPairs(labelValuePairs, [
-    "listing agent",
-    "list agent",
-    "agent name",
-    "broker name"
-  ]);
+  const listingAgentName =
+    redfinListing?.listingAgentName ||
+    getFromPairs(labelValuePairs, [
+      "listing agent",
+      "list agent",
+      "agent name",
+      "broker name"
+    ]);
 
-  const listingAgentPhone = getFromPairs(labelValuePairs, [
-    "listing agent phone",
-    "agent phone",
-    "broker phone",
-    "phone"
-  ]);
+  const listingAgentPhone = redfinListing
+    ? redfinListing.listingAgentPhone
+    : getFromPairs(labelValuePairs, [
+        "listing agent phone",
+        "agent phone",
+        "broker phone",
+        "phone"
+      ]);
 
   const unitInformation = parseUnitInformation();
 
@@ -1230,7 +1474,10 @@ function extractListingDataFromPage() {
 
     unitInformation,
 
-    allExtractedFields: labelValuePairs,
+    sourceSite: redfinListing?.sourceSite || "",
+    allExtractedFields: redfinListing
+      ? redfinListing.allExtractedFields
+      : labelValuePairs,
     rawText: rawText.slice(0, 30000)
   };
 }
