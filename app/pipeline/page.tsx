@@ -65,7 +65,7 @@ export default async function PipelinePage() {
         <div>
           <h2 className="text-3xl font-bold text-slate-950">Pipeline</h2>
           <p className="text-slate-600">
-            Drag and drop properties to move them through your deal flow.
+            Drag cards between stages or right-click a card for more actions.
           </p>
           <p className="mt-2 text-xs font-medium text-slate-500 lg:hidden">
             Swipe sideways to move through pipeline stages.

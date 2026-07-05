@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { Archive } from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -49,6 +51,18 @@ type PipelineColumnConfig = {
   statuses: string[];
   targetStatus: string;
 };
+
+type PropertyContextMenu = {
+  property: Property;
+  x: number;
+  y: number;
+};
+
+type OpenPropertyContextMenu = (
+  property: Property,
+  clientX: number,
+  clientY: number,
+) => void;
 
 const PIPELINE_COLUMNS: PipelineColumnConfig[] = [
   {
@@ -161,9 +175,11 @@ async function parseJsonResponse(response: Response) {
 function PipelineColumn({
   column,
   properties,
+  onOpenContextMenu,
 }: {
   column: PipelineColumnConfig;
   properties: Property[];
+  onOpenContextMenu: OpenPropertyContextMenu;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -193,7 +209,11 @@ function PipelineColumn({
           </div>
         ) : (
           properties.map((property) => (
-            <DraggablePropertyCard key={property.id} property={property} />
+            <DraggablePropertyCard
+              key={property.id}
+              property={property}
+              onOpenContextMenu={onOpenContextMenu}
+            />
           ))
         )}
       </div>
@@ -201,7 +221,13 @@ function PipelineColumn({
   );
 }
 
-function DraggablePropertyCard({ property }: { property: Property }) {
+function DraggablePropertyCard({
+  property,
+  onOpenContextMenu,
+}: {
+  property: Property;
+  onOpenContextMenu: OpenPropertyContextMenu;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: property.id,
@@ -220,6 +246,11 @@ function DraggablePropertyCard({ property }: { property: Property }) {
       className={isDragging ? "opacity-40" : ""}
       {...listeners}
       {...attributes}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpenContextMenu(property, event.clientX, event.clientY);
+      }}
     >
       <PropertyCard property={property} />
     </div>
@@ -284,8 +315,10 @@ function PropertyCard({ property }: { property: Property }) {
 
 function PipelineGrid({
   propertiesByColumn,
+  onOpenContextMenu,
 }: {
   propertiesByColumn: Record<string, Property[]>;
+  onOpenContextMenu: OpenPropertyContextMenu;
 }) {
   return (
     <div
@@ -297,6 +330,7 @@ function PipelineGrid({
           key={column.id}
           column={column}
           properties={propertiesByColumn[column.id] || []}
+          onOpenContextMenu={onOpenContextMenu}
         />
       ))}
     </div>
@@ -352,9 +386,18 @@ function StaticPipelineGrid({ properties }: { properties: Property[] }) {
 }
 
 export function PipelineBoard({ properties }: PipelineBoardProps) {
+  const router = useRouter();
+  const [archivedPropertyIds, setArchivedPropertyIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const activeProperties = useMemo(
-    () => properties.filter((property) => !isArchivedProperty(property)),
-    [properties]
+    () =>
+      properties.filter(
+        (property) =>
+          !isArchivedProperty(property) &&
+          !archivedPropertyIds.has(property.id),
+      ),
+    [archivedPropertyIds, properties],
   );
 
   const mounted = useSyncExternalStore(
@@ -366,6 +409,38 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
     Record<string, string>
   >({});
   const [activeProperty, setActiveProperty] = useState<Property | null>(null);
+  const [contextMenu, setContextMenu] = useState<PropertyContextMenu | null>(
+    null,
+  );
+  const [archivingPropertyId, setArchivingPropertyId] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    function closeContextMenu() {
+      setContextMenu(null);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closeContextMenu();
+    }
+
+    window.addEventListener("click", closeContextMenu);
+    window.addEventListener("blur", closeContextMenu);
+    window.addEventListener("resize", closeContextMenu);
+    window.addEventListener("scroll", closeContextMenu, true);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("click", closeContextMenu);
+      window.removeEventListener("blur", closeContextMenu);
+      window.removeEventListener("resize", closeContextMenu);
+      window.removeEventListener("scroll", closeContextMenu, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [contextMenu]);
 
   const items = useMemo(
     () =>
@@ -469,6 +544,72 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
     setActiveProperty(null);
   }
 
+  function openContextMenu(
+    property: Property,
+    clientX: number,
+    clientY: number,
+  ) {
+    const menuWidth = 208;
+    const menuHeight = 116;
+    const edgePadding = 8;
+
+    setContextMenu({
+      property,
+      x: Math.max(
+        edgePadding,
+        Math.min(clientX, window.innerWidth - menuWidth - edgePadding),
+      ),
+      y: Math.max(
+        edgePadding,
+        Math.min(clientY, window.innerHeight - menuHeight - edgePadding),
+      ),
+    });
+  }
+
+  async function archiveProperty(property: Property) {
+    const confirmed = window.confirm(
+      `Archive ${property.address || "this property"}? It will be removed from the pipeline but its data will be kept.`,
+    );
+
+    if (!confirmed) return;
+
+    setArchivingPropertyId(property.id);
+
+    try {
+      const response = await fetch(`/api/properties/${property.id}/archive`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          archiveReason: "Archived from pipeline board context menu",
+        }),
+      });
+      const result = await parseJsonResponse(response);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Could not archive property.");
+      }
+
+      setArchivedPropertyIds((current) => {
+        const next = new Set(current);
+        next.add(property.id);
+        return next;
+      });
+      setContextMenu(null);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Could not archive property.",
+      );
+    } finally {
+      setArchivingPropertyId(null);
+    }
+  }
+
   if (!mounted) {
     return <StaticPipelineGrid properties={activeProperties} />;
   }
@@ -480,7 +621,40 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <PipelineGrid propertiesByColumn={propertiesByColumn} />
+      <PipelineGrid
+        propertiesByColumn={propertiesByColumn}
+        onOpenContextMenu={openContextMenu}
+      />
+
+      {contextMenu && (
+        <div
+          role="menu"
+          aria-label={`Actions for ${contextMenu.property.address || "property"}`}
+          className="fixed z-50 w-52 overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <p className="truncate px-2 py-1.5 text-xs font-semibold text-slate-500">
+            {contextMenu.property.address || "Untitled Property"}
+          </p>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={archivingPropertyId === contextMenu.property.id}
+            onClick={() => void archiveProperty(contextMenu.property)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Archive className="h-4 w-4" aria-hidden="true" />
+            {archivingPropertyId === contextMenu.property.id
+              ? "Archiving..."
+              : "Archive"}
+          </button>
+        </div>
+      )}
 
       <DragOverlay>
         {activeProperty ? (
