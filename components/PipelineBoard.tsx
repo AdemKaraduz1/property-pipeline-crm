@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive } from "lucide-react";
+import { Archive, ArrowUpDown } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   DndContext,
@@ -33,6 +33,7 @@ type Property = {
   condition?: string | null;
   days_on_market?: number | null;
   status?: string | null;
+  created_at?: string | null;
   all_extracted_fields?: unknown;
 
   // Archive fields - this covers whichever one your app/database is using
@@ -65,6 +66,27 @@ type OpenPropertyContextMenu = (
   clientX: number,
   clientY: number,
 ) => void;
+
+type PipelineSort =
+  | "newest"
+  | "dom_desc"
+  | "dom_asc"
+  | "price_desc"
+  | "price_asc"
+  | "neighborhood"
+  | "address";
+
+const PIPELINE_SORT_STORAGE_KEY = "property-pipeline-sort";
+const PIPELINE_SORT_CHANGE_EVENT = "property-pipeline-sort-change";
+const PIPELINE_SORT_OPTIONS: { value: PipelineSort; label: string }[] = [
+  { value: "newest", label: "Newest added" },
+  { value: "dom_desc", label: "DOM: highest first" },
+  { value: "dom_asc", label: "DOM: lowest first" },
+  { value: "price_desc", label: "Price: highest first" },
+  { value: "price_asc", label: "Price: lowest first" },
+  { value: "neighborhood", label: "Neighborhood: A–Z" },
+  { value: "address", label: "Address: A–Z" },
+];
 
 const PIPELINE_COLUMNS: PipelineColumnConfig[] = [
   {
@@ -113,6 +135,29 @@ const pipelineColumnClass =
 
 const subscribeToClient = () => () => {};
 
+function isPipelineSort(value: string | null): value is PipelineSort {
+  return PIPELINE_SORT_OPTIONS.some((option) => option.value === value);
+}
+
+function subscribeToPipelineSort(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(PIPELINE_SORT_CHANGE_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(PIPELINE_SORT_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function getPipelineSortSnapshot(): PipelineSort {
+  const savedSort = window.localStorage.getItem(PIPELINE_SORT_STORAGE_KEY);
+  return isPipelineSort(savedSort) ? savedSort : "newest";
+}
+
+function getServerPipelineSortSnapshot(): PipelineSort {
+  return "newest";
+}
+
 function formatCurrency(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") return "No price";
 
@@ -159,6 +204,59 @@ function getNeighborhood(value: unknown) {
     .trim();
 
   return neighborhood && neighborhood.length <= 80 ? neighborhood : null;
+}
+
+function getSortableNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function compareNullableNumbers(
+  left: number | null,
+  right: number | null,
+  direction: "asc" | "desc",
+) {
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+
+  return direction === "asc" ? left - right : right - left;
+}
+
+function compareProperties(
+  left: Property,
+  right: Property,
+  sort: PipelineSort,
+) {
+  let comparison = 0;
+
+  if (sort === "newest") {
+    comparison =
+      new Date(right.created_at || 0).getTime() -
+      new Date(left.created_at || 0).getTime();
+  } else if (sort === "dom_desc" || sort === "dom_asc") {
+    comparison = compareNullableNumbers(
+      getSortableNumber(left.days_on_market),
+      getSortableNumber(right.days_on_market),
+      sort === "dom_asc" ? "asc" : "desc",
+    );
+  } else if (sort === "price_desc" || sort === "price_asc") {
+    comparison = compareNullableNumbers(
+      getSortableNumber(left.asking_price ?? left.list_price),
+      getSortableNumber(right.asking_price ?? right.list_price),
+      sort === "price_asc" ? "asc" : "desc",
+    );
+  } else if (sort === "neighborhood") {
+    comparison = (getNeighborhood(left.all_extracted_fields) || "").localeCompare(
+      getNeighborhood(right.all_extracted_fields) || "",
+    );
+  }
+
+  if (sort === "address" || comparison === 0) {
+    return (left.address || "").localeCompare(right.address || "");
+  }
+
+  return comparison;
 }
 
 function isArchivedProperty(property: Property) {
@@ -448,6 +546,11 @@ function StaticPipelineGrid({ properties }: { properties: Property[] }) {
 
 export function PipelineBoard({ properties }: PipelineBoardProps) {
   const router = useRouter();
+  const sort = useSyncExternalStore(
+    subscribeToPipelineSort,
+    getPipelineSortSnapshot,
+    getServerPipelineSortSnapshot,
+  );
   const [archivedPropertyIds, setArchivedPropertyIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -537,8 +640,19 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
         grouped[column.id].push(property);
       });
 
+    PIPELINE_COLUMNS.forEach((column) => {
+      grouped[column.id].sort((left, right) =>
+        compareProperties(left, right, sort),
+      );
+    });
+
     return grouped;
-  }, [items]);
+  }, [items, sort]);
+
+  function changeSort(nextSort: PipelineSort) {
+    window.localStorage.setItem(PIPELINE_SORT_STORAGE_KEY, nextSort);
+    window.dispatchEvent(new Event(PIPELINE_SORT_CHANGE_EVENT));
+  }
 
   function handleDragStart(event: DragStartEvent) {
     const property = items.find((item) => item.id === event.active.id);
@@ -682,6 +796,28 @@ export function PipelineBoard({ properties }: PipelineBoardProps) {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
+      <div className="mb-3 flex justify-end">
+        <label className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm sm:w-auto">
+          <ArrowUpDown
+            className="h-4 w-4 shrink-0 text-slate-500"
+            aria-hidden="true"
+          />
+          <span className="text-xs font-semibold text-slate-600">Sort</span>
+          <select
+            value={sort}
+            onChange={(event) => changeSort(event.target.value as PipelineSort)}
+            className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-900 outline-none sm:w-44"
+            aria-label="Sort pipeline cards"
+          >
+            {PIPELINE_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <PipelineGrid
         propertiesByColumn={propertiesByColumn}
         onOpenContextMenu={openContextMenu}

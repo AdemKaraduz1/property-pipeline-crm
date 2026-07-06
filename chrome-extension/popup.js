@@ -1356,7 +1356,12 @@ function extractListingDataFromPage() {
 
   const daysOnMarket =
     redfinListing?.daysOnMarket ||
-    getFromPairs(labelValuePairs, ["days on market", "dom"]);
+    getFromPairs(labelValuePairs, [
+      "days on market",
+      "list mkt time",
+      "listing market time",
+      "dom"
+    ]);
   const neighborhood =
     redfinListing?.neighborhood ||
     getFromPairs(labelValuePairs, [
