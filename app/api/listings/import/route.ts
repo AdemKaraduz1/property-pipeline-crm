@@ -112,6 +112,11 @@ export async function POST(request: Request) {
 
     const listPrice = toNumber(payload.listPrice);
     const taxes = toNumber(payload.taxes);
+    const neighborhood = toText(payload.neighborhood);
+    const extractedFields = {
+      ...asRecord(payload.allExtractedFields),
+      ...(neighborhood ? { neighborhood } : {}),
+    };
 
     const propertyPayload = {
       user_id: defaultPropertyUserId,
@@ -170,7 +175,7 @@ export async function POST(request: Request) {
       description: toText(payload.description),
       notes: toText(payload.description),
 
-      all_extracted_fields: payload.allExtractedFields || {},
+      all_extracted_fields: extractedFields,
       raw_import: toText(payload.rawImport),
     };
 
@@ -232,7 +237,7 @@ export async function POST(request: Request) {
         ...propertyPayload,
         all_extracted_fields: {
           ...asRecord(existingProperty.all_extracted_fields),
-          ...asRecord(payload.allExtractedFields),
+          ...extractedFields,
         },
       };
 

@@ -30,6 +30,8 @@ export default async function PipelinePage() {
       asking_price,
       list_price,
       condition,
+      days_on_market,
+      all_extracted_fields,
       created_at,
       archived_at,
       property_tags (

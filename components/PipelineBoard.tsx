@@ -31,7 +31,9 @@ type Property = {
   asking_price?: number | null;
   list_price?: number | null;
   condition?: string | null;
+  days_on_market?: number | null;
   status?: string | null;
+  all_extracted_fields?: unknown;
 
   // Archive fields - this covers whichever one your app/database is using
   archived?: boolean | null;
@@ -136,6 +138,27 @@ function formatStatusLabel(value: string | null | undefined) {
     .split("_")
     .map((word) => word[0]?.toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function getNeighborhood(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const metadata = value as Record<string, unknown>;
+  const neighborhoodEntry = Object.entries(metadata).find(([key]) =>
+    [
+      "neighborhood",
+      "neighbourhood",
+      "community area",
+      "community_area",
+      "redfin neighborhood",
+      "redfin_neighborhood",
+    ].includes(key.trim().toLowerCase()),
+  );
+  const neighborhood = String(neighborhoodEntry?.[1] || "")
+    .replace(/^neighbou?rhood\s*:\s*/i, "")
+    .trim();
+
+  return neighborhood && neighborhood.length <= 80 ? neighborhood : null;
 }
 
 function isArchivedProperty(property: Property) {
@@ -259,6 +282,13 @@ function DraggablePropertyCard({
 
 function PropertyCard({ property }: { property: Property }) {
   const price = property.asking_price ?? property.list_price ?? null;
+  const daysOnMarket = Number(property.days_on_market);
+  const hasDaysOnMarket =
+    property.days_on_market !== null &&
+    property.days_on_market !== undefined &&
+    Number.isFinite(daysOnMarket);
+  const normalizedCondition = normalizeStatus(property.condition);
+  const neighborhood = getNeighborhood(property.all_extracted_fields);
 
   return (
     <Link
@@ -277,18 +307,49 @@ function PropertyCard({ property }: { property: Property }) {
         </p>
       )}
 
-      <div className="mt-3 space-y-1 text-xs">
-        <p className="line-clamp-1 text-slate-600">
-          {property.property_type || "No type"}
-        </p>
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 text-xs">
+        <div className="min-w-0 space-y-1">
+          <p className="line-clamp-1 text-slate-600">
+            {property.property_type || "No type"}
+          </p>
 
-        <p className="font-bold text-slate-950">{formatCurrency(price)}</p>
+          <p className="font-bold text-slate-950">{formatCurrency(price)}</p>
+        </div>
+
+        {hasDaysOnMarket && (
+          <div
+            className="rounded-md bg-white px-2 py-1 text-right shadow-sm ring-1 ring-slate-200"
+            title="Days on market"
+          >
+            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500">
+              DOM
+            </p>
+            <p className="font-bold text-slate-800">
+              {Math.max(0, Math.trunc(daysOnMarket))}d
+            </p>
+          </div>
+        )}
       </div>
 
-      <div className="mt-2">
+      <div className="mt-2 flex flex-wrap gap-1">
+        {neighborhood && (
+          <span
+            className="max-w-full truncate rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700"
+            title={`Chicago neighborhood: ${neighborhood}`}
+          >
+            {neighborhood}
+          </span>
+        )}
+
         <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700">
           {formatStatusLabel(property.status)}
         </span>
+
+        {normalizedCondition !== "unknown" && (
+          <span className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
+            {formatStatusLabel(property.condition)}
+          </span>
+        )}
       </div>
 
       {property.property_tags && property.property_tags.length > 0 && (

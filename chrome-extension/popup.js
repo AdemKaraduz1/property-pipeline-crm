@@ -473,9 +473,19 @@ function extractListingDataFromPage() {
       publicFactsText.match(/\bAPN\s*([A-Z0-9-]+)/i) ||
       rawText.match(/\bAPN\s*[:#]?\s*([A-Z0-9-]+)/i);
     const zoningMatch = rawText.match(/\b(RS-\d+)\b/i);
+    const neighborhood =
+      [...document.querySelectorAll('a[href*="/neighborhood/"]')]
+        .map((element) => cleanText(element.textContent))
+        .find(
+          (text) =>
+            text &&
+            text.length <= 80 &&
+            !/^neighbou?rhoods?$/i.test(text)
+        ) || "";
 
     return {
       sourceSite: "redfin",
+      neighborhood,
       address,
       listPrice: listing.offers?.price || getTestIdText("abp-price"),
       beds: residence.numberOfBedrooms || getTestIdText("abp-beds"),
@@ -508,6 +518,7 @@ function extractListingDataFromPage() {
         redfin_last_reviewed: listing.lastReviewed || "",
         redfin_latitude: residence.geo?.latitude || "",
         redfin_longitude: residence.geo?.longitude || "",
+        neighborhood,
         redfin_property_details: detailItems
       }
     };
@@ -1346,6 +1357,13 @@ function extractListingDataFromPage() {
   const daysOnMarket =
     redfinListing?.daysOnMarket ||
     getFromPairs(labelValuePairs, ["days on market", "dom"]);
+  const neighborhood =
+    redfinListing?.neighborhood ||
+    getFromPairs(labelValuePairs, [
+      "neighborhood",
+      "neighbourhood",
+      "community area"
+    ]);
   const parking =
     redfinListing?.parking ||
     getFromPairs(labelValuePairs, ["parking", "garage"]);
@@ -1454,6 +1472,7 @@ function extractListingDataFromPage() {
     taxes: cleanMoney(taxes),
     hoa: cleanMoney(hoa),
     daysOnMarket: cleanNumber(daysOnMarket),
+    neighborhood: cleanText(neighborhood),
     parking: cleanText(parking),
     heating: cleanText(heating),
     cooling: cleanText(cooling),
@@ -1477,7 +1496,10 @@ function extractListingDataFromPage() {
     sourceSite: redfinListing?.sourceSite || "",
     allExtractedFields: redfinListing
       ? redfinListing.allExtractedFields
-      : labelValuePairs,
+      : {
+          ...labelValuePairs,
+          neighborhood: cleanText(neighborhood)
+        },
     rawText: rawText.slice(0, 30000)
   };
 }
