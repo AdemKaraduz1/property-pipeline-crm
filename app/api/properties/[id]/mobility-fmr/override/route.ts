@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-const FMR_2026_CHICAGO: Record<number, number> = {
-  0: 1480,
-  1: 1581,
-  2: 1781,
-  3: 2294,
-  4: 2653,
-};
+import { calculateChicagoFmr } from "@/lib/fmr";
 
 function toNumber(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
@@ -17,31 +10,13 @@ function toNumber(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function getBedroomCount(unit: any) {
+function getBedroomCount(unit: Record<string, unknown>) {
   const bedroomValue = unit.bedrooms ?? unit.beds ?? unit.fmr_bedroom_count;
   const bedrooms = toNumber(bedroomValue);
 
   if (bedrooms === null) return null;
 
   return Math.max(0, Math.round(bedrooms));
-}
-
-function getBaseFmrRent(bedrooms: number | null) {
-  if (bedrooms === null) return null;
-
-  if (bedrooms <= 4) {
-    return FMR_2026_CHICAGO[bedrooms] ?? null;
-  }
-
-  const fourBedroomFmr = FMR_2026_CHICAGO[4];
-
-  return Math.round(fourBedroomFmr * (1 + 0.15 * (bedrooms - 4)));
-}
-
-function getMobilityFmrRent(baseFmrRent: number | null) {
-  if (baseFmrRent === null) return null;
-
-  return Math.round(baseFmrRent * 1.5);
 }
 
 export async function PATCH(
@@ -140,9 +115,8 @@ export async function PATCH(
 
   const unitUpdates = (units || []).map((unit) => {
     const bedrooms = getBedroomCount(unit);
-    const baseFmrRent = getBaseFmrRent(bedrooms);
-    const mobilityFmrRent = getMobilityFmrRent(baseFmrRent);
-    const appliedFmrRent = isMobilityArea ? mobilityFmrRent : baseFmrRent;
+    const { baseFmrRent, mobilityFmrRent, appliedFmrRent } =
+      calculateChicagoFmr(bedrooms, isMobilityArea);
 
     return {
       id: unit.id,

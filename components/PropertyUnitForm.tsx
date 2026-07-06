@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { calculateChicagoFmr } from "@/lib/fmr";
 
 type PropertyUnitFormProps = {
   propertyId: string;
+  isMobilityArea: boolean;
 };
 
 function toNumber(value: FormDataEntryValue | null) {
@@ -28,7 +30,10 @@ function toText(value: FormDataEntryValue | null) {
   return text.length > 0 ? text : null;
 }
 
-export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
+export function PropertyUnitForm({
+  propertyId,
+  isMobilityArea,
+}: PropertyUnitFormProps) {
   const supabase = createClient();
   const router = useRouter();
 
@@ -47,6 +52,13 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
     const currentRent = toNumber(formData.get("rent"));
     const projectedRent = toNumber(formData.get("projected_rent"));
     const bathrooms = toNumber(formData.get("bathrooms"));
+    const bedrooms = toNumber(formData.get("bedrooms"));
+    const {
+      bedrooms: fmrBedroomCount,
+      baseFmrRent,
+      mobilityFmrRent,
+      appliedFmrRent,
+    } = calculateChicagoFmr(bedrooms, isMobilityArea);
 
     const unit = {
       property_id: propertyId,
@@ -56,7 +68,7 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
       floor_number: toText(formData.get("floor_number")),
       sqft: toNumber(formData.get("sqft")),
       rooms: toNumber(formData.get("rooms")),
-      bedrooms: toNumber(formData.get("bedrooms")),
+      bedrooms,
       baths: bathrooms,
       full_baths: bathrooms,
       half_baths: null,
@@ -68,7 +80,11 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
       // Keep these because your analyzer still uses them
       current_rent: currentRent,
       projected_rent: projectedRent,
-      fmr_rent: toNumber(formData.get("fmr_rent")),
+      fmr_bedroom_count: fmrBedroomCount,
+      base_fmr_rent: baseFmrRent,
+      mobility_fmr_rent: mobilityFmrRent,
+      fmr_rent: appliedFmrRent,
+      fmr_updated_at: new Date().toISOString(),
       condition: toText(formData.get("condition")) || "unknown",
       rehab_estimate: toNumber(formData.get("rehab_estimate")) || 0,
       notes: toText(formData.get("notes")),
@@ -164,8 +180,10 @@ export function PropertyUnitForm({ propertyId }: PropertyUnitFormProps) {
         </div>
 
         <div>
-          <Label htmlFor="fmr_rent">FMR Rent</Label>
-          <Input id="fmr_rent" name="fmr_rent" type="number" placeholder="2500" />
+          <Label>Applied FMR</Label>
+          <p className="mt-1 rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600">
+            Calculated automatically from the bedroom count when saved.
+          </p>
         </div>
 
         <div>

@@ -15,6 +15,7 @@ import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
 import { parseDealAnalyzerSettings } from "@/lib/deal-analyzer";
+import { calculateChicagoFmr } from "@/lib/fmr";
 
 type PageProps = {
   params: Promise<{
@@ -308,6 +309,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       const updatedCurrentRent = parseMoneyInput(field("current_rent"));
       const updatedBeds = parseMoneyInput(field("bedrooms"));
       const updatedBathrooms = parseMoneyInput(field("bathrooms"));
+      const {
+        bedrooms: fmrBedroomCount,
+        baseFmrRent,
+        mobilityFmrRent,
+        appliedFmrRent,
+      } = calculateChicagoFmr(
+        updatedBeds,
+        property.is_mobility_area === true,
+      );
 
       await updateSupabase
         .from("property_units")
@@ -318,13 +328,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           sqft: parseMoneyInput(field("sqft")),
           bedrooms: updatedBeds,
           beds: updatedBeds,
+          fmr_bedroom_count: fmrBedroomCount,
+          base_fmr_rent: baseFmrRent,
+          mobility_fmr_rent: mobilityFmrRent,
+          fmr_rent: appliedFmrRent,
+          fmr_updated_at: new Date().toISOString(),
           baths: updatedBathrooms,
           full_baths: updatedBathrooms,
           half_baths: null,
           current_rent: updatedCurrentRent,
           rent: updatedCurrentRent,
           projected_rent: parseMoneyInput(field("projected_rent")),
-          fmr_rent: parseMoneyInput(field("fmr_rent")),
           lease_expiration: parseDateInput(field("lease_expiration")),
           rehab_estimate: parseMoneyInput(field("rehab_estimate")),
           water_included: formData.has(`${unitId}__water_included`),
@@ -1000,7 +1014,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           </div>
 
           <AddUnitModal>
-            <PropertyUnitForm propertyId={id} />
+            <PropertyUnitForm
+              propertyId={id}
+              isMobilityArea={property.is_mobility_area === true}
+            />
           </AddUnitModal>
         </div>
 
@@ -1183,30 +1200,27 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         </div>
                       </div>
 
-                      <label className="block min-w-0">
+                      <div className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           {property.is_mobility_area === true
                             ? "Applied FMR (150%)"
                             : "Applied FMR (Base)"}
                         </span>
-                        <input
-                          form={formId}
-                          name={`${unit.id}__fmr_rent`}
-                          type="number"
-                          min="0"
-                          step="1"
-                          defaultValue={
-                            hasValue(unit.fmr_rent) ? Number(unit.fmr_rent) : ""
-                          }
-                          className={mobileFieldClass}
-                          aria-label="FMR rent"
-                        />
+                        <div
+                          className={`${mobileFieldClass} flex items-center bg-slate-100 font-medium text-slate-700`}
+                          title="Calculated automatically from the applicable FMR"
+                          aria-label={`Applied FMR: ${formatCurrency(unit.fmr_rent)}`}
+                        >
+                          {hasValue(unit.fmr_rent)
+                            ? formatCurrency(unit.fmr_rent)
+                            : "—"}
+                        </div>
                         <span className="mt-1 block text-[10px] leading-tight text-slate-500">
                           {property.is_mobility_area === true
                             ? `150% of ${formatCurrency(unit.base_fmr_rent)} base FMR`
                             : `Mobility potential: ${formatCurrency(unit.mobility_fmr_rent)}`}
                         </span>
-                      </label>
+                      </div>
 
                       <label className="block min-w-0">
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -1459,20 +1473,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         </td>
 
                         <td className="py-3 pr-2">
-                          <input
-                            form={formId}
-                            name={`${unit.id}__fmr_rent`}
-                            type="number"
-                            min="0"
-                            step="1"
-                            defaultValue={
-                              hasValue(unit.fmr_rent)
-                                ? Number(unit.fmr_rent)
-                                : ""
-                            }
-                            className={smallInlineInputClass}
-                            aria-label="FMR rent"
-                          />
+                          <div
+                            className="w-20 rounded-md bg-slate-100 px-2 py-1.5 text-sm font-medium text-slate-700"
+                            title="Calculated automatically from the applicable FMR"
+                            aria-label={`Applied FMR: ${formatCurrency(unit.fmr_rent)}`}
+                          >
+                            {hasValue(unit.fmr_rent)
+                              ? formatCurrency(unit.fmr_rent)
+                              : "—"}
+                          </div>
                         </td>
 
                         <td className="py-3 pr-2">

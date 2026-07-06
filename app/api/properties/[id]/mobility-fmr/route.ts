@@ -1,19 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { calculateChicagoFmr } from "@/lib/fmr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const CHA_INSTANT_APP_ID = "5ce5a99dad2e4579b2095e514ad64294";
 const CHA_SECONDARY_APP_ID = "cea7851188664bbe89b990dc355b6f80";
-
-const FMR_2026_CHICAGO: Record<number, number> = {
-  0: 1480,
-  1: 1581,
-  2: 1781,
-  3: 2294,
-  4: 2653,
-};
 
 type ArcgisLayerCandidate = {
   url: string;
@@ -24,7 +17,7 @@ function cleanUrl(value: string) {
   return value.replace(/\/$/, "");
 }
 
-function formatAddress(property: any) {
+function formatAddress(property: Record<string, unknown>) {
   const streetAddress = String(property.address || "")
     .replace(/\s+/g, " ")
     .trim();
@@ -46,31 +39,13 @@ function toNumber(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
-function getBedroomCount(unit: any) {
+function getBedroomCount(unit: Record<string, unknown>) {
   const bedroomValue = unit.bedrooms ?? unit.beds ?? unit.fmr_bedroom_count;
   const bedrooms = toNumber(bedroomValue);
 
   if (bedrooms === null) return null;
 
   return Math.max(0, Math.round(bedrooms));
-}
-
-function getBaseFmrRent(bedrooms: number | null) {
-  if (bedrooms === null) return null;
-
-  if (bedrooms <= 4) {
-    return FMR_2026_CHICAGO[bedrooms] ?? null;
-  }
-
-  const fourBedroomFmr = FMR_2026_CHICAGO[4];
-
-  return Math.round(fourBedroomFmr * (1 + 0.15 * (bedrooms - 4)));
-}
-
-function getMobilityFmrRent(baseFmrRent: number | null) {
-  if (baseFmrRent === null) return null;
-
-  return Math.round(baseFmrRent * 1.5);
 }
 
 async function getJson(url: string) {
@@ -168,15 +143,24 @@ function collectLayerCandidatesFromObject(
 
   if (typeof value !== "object") return candidates;
 
-  const objectValue = value as Record<string, any>;
+  const objectValue = value as Record<string, unknown>;
+  const layerDefinition =
+    objectValue.layerDefinition &&
+    typeof objectValue.layerDefinition === "object"
+      ? (objectValue.layerDefinition as Record<string, unknown>)
+      : {};
+  const popupInfo =
+    objectValue.popupInfo && typeof objectValue.popupInfo === "object"
+      ? (objectValue.popupInfo as Record<string, unknown>)
+      : {};
 
   const label = [
     parentLabel,
     objectValue.title,
     objectValue.name,
     objectValue.id,
-    objectValue.layerDefinition?.name,
-    objectValue.popupInfo?.title,
+    layerDefinition.name,
+    popupInfo.title,
   ]
     .filter(Boolean)
     .join(" ");
@@ -493,11 +477,8 @@ export async function POST(
 
     const unitUpdates = (units || []).map((unit) => {
       const bedrooms = getBedroomCount(unit);
-      const baseFmrRent = getBaseFmrRent(bedrooms);
-      const mobilityFmrRent = getMobilityFmrRent(baseFmrRent);
-      const appliedFmrRent = mobilityResult.isMobilityArea
-        ? mobilityFmrRent
-        : baseFmrRent;
+      const { baseFmrRent, mobilityFmrRent, appliedFmrRent } =
+        calculateChicagoFmr(bedrooms, mobilityResult.isMobilityArea);
 
       return {
         id: unit.id,
