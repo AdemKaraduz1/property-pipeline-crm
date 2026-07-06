@@ -20,6 +20,26 @@ export type DealAnalyzerSettings = {
   initialOfferDiscount: number;
 };
 
+export function getMonthlyMortgagePayment(
+  principal: number,
+  annualRatePercent: number,
+  termYears: number,
+) {
+  if (principal <= 0 || termYears <= 0) return 0;
+
+  const paymentCount = termYears * 12;
+  const monthlyRate = annualRatePercent / 100 / 12;
+
+  if (monthlyRate === 0) return principal / paymentCount;
+
+  return (
+    (principal *
+      monthlyRate *
+      Math.pow(1 + monthlyRate, paymentCount)) /
+    (Math.pow(1 + monthlyRate, paymentCount) - 1)
+  );
+}
+
 const NUMBER_KEYS = [
   "purchasePrice",
   "downPaymentRate",

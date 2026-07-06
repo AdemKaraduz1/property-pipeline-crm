@@ -14,7 +14,10 @@ import { MobilityFmrCard } from "@/components/MobilityFmrCard";
 import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
-import { parseDealAnalyzerSettings } from "@/lib/deal-analyzer";
+import {
+  getMonthlyMortgagePayment,
+  parseDealAnalyzerSettings,
+} from "@/lib/deal-analyzer";
 import { calculateChicagoFmr } from "@/lib/fmr";
 
 type PageProps = {
@@ -564,6 +567,31 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const projectedNoi = annualProjectedRent - projectedOperatingExpenses;
   const projectedCapRate =
     Number(askingPrice) > 0 ? projectedNoi / Number(askingPrice) : null;
+  const projectedPurchasePrice =
+    dealAnalyzerSettings?.purchasePrice ?? Number(askingPrice || 0);
+  const projectedIsFinanced =
+    dealAnalyzerSettings?.purchaseMethod !== "cash";
+  const projectedDownPaymentRate =
+    dealAnalyzerSettings?.downPaymentRate ?? 20;
+  const projectedLoanAmount = projectedIsFinanced
+    ? Math.max(
+        0,
+        projectedPurchasePrice * (1 - projectedDownPaymentRate / 100),
+      )
+    : 0;
+  const projectedInterestRate =
+    dealAnalyzerSettings?.customInterestRate ?? 7.25;
+  const projectedLoanTermYears =
+    dealAnalyzerSettings?.loanTermYears ?? 30;
+  const projectedAnnualDebtService = projectedIsFinanced
+    ? getMonthlyMortgagePayment(
+        projectedLoanAmount,
+        projectedInterestRate,
+        projectedLoanTermYears,
+      ) * 12
+    : 0;
+  const projectedCashFlowAfterDebt =
+    projectedNoi - projectedAnnualDebtService;
 
   const locationLine =
     property.city || property.state || property.zip
@@ -787,7 +815,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <p className="text-sm text-slate-500">Projected Annual Rent</p>
             <p className="text-xl font-bold text-slate-950">
@@ -816,7 +844,21 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             <p className="text-xl font-bold text-slate-950">
               {projectedCapRate !== null
                 ? `${(projectedCapRate * 100).toFixed(2)}%`
-                : "Not entered"}
+              : "Not entered"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-500">
+              Annual Cash Flow After Debt Service
+            </p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(projectedCashFlowAfterDebt)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {projectedIsFinanced
+                ? `NOI minus ${formatCurrency(projectedAnnualDebtService)} annual mortgage payments`
+                : "Cash purchase—no mortgage debt service"}
             </p>
           </div>
         </div>

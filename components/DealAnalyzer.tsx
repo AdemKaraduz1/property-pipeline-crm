@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { parseDealAnalyzerSettings } from "@/lib/deal-analyzer";
+import {
+  getMonthlyMortgagePayment,
+  parseDealAnalyzerSettings,
+} from "@/lib/deal-analyzer";
 import type {
   DealAnalyzerSettings,
   PurchaseMethod,
@@ -56,26 +59,6 @@ function formatPercent(value: number) {
 
 function formatRatio(value: number) {
   return Number.isFinite(value) ? `${value.toFixed(2)}x` : "—";
-}
-
-function getMonthlyPayment(
-  principal: number,
-  annualRatePercent: number,
-  termYears: number,
-) {
-  if (principal <= 0 || termYears <= 0) return 0;
-
-  const paymentCount = termYears * 12;
-  const monthlyRate = annualRatePercent / 100 / 12;
-
-  if (monthlyRate === 0) return principal / paymentCount;
-
-  return (
-    (principal *
-      monthlyRate *
-      Math.pow(1 + monthlyRate, paymentCount)) /
-    (Math.pow(1 + monthlyRate, paymentCount) - 1)
-  );
 }
 
 function getFirstYearInterest(
@@ -513,7 +496,7 @@ export function DealAnalyzer({
     const loanAmount = isFinanced ? Math.max(0, price - downPayment) : 0;
     const acquisitionCosts = price * (acquisitionCostsRate / 100);
     const monthlyPrincipalAndInterest = isFinanced
-      ? getMonthlyPayment(loanAmount, interestRate, loanTermYears)
+      ? getMonthlyMortgagePayment(loanAmount, interestRate, loanTermYears)
       : 0;
     const annualDebtService = monthlyPrincipalAndInterest * 12;
     const firstYearInterest = isFinanced
