@@ -601,9 +601,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   );
   const annualCleaning = toFiniteNumber(
     operatingExpenseCategories.cleaning,
-    1200,
+    1500,
   );
-  const annualLawn = toFiniteNumber(operatingExpenseCategories.lawn, 1200);
+  const annualLawn = toFiniteNumber(operatingExpenseCategories.lawn, 1500);
 
   const annualCurrentRent =
     currentMonthlyRent > 0
