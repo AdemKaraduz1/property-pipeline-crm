@@ -2,6 +2,21 @@ import { asRecord } from "@/lib/rehab";
 
 export type PurchaseMethod = "financed" | "cash";
 
+export const DEAL_ANALYZER_PROJECTION_EVENT =
+  "property-pipeline:deal-analyzer-projection";
+
+export type DealAnalyzerProjection = {
+  propertyId: string;
+  purchasePrice: number;
+  annualGrossRent: number;
+  operatingExpenses: number;
+  noiAnnual: number;
+  capRate: number;
+  annualDebtService: number;
+  cashFlowAfterDebt: number;
+  isFinanced: boolean;
+};
+
 export type DealAnalyzerSettings = {
   purchaseMethod: PurchaseMethod;
   purchasePrice: number;

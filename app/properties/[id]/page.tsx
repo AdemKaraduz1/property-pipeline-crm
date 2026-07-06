@@ -4,6 +4,8 @@ import { PropertyUnitForm } from "@/components/PropertyUnitForm";
 import { AddUnitModal } from "@/components/AddUnitModal";
 import { EditPropertyModal } from "@/components/EditPropertyModal";
 import { DealAnalyzer } from "@/components/DealAnalyzer";
+import { ProjectedFinancials } from "@/components/ProjectedFinancials";
+import { AutoSaveForm } from "@/components/AutoSaveForm";
 import { PropertyStatusUpdater } from "@/components/PropertyStatusUpdater";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -306,7 +308,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         propertyError,
         unitsError,
       });
-      return;
+      return {
+        success: false,
+        message: "Could not load the operating expense inputs.",
+      };
     }
 
     const taxes = parseMoneyInput(formData.get("property_taxes")) || 0;
@@ -362,11 +367,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
     if (updateError) {
       console.error("Could not save operating expenses:", updateError);
-      return;
+      return {
+        success: false,
+        message: "Could not save operating expenses.",
+      };
     }
 
     revalidatePath(`/properties/${id}`);
     revalidatePath("/pipeline");
+    return { success: true };
   }
 
   async function updateAllUnits(formData: FormData) {
@@ -395,7 +404,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         propertyId: id,
         error: propertyAccessError,
       });
-      return;
+      return {
+        success: false,
+        message: "Could not verify this property before saving units.",
+      };
     }
 
     const unitIds = formData
@@ -457,12 +469,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           unitId,
           error: unitUpdateError,
         });
-        return;
+        return {
+          success: false,
+          message: "Could not save one or more units.",
+        };
       }
     }
 
     revalidatePath(`/properties/${id}`);
     revalidatePath("/pipeline");
+    return { success: true };
   }
 
   async function updateCommonAreaRehab(formData: FormData) {
@@ -473,7 +489,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       data: { user: updateUser },
     } = await updateSupabase.auth.getUser();
 
-    if (!updateUser) return;
+    if (!updateUser) {
+      return {
+        success: false,
+        message: "You must be signed in to save common-area rehab.",
+      };
+    }
 
     const { data: currentProperty } = await updateSupabase
       .from("properties")
@@ -482,7 +503,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       .eq("user_id", updateUser.id)
       .single();
 
-    if (!currentProperty) return;
+    if (!currentProperty) {
+      return {
+        success: false,
+        message: "Could not load common-area rehab.",
+      };
+    }
 
     const currentMetadata = asRecord(currentProperty.all_extracted_fields);
     const items = Object.fromEntries(
@@ -492,7 +518,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       ]),
     );
 
-    await updateSupabase
+    const { error: updateError } = await updateSupabase
       .from("properties")
       .update({
         all_extracted_fields: {
@@ -508,8 +534,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       .eq("id", id)
       .eq("user_id", updateUser.id);
 
+    if (updateError) {
+      console.error("Could not save common-area rehab:", updateError);
+      return {
+        success: false,
+        message: "Could not save common-area rehab.",
+      };
+    }
+
     revalidatePath(`/properties/${id}`);
     revalidatePath("/pipeline");
+    return { success: true };
   }
 
   const { data: property, error: propertyError } = await supabase
@@ -640,7 +675,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       ? (toFiniteNumber(operatingExpenseCategories.property_management) /
           annualProjectedRent) *
         100
-      : (dealAnalyzerSettings?.managementRate ?? 0);
+      : (dealAnalyzerSettings?.managementRate ?? 8);
   const currentRepairsMaintenance =
     annualCurrentRent * (repairsMaintenanceRate / 100);
   const currentPropertyManagement =
@@ -676,8 +711,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     annualProjectedRent -
     projectedVacancyLoss -
     projectedOperatingExpenses;
-  const projectedCapRate =
-    Number(askingPrice) > 0 ? projectedNoi / Number(askingPrice) : null;
   const projectedPurchasePrice =
     dealAnalyzerSettings?.purchasePrice ?? Number(askingPrice || 0);
   const projectedIsFinanced =
@@ -701,9 +734,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         projectedLoanTermYears,
       ) * 12
     : 0;
-  const projectedCashFlowAfterDebt =
-    projectedNoi - projectedAnnualDebtService;
-
   const locationLine =
     property.city || property.state || property.zip
       ? `${property.city || ""}${property.city && property.state ? ", " : ""}${
@@ -730,10 +760,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     hasValue(insuranceAnnual) ||
     annualUtilities > 0 ||
     unitCount > 0;
-
-  const hasListingAgent =
-    hasValue(property.listing_agent_name) ||
-    hasValue(property.listing_agent_phone);
 
   const googleMapsUrl = getGoogleMapsUrl(property);
   const cookCountyTaxUrl = getCookCountyTaxUrl(property.parcel_number);
@@ -918,65 +944,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className={sectionCardClass}>
-        <div className="mb-4">
-          <h3 className={sectionTitleClass}>Projected Financials</h3>
-          <p className={sectionDescriptionClass}>
-            Uses projected rents and the saved itemized operating expenses.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div>
-            <p className="text-sm text-slate-500">Projected Annual Rent</p>
-            <p className="text-xl font-bold text-slate-950">
-              {formatCurrency(annualProjectedRent)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-slate-500">
-              Projected Operating Expenses
-            </p>
-            <p className="text-xl font-bold text-slate-950">
-              {formatCurrency(projectedOperatingExpenses)}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Itemized expenses; vacancy is reflected separately in NOI
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-slate-500">Projected NOI</p>
-            <p className="text-xl font-bold text-slate-950">
-              {formatCurrency(projectedNoi)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-slate-500">Projected Cap Rate</p>
-            <p className="text-xl font-bold text-slate-950">
-              {projectedCapRate !== null
-                ? `${(projectedCapRate * 100).toFixed(2)}%`
-              : "Not entered"}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-slate-500">
-              Annual Cash Flow After Debt Service
-            </p>
-            <p className="text-xl font-bold text-slate-950">
-              {formatCurrency(projectedCashFlowAfterDebt)}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {projectedIsFinanced
-                ? `NOI minus ${formatCurrency(projectedAnnualDebtService)} annual mortgage payments`
-                : "Cash purchase—no mortgage debt service"}
-            </p>
-          </div>
-        </div>
-      </div>
+      <ProjectedFinancials
+        propertyId={id}
+        annualProjectedRent={annualProjectedRent}
+        projectedOperatingExpenses={projectedOperatingExpenses}
+        projectedNoi={projectedNoi}
+        purchasePrice={projectedPurchasePrice}
+        annualDebtService={projectedAnnualDebtService}
+        isFinanced={projectedIsFinanced}
+      />
 
       {hasBuildingDetails && (
         <div id="building" className={sectionCardClass}>
@@ -1092,28 +1068,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      {hasListingAgent && (
-        <div className={sectionCardClass}>
-          <h3 className={`${sectionTitleClass} mb-4`}>Listing Agent</h3>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-sm text-slate-500">Agent Name</p>
-              <p className="font-medium text-slate-950">
-                {valueOrDash(property.listing_agent_name)}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-slate-500">Agent Phone</p>
-              <p className="font-medium text-slate-950">
-                {valueOrDash(property.listing_agent_phone)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div id="operating-expenses" className={sectionCardClass}>
         <div className="mb-4">
           <h3 className={sectionTitleClass}>Operating Expenses</h3>
@@ -1123,7 +1077,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <form action={updateOperatingExpenses}>
+        <AutoSaveForm
+          action={updateOperatingExpenses}
+          draftKey={`property-pipeline:autosave:${id}:operating-expenses`}
+          statusClassName="mt-3 text-right text-xs text-slate-500"
+        >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="block">
               <span className={detailLabelClass}>Property Taxes</span>
@@ -1232,14 +1190,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 {formatCurrency(projectedItemizedOperatingExpenses)}
               </p>
             </div>
-            <button
-              type="submit"
-              className="min-h-11 rounded-md bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              Save Operating Expenses
-            </button>
           </div>
-        </form>
+        </AutoSaveForm>
       </div>
 
       <div id="analysis" className="scroll-mt-24">
@@ -1565,18 +1517,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               })}
             </div>
 
-            <form
+            <AutoSaveForm
               id="mobile-units-form"
               action={updateAllUnits}
+              draftKey={`property-pipeline:autosave:${id}:mobile-units`}
               className="mt-2 md:hidden"
-            >
-              <button
-                type="submit"
-                className="min-h-9 w-full rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
-              >
-                Save All Units
-              </button>
-            </form>
+              statusClassName="text-center text-xs text-slate-500"
+            />
 
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[1180px] text-left text-sm">
@@ -1834,18 +1781,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 </tbody>
               </table>
 
-              <form
+              <AutoSaveForm
                 id="desktop-units-form"
                 action={updateAllUnits}
+                draftKey={`property-pipeline:autosave:${id}:desktop-units`}
                 className="sticky left-0 mt-4 flex w-full justify-end"
-              >
-                <button
-                  type="submit"
-                  className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                >
-                  Save All Units
-                </button>
-              </form>
+                statusClassName="text-xs text-slate-500"
+              />
             </div>
           </div>
         )}
@@ -1870,7 +1812,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        <form action={updateCommonAreaRehab}>
+        <AutoSaveForm
+          action={updateCommonAreaRehab}
+          draftKey={`property-pipeline:autosave:${id}:common-area-rehab`}
+          statusClassName="mt-2 text-right text-xs text-slate-500"
+        >
           <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {COMMON_REHAB_ITEMS.map((item) => {
               const storedCost = toFiniteNumber(commonRehabItems[item.id]);
@@ -1946,14 +1892,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               Unit rehab: {formatCurrency(unitRehabTotal)} · Combined rehab:{" "}
               {formatCurrency(totalRehab)}
             </p>
-            <button
-              type="submit"
-              className="min-h-9 rounded-md bg-slate-950 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 sm:px-4 sm:text-sm"
-            >
-              Save Common Area Rehab
-            </button>
           </div>
-        </form>
+        </AutoSaveForm>
       </div>
 
       <div id="programs" className="scroll-mt-24">

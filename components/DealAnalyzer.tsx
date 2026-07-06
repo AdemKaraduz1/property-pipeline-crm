@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  DEAL_ANALYZER_PROJECTION_EVENT,
   getMonthlyMortgagePayment,
   parseDealAnalyzerSettings,
 } from "@/lib/deal-analyzer";
 import type {
+  DealAnalyzerProjection,
   DealAnalyzerSettings,
   PurchaseMethod,
 } from "@/lib/deal-analyzer";
@@ -256,6 +258,56 @@ export function DealAnalyzer({
     latestSettings.current = settings;
   }, [settings]);
 
+  const persistSettings = useCallback(
+    async (
+      settingsToSave: DealAnalyzerSettings,
+      signal?: AbortSignal,
+    ) => {
+      const serializedSettings = JSON.stringify(settingsToSave);
+
+      setSaveStatus("saving");
+
+      try {
+        window.localStorage.setItem(
+          getPropertyDealAnalyzerStorageKey(propertyId),
+          serializedSettings,
+        );
+        window.localStorage.setItem(
+          dealAnalyzerStorageKey,
+          serializedSettings,
+        );
+      } catch {
+        // The database remains the durable fallback when storage is blocked.
+      }
+
+      try {
+        const response = await fetch(
+          `/api/properties/${propertyId}/deal-analyzer`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settings: settingsToSave }),
+            signal,
+            keepalive: true,
+          },
+        );
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Could not save deal analysis.");
+        }
+
+        lastSavedSettings.current = serializedSettings;
+        setSaveStatus("saved");
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error(error);
+        setSaveStatus("error");
+      }
+    },
+    [propertyId],
+  );
+
   useEffect(() => {
     function readStoredSettings(key: string) {
       try {
@@ -325,38 +377,15 @@ export function DealAnalyzer({
 
     setSaveStatus("saving");
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `/api/properties/${propertyId}/deal-analyzer`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ settings }),
-            signal: controller.signal,
-            keepalive: true,
-          },
-        );
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || "Could not save deal analysis.");
-        }
-
-        lastSavedSettings.current = serializedSettings;
-        setSaveStatus("saved");
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error(error);
-        setSaveStatus("error");
-      }
+    const timeoutId = window.setTimeout(() => {
+      void persistSettings(settings, controller.signal);
     }, 700);
 
     return () => {
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [hasRestoredSettings, propertyId, settings]);
+  }, [hasRestoredSettings, persistSettings, settings]);
 
   useEffect(() => {
     function flushPendingSave() {
@@ -545,13 +574,33 @@ export function DealAnalyzer({
 
   const isFinanced = purchaseMethod === "financed";
 
+  useEffect(() => {
+    const projection: DealAnalyzerProjection = {
+      propertyId,
+      purchasePrice,
+      annualGrossRent: results.annualGrossRent,
+      operatingExpenses: results.operatingExpenses,
+      noiAnnual: results.noiAnnual,
+      capRate: results.capRate,
+      annualDebtService: results.annualDebtService,
+      cashFlowAfterDebt: results.noiAnnual - results.annualDebtService,
+      isFinanced,
+    };
+
+    window.dispatchEvent(
+      new CustomEvent(DEAL_ANALYZER_PROJECTION_EVENT, {
+        detail: projection,
+      }),
+    );
+  }, [isFinanced, propertyId, purchasePrice, results]);
+
   return (
     <Card
       size="sm"
       className="mb-6 rounded-xl border-slate-200 bg-white sm:[--card-spacing:--spacing(8)]"
     >
       <CardHeader>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="font-sans text-base font-semibold normal-case tracking-normal text-slate-950 sm:text-lg">
             Deal Analyzer
           </CardTitle>
@@ -562,6 +611,8 @@ export function DealAnalyzer({
             role="status"
             aria-live="polite"
           >
+            {!hasRestoredSettings && "Loading..."}
+            {hasRestoredSettings && saveStatus === "idle" && "Autosave on"}
             {saveStatus === "saving" && "Saving..."}
             {saveStatus === "saved" && "Saved"}
             {saveStatus === "error" && "Could not save"}
