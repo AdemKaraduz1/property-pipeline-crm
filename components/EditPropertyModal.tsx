@@ -38,12 +38,12 @@ export function EditPropertyModal({ children }: EditPropertyModalProps) {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="relative max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center sm:px-4 sm:py-6">
+          <div className="relative max-h-[92dvh] w-full max-w-6xl overscroll-contain overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:max-h-[90vh] sm:p-6">
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="absolute right-5 top-5 rounded-md px-2 text-2xl leading-none text-slate-400 hover:text-slate-700"
+              className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-md text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:right-5 sm:top-5"
               aria-label="Close edit property form"
             >
               ×

@@ -63,8 +63,8 @@ export default async function PipelinePage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-3xl font-bold text-slate-950">Pipeline</h2>
           <p className="text-slate-600">
             Drag cards between stages or right-click a card for more actions.
@@ -76,7 +76,7 @@ export default async function PipelinePage() {
 
         <Link
           href="/properties/new"
-          className="shrink-0 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          className="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 sm:w-auto"
         >
           Add Property
         </Link>

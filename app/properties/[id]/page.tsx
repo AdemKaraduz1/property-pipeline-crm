@@ -298,10 +298,36 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     "use server";
 
     const updateSupabase = await createClient();
+    const {
+      data: { user: updateUser },
+      error: userError,
+    } = await updateSupabase.auth.getUser();
+
+    if (userError || !updateUser) {
+      redirect("/login");
+    }
+
+    const { data: currentProperty, error: propertyAccessError } =
+      await updateSupabase
+        .from("properties")
+        .select("is_mobility_area")
+        .eq("id", id)
+        .eq("user_id", updateUser.id)
+        .single();
+
+    if (propertyAccessError || !currentProperty) {
+      console.error("Could not verify property before saving units:", {
+        propertyId: id,
+        error: propertyAccessError,
+      });
+      return;
+    }
+
     const unitIds = formData
       .getAll("unit_id")
       .map((value) => String(value).trim())
       .filter(Boolean);
+    const fmrUpdatedAt = new Date().toISOString();
 
     for (const unitId of unitIds) {
       const field = (name: string) => formData.get(`${unitId}__${name}`);
@@ -316,10 +342,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         appliedFmrRent,
       } = calculateChicagoFmr(
         updatedBeds,
-        property.is_mobility_area === true,
+        currentProperty.is_mobility_area === true,
       );
 
-      await updateSupabase
+      const { error: unitUpdateError } = await updateSupabase
         .from("property_units")
         .update({
           unit_number: updatedUnitNumber,
@@ -332,7 +358,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           base_fmr_rent: baseFmrRent,
           mobility_fmr_rent: mobilityFmrRent,
           fmr_rent: appliedFmrRent,
-          fmr_updated_at: new Date().toISOString(),
+          fmr_updated_at: fmrUpdatedAt,
           baths: updatedBathrooms,
           full_baths: updatedBathrooms,
           half_baths: null,
@@ -349,6 +375,15 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         })
         .eq("id", unitId)
         .eq("property_id", id);
+
+      if (unitUpdateError) {
+        console.error("Could not save unit:", {
+          propertyId: id,
+          unitId,
+          error: unitUpdateError,
+        });
+        return;
+      }
     }
 
     revalidatePath(`/properties/${id}`);
@@ -764,7 +799,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <div>
             <p className="text-sm text-slate-500">Projected Annual Rent</p>
             <p className="text-xl font-bold text-slate-950">

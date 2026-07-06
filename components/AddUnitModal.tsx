@@ -38,8 +38,8 @@ export function AddUnitModal({ children }: AddUnitModalProps) {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center sm:px-4 sm:py-6">
-          <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white shadow-xl">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center sm:px-4 sm:py-6">
+          <div className="max-h-[92dvh] w-full max-w-6xl overscroll-contain overflow-y-auto rounded-xl bg-white shadow-xl sm:max-h-[90vh]">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
               <div>
                 <h2 className="text-xl font-semibold text-slate-950">

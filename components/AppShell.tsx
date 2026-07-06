@@ -33,12 +33,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile header */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-4 py-3 md:hidden">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] md:hidden">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Home className="h-5 w-5 text-slate-900" />
-            <div>
-              <h1 className="text-sm font-bold leading-tight text-slate-950">
+          <div className="flex min-w-0 items-center gap-2">
+            <Home className="h-5 w-5 shrink-0 text-slate-900" />
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-bold leading-tight text-slate-950">
                 Property Pipeline CRM
               </h1>
               <p className="text-xs text-slate-500">Deal Analysis</p>
@@ -50,10 +50,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Page content */}
-      <main className="p-4 pb-24 md:ml-64 md:p-8">{children}</main>
+      <main className="p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:ml-64 md:p-8">
+        {children}
+      </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-2 py-2 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 md:hidden">
         <div className="grid grid-cols-1 gap-1">
           <MobileNavLink
             href="/pipeline"
