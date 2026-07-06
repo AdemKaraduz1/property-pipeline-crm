@@ -658,7 +658,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     projectedRepairsMaintenance +
     projectedPropertyManagement;
 
-  const operatingVacancyRate = dealAnalyzerSettings?.vacancyRate ?? 5;
+  const operatingVacancyRate = dealAnalyzerSettings?.vacancyRate ?? 7;
   const currentVacancyLoss =
     annualCurrentRent * (operatingVacancyRate / 100);
   const currentNoi =

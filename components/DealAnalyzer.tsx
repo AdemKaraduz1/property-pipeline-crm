@@ -189,13 +189,13 @@ export function DealAnalyzer({
     initialSettings?.acquisitionCostsRate ?? 3,
   );
   const [vacancyRate, setVacancyRate] = useState(
-    initialSettings?.vacancyRate ?? 5,
+    initialSettings?.vacancyRate ?? 7,
   );
   const [managementRate, setManagementRate] = useState(
     initialSettings?.managementRate ?? 8,
   );
   const [repairsRate, setRepairsRate] = useState(
-    initialSettings?.repairsRate ?? 8,
+    initialSettings?.repairsRate ?? 5,
   );
   const [capexRate, setCapexRate] = useState(
     initialSettings?.capexRate ?? 5,
