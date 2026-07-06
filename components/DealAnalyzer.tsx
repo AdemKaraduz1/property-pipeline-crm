@@ -494,18 +494,6 @@ export function DealAnalyzer({
     const capRate = price > 0 ? noiAnnual / price : 0;
     const dscr =
       annualDebtService > 0 ? noiAnnual / annualDebtService : Infinity;
-    const debtYield = loanAmount > 0 ? noiAnnual / loanAmount : 0;
-    const breakEvenOccupancy =
-      annualGrossRent > 0
-        ? (operatingExpenses + capexExpense + annualDebtService) /
-          annualGrossRent
-        : 0;
-    const grossRentMultiplier =
-      annualGrossRent > 0 ? price / annualGrossRent : 0;
-    const expenseRatio =
-      effectiveGrossIncome > 0
-        ? operatingExpenses / effectiveGrossIncome
-        : 0;
     const valueByCapRate =
       targetCapRate > 0 ? noiAnnual / (targetCapRate / 100) : 0;
     const maxPurchasePrice =
@@ -531,10 +519,6 @@ export function DealAnalyzer({
       cashOnCashReturn,
       capRate,
       dscr,
-      debtYield,
-      breakEvenOccupancy,
-      grossRentMultiplier,
-      expenseRatio,
       valueByCapRate,
       maxPurchasePrice,
     };
@@ -808,26 +792,6 @@ export function DealAnalyzer({
                 label="DSCR"
                 value={isFinanced ? formatRatio(results.dscr) : "N/A"}
                 note="NOI ÷ annual debt service"
-              />
-              <Metric
-                label="Debt Yield"
-                value={isFinanced ? formatPercent(results.debtYield) : "N/A"}
-                note="NOI ÷ loan amount"
-              />
-              <Metric
-                label="Break-Even Occupancy"
-                value={formatPercent(results.breakEvenOccupancy)}
-                note="Occupancy needed to cover expenses and debt"
-              />
-              <Metric
-                label="Gross Rent Multiplier"
-                value={formatRatio(results.grossRentMultiplier)}
-                note="Purchase price ÷ annual gross rent"
-              />
-              <Metric
-                label="Operating Expense Ratio"
-                value={formatPercent(results.expenseRatio)}
-                note={`${formatCurrency(results.operatingExpenses)} annual operating expenses; CapEx excluded`}
               />
             </div>
           </section>
