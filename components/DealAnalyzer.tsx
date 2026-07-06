@@ -19,7 +19,6 @@ type DealAnalyzerProps = {
   taxesAnnual: number | null;
   insuranceAnnual: number | null;
   operatingExpensesAnnual: number | null;
-  hasSavedOperatingExpenses: boolean;
   projectedMonthlyRent: number;
   totalRehab: number;
   ownerPaidUtilitiesAnnual: number;
@@ -163,7 +162,6 @@ export function DealAnalyzer({
   taxesAnnual,
   insuranceAnnual,
   operatingExpensesAnnual,
-  hasSavedOperatingExpenses,
   projectedMonthlyRent,
   totalRehab,
   ownerPaidUtilitiesAnnual,
@@ -202,12 +200,7 @@ export function DealAnalyzer({
   const [capexRate, setCapexRate] = useState(
     initialSettings?.capexRate ?? 5,
   );
-  const [customOperatingExpensesAnnual, setCustomOperatingExpensesAnnual] =
-    useState<number | null>(
-      initialSettings && hasSavedOperatingExpenses
-        ? initialSettings.customOperatingExpensesAnnual
-        : operatingExpensesAnnual,
-    );
+  const customOperatingExpensesAnnual = operatingExpensesAnnual;
   const [customUtilitiesAnnual, setCustomUtilitiesAnnual] = useState<
     number | null
   >(initialSettings?.customUtilitiesAnnual ?? null);
@@ -281,18 +274,7 @@ export function DealAnalyzer({
     const rawPropertySettings = readStoredSettings(
       getPropertyDealAnalyzerStorageKey(propertyId),
     );
-    const hasStoredOperatingExpenses =
-      rawPropertySettings !== null &&
-      typeof rawPropertySettings === "object" &&
-      Object.prototype.hasOwnProperty.call(
-        rawPropertySettings,
-        "customOperatingExpensesAnnual",
-      );
     const propertySettings = parseDealAnalyzerSettings(rawPropertySettings);
-    if (propertySettings && !hasStoredOperatingExpenses) {
-      propertySettings.customOperatingExpensesAnnual =
-        operatingExpensesAnnual;
-    }
     const lastUsedSettings = parseDealAnalyzerSettings(
       readStoredSettings(dealAnalyzerStorageKey),
     );
@@ -315,9 +297,6 @@ export function DealAnalyzer({
 
         if (propertySettings) {
           setPurchasePrice(storedSettings.purchasePrice);
-          setCustomOperatingExpensesAnnual(
-            storedSettings.customOperatingExpensesAnnual,
-          );
           setCustomUtilitiesAnnual(storedSettings.customUtilitiesAnnual);
           setOtherExpensesAnnual(storedSettings.otherExpensesAnnual);
         }
@@ -753,7 +732,7 @@ export function DealAnalyzer({
 
           <section className={mobileAnalysisPanelClass}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
-              Operating Assumptions
+              Analysis Assumptions
             </h3>
             <div className={analysisGridClass}>
               <div className="col-span-2">
@@ -765,30 +744,13 @@ export function DealAnalyzer({
                   type="number"
                   min="0"
                   value={customOperatingExpensesAnnual ?? ""}
-                  placeholder={formatCurrency(results.operatingExpenses)}
-                  className={analysisInputClass}
-                  onChange={(event) =>
-                    setCustomOperatingExpensesAnnual(
-                      event.target.value === ""
-                        ? null
-                        : Number(event.target.value),
-                    )
-                  }
+                  readOnly
+                  className={`${analysisInputClass} cursor-not-allowed bg-slate-100 text-slate-600`}
                 />
                 <p className={analysisHintClass}>
-                  {customOperatingExpensesAnnual === null
-                    ? "Calculated from the itemized assumptions below."
-                    : "Using the entered annual total instead of itemized operating expenses. CapEx remains separate."}
+                  Calculated from the Operating Expenses section above. CapEx
+                  remains separate.
                 </p>
-                {customOperatingExpensesAnnual !== null && (
-                  <button
-                    type="button"
-                    onClick={() => setCustomOperatingExpensesAnnual(null)}
-                    className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900"
-                  >
-                    Use itemized assumptions
-                  </button>
-                )}
               </div>
               <div>
                 <Label htmlFor="vacancy-rate">Vacancy %</Label>
@@ -803,30 +765,6 @@ export function DealAnalyzer({
                 />
               </div>
               <div>
-                <Label htmlFor="management-rate">Management %</Label>
-                <Input
-                  id="management-rate"
-                  type="number"
-                  value={managementRate}
-                  className={analysisInputClass}
-                  onChange={(event) =>
-                    setManagementRate(Number(event.target.value))
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="repairs-rate">Repairs %</Label>
-                <Input
-                  id="repairs-rate"
-                  type="number"
-                  value={repairsRate}
-                  className={analysisInputClass}
-                  onChange={(event) =>
-                    setRepairsRate(Number(event.target.value))
-                  }
-                />
-              </div>
-              <div>
                 <Label htmlFor="capex-rate">CapEx Reserve %</Label>
                 <Input
                   id="capex-rate"
@@ -835,32 +773,6 @@ export function DealAnalyzer({
                   className={analysisInputClass}
                   onChange={(event) =>
                     setCapexRate(Number(event.target.value))
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="utilities-annual">Utilities / Year</Label>
-                <Input
-                  id="utilities-annual"
-                  type="number"
-                  min="0"
-                  value={utilitiesAnnual}
-                  className={analysisInputClass}
-                  onChange={(event) =>
-                    setCustomUtilitiesAnnual(Number(event.target.value))
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="other-expenses">Other Expenses / Year</Label>
-                <Input
-                  id="other-expenses"
-                  type="number"
-                  min="0"
-                  value={otherExpensesAnnual}
-                  className={analysisInputClass}
-                  onChange={(event) =>
-                    setOtherExpensesAnnual(Number(event.target.value))
                   }
                 />
               </div>

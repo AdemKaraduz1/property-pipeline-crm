@@ -275,23 +275,84 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  async function updateBuildingFinancials(formData: FormData) {
+  async function updateOperatingExpenses(formData: FormData) {
     "use server";
 
     const updateSupabase = await createClient();
+    const {
+      data: { user: updateUser },
+    } = await updateSupabase.auth.getUser();
 
-    const updatedTaxesAnnual = parseMoneyInput(formData.get("taxes_annual"));
-    const updatedInsuranceAnnual = parseMoneyInput(
-      formData.get("insurance_annual"),
+    if (!updateUser) {
+      redirect("/login");
+    }
+
+    const { data: currentProperty, error: propertyError } =
+      await updateSupabase
+        .from("properties")
+        .select("all_extracted_fields")
+        .eq("id", id)
+        .eq("user_id", updateUser.id)
+        .single();
+    const { data: currentUnits, error: unitsError } = await updateSupabase
+      .from("property_units")
+      .select("water_included, electricity_included, gas_included")
+      .eq("property_id", id);
+
+    if (propertyError || unitsError || !currentProperty) {
+      console.error("Could not load operating expense inputs:", {
+        propertyError,
+        unitsError,
+      });
+      return;
+    }
+
+    const taxes = parseMoneyInput(formData.get("property_taxes")) || 0;
+    const insurance =
+      parseMoneyInput(formData.get("insurance_premiums")) || 0;
+    const cleaning = parseMoneyInput(formData.get("cleaning")) || 0;
+    const lawn = parseMoneyInput(formData.get("lawn")) || 0;
+    const repairsMaintenance =
+      parseMoneyInput(formData.get("repairs_maintenance")) || 0;
+    const propertyManagement =
+      parseMoneyInput(formData.get("property_management")) || 0;
+    const utilities = ((currentUnits || []) as PropertyUnit[]).reduce(
+      (sum, unit) => sum + getAnnualUtilityCost(unit),
+      0,
     );
+    const total =
+      taxes +
+      insurance +
+      cleaning +
+      lawn +
+      utilities +
+      repairsMaintenance +
+      propertyManagement;
+    const currentMetadata = asRecord(currentProperty.all_extracted_fields);
 
-    await updateSupabase
+    const { error: updateError } = await updateSupabase
       .from("properties")
       .update({
-        taxes_annual: updatedTaxesAnnual,
-        insurance_annual: updatedInsuranceAnnual,
+        taxes_annual: taxes,
+        insurance_annual: insurance,
+        operating_expenses: total,
+        all_extracted_fields: {
+          ...currentMetadata,
+          operating_expense_categories: {
+            cleaning,
+            lawn,
+            repairs_maintenance: repairsMaintenance,
+            property_management: propertyManagement,
+          },
+        },
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", updateUser.id);
+
+    if (updateError) {
+      console.error("Could not save operating expenses:", updateError);
+      return;
+    }
 
     revalidatePath(`/properties/${id}`);
     revalidatePath("/pipeline");
@@ -494,10 +555,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   const propertyMetadata = asRecord(property.all_extracted_fields);
   const rawDealAnalyzerSettings = asRecord(propertyMetadata.deal_analyzer);
-  const hasSavedOperatingExpenses = Object.prototype.hasOwnProperty.call(
-    rawDealAnalyzerSettings,
-    "customOperatingExpensesAnnual",
-  );
   const dealAnalyzerSettings = parseDealAnalyzerSettings(
     rawDealAnalyzerSettings,
   );
@@ -528,6 +585,25 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     (sum, unit) => sum + getAnnualUtilityCost(unit),
     0,
   );
+  const operatingExpenseCategories = asRecord(
+    propertyMetadata.operating_expense_categories,
+  );
+  const annualCleaning = toFiniteNumber(operatingExpenseCategories.cleaning);
+  const annualLawn = toFiniteNumber(operatingExpenseCategories.lawn);
+  const annualRepairsMaintenance = toFiniteNumber(
+    operatingExpenseCategories.repairs_maintenance,
+  );
+  const annualPropertyManagement = toFiniteNumber(
+    operatingExpenseCategories.property_management,
+  );
+  const annualItemizedOperatingExpenses =
+    Number(taxesAnnual || 0) +
+    Number(insuranceAnnual || 0) +
+    annualCleaning +
+    annualLawn +
+    annualUtilities +
+    annualRepairsMaintenance +
+    annualPropertyManagement;
 
   const annualCurrentRent =
     currentMonthlyRent > 0
@@ -538,33 +614,24 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       ? projectedMonthlyRent * 12
       : annualCurrentRent;
 
-  const currentOperatingExpenses =
-    property.operating_expenses !== null &&
-    property.operating_expenses !== undefined
-      ? Number(property.operating_expenses || 0)
-      : annualCurrentRent * 0.3 +
-        Number(taxesAnnual || 0) +
-        Number(insuranceAnnual || 0) +
-        Number(annualUtilities || 0);
-
+  const operatingVacancyRate = dealAnalyzerSettings?.vacancyRate ?? 5;
+  const currentVacancyLoss =
+    annualCurrentRent * (operatingVacancyRate / 100);
   const currentNoi =
-    property.net_operating_income !== null &&
-    property.net_operating_income !== undefined
-      ? Number(property.net_operating_income || 0)
-      : annualCurrentRent - currentOperatingExpenses;
+    annualCurrentRent -
+    currentVacancyLoss -
+    annualItemizedOperatingExpenses;
 
   const currentCapRate =
     Number(askingPrice) > 0 ? currentNoi / Number(askingPrice) : null;
 
-  const projectedOperatingExpenses =
-    property.operating_expenses !== null &&
-    property.operating_expenses !== undefined
-      ? Number(property.operating_expenses || 0)
-      : annualProjectedRent * 0.3 +
-        Number(taxesAnnual || 0) +
-        Number(insuranceAnnual || 0) +
-        Number(annualUtilities || 0);
-  const projectedNoi = annualProjectedRent - projectedOperatingExpenses;
+  const projectedVacancyLoss =
+    annualProjectedRent * (operatingVacancyRate / 100);
+  const projectedOperatingExpenses = annualItemizedOperatingExpenses;
+  const projectedNoi =
+    annualProjectedRent -
+    projectedVacancyLoss -
+    projectedOperatingExpenses;
   const projectedCapRate =
     Number(askingPrice) > 0 ? projectedNoi / Number(askingPrice) : null;
   const projectedPurchasePrice =
@@ -749,6 +816,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           {[
             ["#overview", "Overview"],
             ["#building", "Building"],
+            ["#operating-expenses", "Expenses"],
             ["#analysis", "Analysis"],
             ["#units", `Units (${unitCount})`],
             ["#rehab", "Rehab"],
@@ -810,8 +878,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         <div className="mb-4">
           <h3 className={sectionTitleClass}>Projected Financials</h3>
           <p className={sectionDescriptionClass}>
-            Based on projected unit rents and the property&apos;s operating
-            expenses.
+            Uses projected rents and the saved itemized operating expenses.
           </p>
         </div>
 
@@ -829,6 +896,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </p>
             <p className="text-xl font-bold text-slate-950">
               {formatCurrency(projectedOperatingExpenses)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Itemized expenses; vacancy is reflected separately in NOI
             </p>
           </div>
 
@@ -975,70 +1045,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="mt-4 border-t border-slate-200 pt-4 md:mt-6 md:pt-5">
-            <form
-              action={updateBuildingFinancials}
-              className="grid grid-cols-2 items-end gap-2 md:flex md:flex-wrap md:gap-4"
-            >
-              <div className="min-w-0 md:min-w-[180px] md:flex-1">
-                <label
-                  htmlFor="taxes_annual"
-                  className="mb-1 block text-[11px] font-medium text-slate-700 sm:text-sm"
-                >
-                  Annual Taxes
-                </label>
-                <input
-                  id="taxes_annual"
-                  name="taxes_annual"
-                  type="number"
-                  min="0"
-                  step="1"
-                  defaultValue={
-                    hasValue(taxesAnnual) ? Number(taxesAnnual) : ""
-                  }
-                  placeholder="Annual taxes"
-                  className={compactMoneyInputClass}
-                />
-              </div>
-
-              <div className="min-w-0 md:min-w-[180px] md:flex-1">
-                <label
-                  htmlFor="insurance_annual"
-                  className="mb-1 block text-[11px] font-medium text-slate-700 sm:text-sm"
-                >
-                  Annual Insurance
-                </label>
-                <input
-                  id="insurance_annual"
-                  name="insurance_annual"
-                  type="number"
-                  min="0"
-                  step="1"
-                  defaultValue={
-                    hasValue(insuranceAnnual) ? Number(insuranceAnnual) : ""
-                  }
-                  placeholder="Annual insurance"
-                  className={compactMoneyInputClass}
-                />
-              </div>
-
-              <div className="min-w-0 pb-1 md:min-w-[160px] md:pb-2">
-                <p className="text-[11px] text-slate-500 sm:text-sm">
-                  Annual Utilities
-                </p>
-                <p className="text-base font-bold text-slate-950 sm:text-lg">
-                  {formatCurrency(annualUtilities)}
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                className="min-h-8 rounded-md bg-slate-950 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800 md:px-4 md:py-2"
-              >
-                Save
-              </button>
-            </form>
-          </div>
         </div>
       )}
 
@@ -1064,18 +1070,135 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       )}
 
+      <div id="operating-expenses" className={sectionCardClass}>
+        <div className="mb-4">
+          <h3 className={sectionTitleClass}>Operating Expenses</h3>
+          <p className={sectionDescriptionClass}>
+            Enter annual expenses. Utilities are calculated from the
+            owner-paid selections in each unit.
+          </p>
+        </div>
+
+        <form action={updateOperatingExpenses}>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block">
+              <span className={detailLabelClass}>Property Taxes</span>
+              <input
+                name="property_taxes"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={
+                  hasValue(taxesAnnual) ? Number(taxesAnnual) : ""
+                }
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Insurance Premiums</span>
+              <input
+                name="insurance_premiums"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={
+                  hasValue(insuranceAnnual) ? Number(insuranceAnnual) : ""
+                }
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Cleaning</span>
+              <input
+                name="cleaning"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={annualCleaning || ""}
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Lawn</span>
+              <input
+                name="lawn"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={annualLawn || ""}
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>
+                Repairs and Maintenance
+              </span>
+              <input
+                name="repairs_maintenance"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={annualRepairsMaintenance || ""}
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Property Management</span>
+              <input
+                name="property_management"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={annualPropertyManagement || ""}
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2 lg:col-span-3">
+              <p className={detailLabelClass}>
+                Utilities from Unit Selections
+              </p>
+              <p className="mt-1 text-xl font-bold text-slate-950">
+                {formatCurrency(annualUtilities)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Water, gas, and electric marked as owner-paid in the Units
+                section.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className={detailLabelClass}>
+                Total Annual Operating Expenses
+              </p>
+              <p className="text-2xl font-bold text-slate-950">
+                {formatCurrency(annualItemizedOperatingExpenses)}
+              </p>
+            </div>
+            <button
+              type="submit"
+              className="min-h-11 rounded-md bg-slate-950 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Save Operating Expenses
+            </button>
+          </div>
+        </form>
+      </div>
+
       <div id="analysis" className="scroll-mt-24">
         <DealAnalyzer
           propertyId={id}
           askingPrice={askingPrice}
           taxesAnnual={taxesAnnual}
           insuranceAnnual={insuranceAnnual}
-          operatingExpensesAnnual={
-            hasValue(property.operating_expenses)
-              ? Number(property.operating_expenses)
-              : null
-          }
-          hasSavedOperatingExpenses={hasSavedOperatingExpenses}
+          operatingExpensesAnnual={annualItemizedOperatingExpenses}
           projectedMonthlyRent={projectedMonthlyRent}
           totalRehab={totalRehab}
           ownerPaidUtilitiesAnnual={annualUtilities}
