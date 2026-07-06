@@ -18,10 +18,6 @@ type DealAnalyzerProps = {
   operatingExpensesAnnual: number | null;
   hasSavedOperatingExpenses: boolean;
   projectedMonthlyRent: number;
-  baseFmrMonthlyRent: number;
-  mobilityFmrMonthlyRent: number;
-  fmrMonthlyRent: number;
-  isMobilityArea: boolean | null;
   totalRehab: number;
   ownerPaidUtilitiesAnnual: number;
   initialSettings: DealAnalyzerSettings | null;
@@ -186,10 +182,6 @@ export function DealAnalyzer({
   operatingExpensesAnnual,
   hasSavedOperatingExpenses,
   projectedMonthlyRent,
-  baseFmrMonthlyRent,
-  mobilityFmrMonthlyRent,
-  fmrMonthlyRent,
-  isMobilityArea,
   totalRehab,
   ownerPaidUtilitiesAnnual,
   initialSettings,
@@ -616,67 +608,6 @@ export function DealAnalyzer({
     initialOfferDiscount,
   ]);
 
-  const fmrResults = useMemo(() => {
-    const annualGrossFmr = Math.max(0, fmrMonthlyRent) * 12;
-    const vacancyLoss = annualGrossFmr * (vacancyRate / 100);
-    const effectiveGrossIncome = annualGrossFmr - vacancyLoss;
-    const managementExpense =
-      effectiveGrossIncome * (managementRate / 100);
-    const repairsExpense = annualGrossFmr * (repairsRate / 100);
-    const capexExpense = annualGrossFmr * (capexRate / 100);
-    const fixedExpenses =
-      Number(taxesAnnual || 0) +
-      Number(insuranceAnnual || 0) +
-      Math.max(0, utilitiesAnnual) +
-      Math.max(0, otherExpensesAnnual);
-    const itemizedOperatingExpenses =
-      managementExpense + repairsExpense + fixedExpenses;
-    const operatingExpenses =
-      customOperatingExpensesAnnual === null
-        ? itemizedOperatingExpenses
-        : Math.max(0, customOperatingExpensesAnnual);
-    const noiAnnual = effectiveGrossIncome - operatingExpenses;
-    const annualCashFlow =
-      noiAnnual - capexExpense - results.annualDebtService;
-    const annualCashObligations =
-      operatingExpenses + capexExpense + results.annualDebtService;
-
-    return {
-      annualGrossFmr,
-      effectiveGrossIncome,
-      operatingExpenses,
-      capexExpense,
-      noiAnnual,
-      annualCashFlow,
-      monthlyCashFlow: annualCashFlow / 12,
-      monthlyOperatingExpenses: operatingExpenses / 12,
-      monthlyCapexExpense: capexExpense / 12,
-      monthlyDebtService: results.annualDebtService / 12,
-      dscr:
-        results.annualDebtService > 0
-          ? noiAnnual / results.annualDebtService
-          : Infinity,
-      totalCoverage:
-        annualCashObligations > 0
-          ? effectiveGrossIncome / annualCashObligations
-          : Infinity,
-      monthlyRentIncrease: fmrMonthlyRent - projectedMonthlyRent,
-    };
-  }, [
-    capexRate,
-    customOperatingExpensesAnnual,
-    fmrMonthlyRent,
-    insuranceAnnual,
-    managementRate,
-    otherExpensesAnnual,
-    projectedMonthlyRent,
-    repairsRate,
-    results.annualDebtService,
-    taxesAnnual,
-    utilitiesAnnual,
-    vacancyRate,
-  ]);
-
   const isFinanced = purchaseMethod === "financed";
 
   return (
@@ -708,95 +639,6 @@ export function DealAnalyzer({
       </CardHeader>
 
       <CardContent>
-        <section className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3 sm:mb-8 sm:p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-950 sm:text-base">
-                FMR Income Coverage
-              </h3>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-600 sm:text-sm">
-                Compares applied Fair Market Rent with operating expenses,
-                CapEx, and mortgage debt service.
-              </p>
-            </div>
-            <span
-              className={
-                isMobilityArea === true
-                  ? "rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-semibold text-green-800 sm:text-xs"
-                  : isMobilityArea === false
-                    ? "rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700 sm:text-xs"
-                    : "rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold text-amber-800 sm:text-xs"
-              }
-            >
-              {isMobilityArea === true
-                ? "150% mobility FMR applied"
-                : isMobilityArea === false
-                  ? "Base FMR applied"
-                  : "Mobility check pending"}
-            </span>
-          </div>
-
-          {fmrMonthlyRent > 0 ? (
-            <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
-              <Metric
-                label="Base Monthly FMR"
-                value={formatCurrency(baseFmrMonthlyRent)}
-                note={
-                  isMobilityArea === true
-                    ? `${formatCurrency(mobilityFmrMonthlyRent)} at 150% mobility`
-                    : "HUD FMR before mobility adjustment"
-                }
-              />
-              <Metric
-                label="Applied Monthly FMR"
-                value={formatCurrency(fmrMonthlyRent)}
-                note={`${formatCurrency(fmrResults.monthlyRentIncrease)} vs. projected monthly rent`}
-                emphasis
-              />
-              <Metric
-                label="Monthly Operating Expenses"
-                value={formatCurrency(fmrResults.monthlyOperatingExpenses)}
-                note="Taxes, insurance, management, repairs, utilities, and other"
-              />
-              <Metric
-                label="Monthly Debt Service"
-                value={
-                  isFinanced
-                    ? formatCurrency(fmrResults.monthlyDebtService)
-                    : "N/A"
-                }
-                note={isFinanced ? "Principal and interest" : "Cash purchase"}
-              />
-              <Metric
-                label="Monthly CapEx Reserve"
-                value={formatCurrency(fmrResults.monthlyCapexExpense)}
-                note={`${capexRate}% of applied annual FMR`}
-              />
-              <Metric
-                label="FMR Monthly Cash Flow"
-                value={formatCurrency(fmrResults.monthlyCashFlow)}
-                note="After vacancy, operating expenses, CapEx, and debt"
-                emphasis
-              />
-              <Metric
-                label="FMR DSCR"
-                value={isFinanced ? formatRatio(fmrResults.dscr) : "N/A"}
-                note="FMR NOI ÷ annual debt service"
-              />
-              <Metric
-                label="Total Cost Coverage"
-                value={formatRatio(fmrResults.totalCoverage)}
-                note="Effective FMR income ÷ OpEx, CapEx, and debt"
-              />
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-slate-600">
-              Run the mobility-area check after entering unit bedroom counts to
-              calculate base and mobility FMR coverage.
-            </div>
-          )}
-        </section>
-
         <div className={mobileAnalysisRailClass}>
           <section className={mobileAnalysisPanelClass}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">

@@ -484,19 +484,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     0,
   );
 
-  const fmrMonthlyRent = unitList.reduce(
-    (sum, unit) => sum + Number(unit.fmr_rent || 0),
-    0,
-  );
-  const baseFmrMonthlyRent = unitList.reduce(
-    (sum, unit) => sum + Number(unit.base_fmr_rent || 0),
-    0,
-  );
-  const mobilityFmrMonthlyRent = unitList.reduce(
-    (sum, unit) => sum + Number(unit.mobility_fmr_rent || 0),
-    0,
-  );
-
   const currentMonthlyRent = unitList.reduce(
     (sum, unit) => sum + Number(getCurrentRent(unit) || 0),
     0,
@@ -1047,10 +1034,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           }
           hasSavedOperatingExpenses={hasSavedOperatingExpenses}
           projectedMonthlyRent={projectedMonthlyRent}
-          baseFmrMonthlyRent={baseFmrMonthlyRent}
-          mobilityFmrMonthlyRent={mobilityFmrMonthlyRent}
-          fmrMonthlyRent={fmrMonthlyRent}
-          isMobilityArea={property.is_mobility_area ?? null}
           totalRehab={totalRehab}
           ownerPaidUtilitiesAnnual={annualUtilities}
           initialSettings={dealAnalyzerSettings}
