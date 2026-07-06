@@ -737,43 +737,44 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       </nav>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-          <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Current Asking Price
-          </p>
-          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-2xl">
-            {formatCurrency(askingPrice)}
+      <div className={sectionCardClass}>
+        <div className="mb-4">
+          <h3 className={sectionTitleClass}>Current Financials</h3>
+          <p className={sectionDescriptionClass}>
+            Based on the current asking price, rents, and operating results.
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-          <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Current Annual Rent
-          </p>
-          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
-            {formatCurrency(annualCurrentRent)}
-          </p>
-        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div>
+            <p className="text-sm text-slate-500">Current Asking Price</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(askingPrice)}
+            </p>
+          </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-          <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Current NOI
-          </p>
-          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
-            {formatCurrency(currentNoi)}
-          </p>
-        </div>
+          <div>
+            <p className="text-sm text-slate-500">Current Annual Rent</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(annualCurrentRent)}
+            </p>
+          </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-          <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Current Cap Rate
-          </p>
-          <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
-            {currentCapRate !== null
-              ? `${(currentCapRate * 100).toFixed(2)}%`
-              : "Not entered"}
-          </p>
+          <div>
+            <p className="text-sm text-slate-500">Current NOI</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(currentNoi)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-500">Current Cap Rate</p>
+            <p className="text-xl font-bold text-slate-950">
+              {currentCapRate !== null
+                ? `${(currentCapRate * 100).toFixed(2)}%`
+                : "Not entered"}
+            </p>
+          </div>
         </div>
       </div>
 
