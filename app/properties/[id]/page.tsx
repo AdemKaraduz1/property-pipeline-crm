@@ -504,9 +504,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     0,
   );
 
-  const annualCurrentRent = currentMonthlyRent * 12;
+  const annualCurrentRent =
+    currentMonthlyRent > 0
+      ? currentMonthlyRent * 12
+      : Number(property.gross_income || 0);
+  const annualProjectedRent =
+    projectedMonthlyRent > 0
+      ? projectedMonthlyRent * 12
+      : annualCurrentRent;
 
-  const estimatedExpenses =
+  const currentOperatingExpenses =
     property.operating_expenses !== null &&
     property.operating_expenses !== undefined
       ? Number(property.operating_expenses || 0)
@@ -515,14 +522,26 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         Number(insuranceAnnual || 0) +
         Number(annualUtilities || 0);
 
-  const estimatedNoi =
+  const currentNoi =
     property.net_operating_income !== null &&
     property.net_operating_income !== undefined
       ? Number(property.net_operating_income || 0)
-      : annualCurrentRent - estimatedExpenses;
+      : annualCurrentRent - currentOperatingExpenses;
 
-  const estimatedCapRate =
-    Number(askingPrice) > 0 ? estimatedNoi / Number(askingPrice) : null;
+  const currentCapRate =
+    Number(askingPrice) > 0 ? currentNoi / Number(askingPrice) : null;
+
+  const projectedOperatingExpenses =
+    property.operating_expenses !== null &&
+    property.operating_expenses !== undefined
+      ? Number(property.operating_expenses || 0)
+      : annualProjectedRent * 0.3 +
+        Number(taxesAnnual || 0) +
+        Number(insuranceAnnual || 0) +
+        Number(annualUtilities || 0);
+  const projectedNoi = annualProjectedRent - projectedOperatingExpenses;
+  const projectedCapRate =
+    Number(askingPrice) > 0 ? projectedNoi / Number(askingPrice) : null;
 
   const locationLine =
     property.city || property.state || property.zip
@@ -532,11 +551,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       : property.mls_number
         ? `MLS #${property.mls_number}`
         : "";
-
-  const hasMlsFinancials =
-    hasValue(property.gross_income) ||
-    hasValue(property.operating_expenses) ||
-    hasValue(property.net_operating_income);
 
   const hasBuildingDetails =
     hasValue(property.year_built) ||
@@ -704,7 +718,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Asking Price
+            Current Asking Price
           </p>
           <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-2xl">
             {formatCurrency(askingPrice)}
@@ -713,7 +727,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Annual Rent
+            Current Annual Rent
           </p>
           <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
             {formatCurrency(annualCurrentRent)}
@@ -722,53 +736,68 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Est. NOI
+            Current NOI
           </p>
           <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
-            {formatCurrency(estimatedNoi)}
+            {formatCurrency(currentNoi)}
           </p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <p className="text-xs font-medium text-slate-500 sm:text-sm">
-            Est. Cap Rate
+            Current Cap Rate
           </p>
           <p className="mt-1 break-words text-lg font-bold text-slate-950 sm:text-xl">
-            {estimatedCapRate !== null
-              ? `${(estimatedCapRate * 100).toFixed(2)}%`
+            {currentCapRate !== null
+              ? `${(currentCapRate * 100).toFixed(2)}%`
               : "Not entered"}
           </p>
         </div>
       </div>
 
-      {hasMlsFinancials && (
-        <div className={sectionCardClass}>
-          <h3 className={`${sectionTitleClass} mb-4`}>MLS Financials</h3>
+      <div className={sectionCardClass}>
+        <div className="mb-4">
+          <h3 className={sectionTitleClass}>Projected Financials</h3>
+          <p className={sectionDescriptionClass}>
+            Based on projected unit rents and the property&apos;s operating
+            expenses.
+          </p>
+        </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <p className="text-sm text-slate-500">Gross Income</p>
-              <p className="text-xl font-bold text-slate-950">
-                {formatCurrency(property.gross_income)}
-              </p>
-            </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div>
+            <p className="text-sm text-slate-500">Projected Annual Rent</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(annualProjectedRent)}
+            </p>
+          </div>
 
-            <div>
-              <p className="text-sm text-slate-500">Operating Expenses</p>
-              <p className="text-xl font-bold text-slate-950">
-                {formatCurrency(property.operating_expenses)}
-              </p>
-            </div>
+          <div>
+            <p className="text-sm text-slate-500">
+              Projected Operating Expenses
+            </p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(projectedOperatingExpenses)}
+            </p>
+          </div>
 
-            <div>
-              <p className="text-sm text-slate-500">Net Operating Income</p>
-              <p className="text-xl font-bold text-slate-950">
-                {formatCurrency(property.net_operating_income)}
-              </p>
-            </div>
+          <div>
+            <p className="text-sm text-slate-500">Projected NOI</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(projectedNoi)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-500">Projected Cap Rate</p>
+            <p className="text-xl font-bold text-slate-950">
+              {projectedCapRate !== null
+                ? `${(projectedCapRate * 100).toFixed(2)}%`
+                : "Not entered"}
+            </p>
           </div>
         </div>
-      )}
+      </div>
 
       {hasBuildingDetails && (
         <div id="building" className={sectionCardClass}>
