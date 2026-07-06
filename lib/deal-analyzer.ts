@@ -17,7 +17,6 @@ export type DealAnalyzerSettings = {
   customUtilitiesAnnual: number | null;
   otherExpensesAnnual: number;
   targetCapRate: number;
-  initialOfferDiscount: number;
 };
 
 export function getMonthlyMortgagePayment(
@@ -51,7 +50,6 @@ const NUMBER_KEYS = [
   "capexRate",
   "otherExpensesAnnual",
   "targetCapRate",
-  "initialOfferDiscount",
 ] as const;
 
 const NULLABLE_NUMBER_KEYS = [

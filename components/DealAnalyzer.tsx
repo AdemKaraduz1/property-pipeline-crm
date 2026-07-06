@@ -210,9 +210,6 @@ export function DealAnalyzer({
   const [targetCapRate, setTargetCapRate] = useState(
     initialSettings?.targetCapRate ?? 8,
   );
-  const [initialOfferDiscount, setInitialOfferDiscount] = useState(
-    initialSettings?.initialOfferDiscount ?? 10,
-  );
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -234,7 +231,6 @@ export function DealAnalyzer({
       customUtilitiesAnnual,
       otherExpensesAnnual,
       targetCapRate,
-      initialOfferDiscount,
     }),
     [
       acquisitionCostsRate,
@@ -243,7 +239,6 @@ export function DealAnalyzer({
       customOperatingExpensesAnnual,
       customUtilitiesAnnual,
       downPaymentRate,
-      initialOfferDiscount,
       loanTermYears,
       managementRate,
       otherExpensesAnnual,
@@ -293,7 +288,6 @@ export function DealAnalyzer({
         setRepairsRate(storedSettings.repairsRate);
         setCapexRate(storedSettings.capexRate);
         setTargetCapRate(storedSettings.targetCapRate);
-        setInitialOfferDiscount(storedSettings.initialOfferDiscount);
 
         if (propertySettings) {
           setPurchasePrice(storedSettings.purchasePrice);
@@ -517,9 +511,6 @@ export function DealAnalyzer({
     const maxPurchasePrice =
       (valueByCapRate - Math.max(0, totalRehab)) /
       (1 + acquisitionCostsRate / 100);
-    const suggestedInitialOffer =
-      maxPurchasePrice * (1 - initialOfferDiscount / 100);
-
     return {
       annualGrossRent,
       effectiveGrossIncome,
@@ -546,7 +537,6 @@ export function DealAnalyzer({
       expenseRatio,
       valueByCapRate,
       maxPurchasePrice,
-      suggestedInitialOffer,
     };
   }, [
     purchasePrice,
@@ -567,7 +557,6 @@ export function DealAnalyzer({
     loanTermYears,
     totalRehab,
     targetCapRate,
-    initialOfferDiscount,
   ]);
 
   const isFinanced = purchaseMethod === "financed";
@@ -735,7 +724,7 @@ export function DealAnalyzer({
               Analysis Assumptions
             </h3>
             <div className={analysisGridClass}>
-              <div className="col-span-2">
+              <div className="col-span-2 sm:col-span-1">
                 <Label htmlFor="operating-expenses">
                   Operating Expenses / Year
                 </Label>
@@ -787,19 +776,6 @@ export function DealAnalyzer({
                   className={analysisInputClass}
                   onChange={(event) =>
                     setTargetCapRate(Number(event.target.value))
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="offer-discount">Initial Offer Discount %</Label>
-                <Input
-                  id="offer-discount"
-                  type="number"
-                  min="0"
-                  value={initialOfferDiscount}
-                  className={analysisInputClass}
-                  onChange={(event) =>
-                    setInitialOfferDiscount(Number(event.target.value))
                   }
                 />
               </div>
@@ -932,11 +908,6 @@ export function DealAnalyzer({
                 label="Max Purchase Price"
                 value={formatCurrency(results.maxPurchasePrice)}
                 note="Cap-rate value less rehab and acquisition costs"
-              />
-              <Metric
-                label="Suggested Initial Offer"
-                value={formatCurrency(results.suggestedInitialOffer)}
-                note={`${initialOfferDiscount}% below max purchase price`}
               />
             </div>
           </section>

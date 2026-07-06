@@ -296,7 +296,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         .single();
     const { data: currentUnits, error: unitsError } = await updateSupabase
       .from("property_units")
-      .select("water_included, electricity_included, gas_included")
+      .select(
+        "projected_rent, rent, water_included, electricity_included, gas_included",
+      )
       .eq("property_id", id);
 
     if (propertyError || unitsError || !currentProperty) {
@@ -312,14 +314,23 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       parseMoneyInput(formData.get("insurance_premiums")) || 0;
     const cleaning = parseMoneyInput(formData.get("cleaning")) || 0;
     const lawn = parseMoneyInput(formData.get("lawn")) || 0;
-    const repairsMaintenance =
-      parseMoneyInput(formData.get("repairs_maintenance")) || 0;
-    const propertyManagement =
-      parseMoneyInput(formData.get("property_management")) || 0;
+    const repairsMaintenanceRate =
+      parseMoneyInput(formData.get("repairs_maintenance_rate")) || 0;
+    const propertyManagementRate =
+      parseMoneyInput(formData.get("property_management_rate")) || 0;
     const utilities = ((currentUnits || []) as PropertyUnit[]).reduce(
       (sum, unit) => sum + getAnnualUtilityCost(unit),
       0,
     );
+    const projectedAnnualRent =
+      ((currentUnits || []) as PropertyUnit[]).reduce(
+        (sum, unit) => sum + Number(getProjectedRent(unit) || 0),
+        0,
+      ) * 12;
+    const repairsMaintenance =
+      projectedAnnualRent * (repairsMaintenanceRate / 100);
+    const propertyManagement =
+      projectedAnnualRent * (propertyManagementRate / 100);
     const total =
       taxes +
       insurance +
@@ -341,8 +352,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           operating_expense_categories: {
             cleaning,
             lawn,
-            repairs_maintenance: repairsMaintenance,
-            property_management: propertyManagement,
+            repairs_maintenance_rate: repairsMaintenanceRate,
+            property_management_rate: propertyManagementRate,
           },
         },
       })
@@ -588,22 +599,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const operatingExpenseCategories = asRecord(
     propertyMetadata.operating_expense_categories,
   );
-  const annualCleaning = toFiniteNumber(operatingExpenseCategories.cleaning);
-  const annualLawn = toFiniteNumber(operatingExpenseCategories.lawn);
-  const annualRepairsMaintenance = toFiniteNumber(
-    operatingExpenseCategories.repairs_maintenance,
+  const annualCleaning = toFiniteNumber(
+    operatingExpenseCategories.cleaning,
+    1200,
   );
-  const annualPropertyManagement = toFiniteNumber(
-    operatingExpenseCategories.property_management,
-  );
-  const annualItemizedOperatingExpenses =
-    Number(taxesAnnual || 0) +
-    Number(insuranceAnnual || 0) +
-    annualCleaning +
-    annualLawn +
-    annualUtilities +
-    annualRepairsMaintenance +
-    annualPropertyManagement;
+  const annualLawn = toFiniteNumber(operatingExpenseCategories.lawn, 1200);
 
   const annualCurrentRent =
     currentMonthlyRent > 0
@@ -613,6 +613,50 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     projectedMonthlyRent > 0
       ? projectedMonthlyRent * 12
       : annualCurrentRent;
+  const annualFixedOperatingExpenses =
+    Number(taxesAnnual || 0) +
+    Number(insuranceAnnual || 0) +
+    annualCleaning +
+    annualLawn +
+    annualUtilities;
+  const repairsMaintenanceRate = Object.prototype.hasOwnProperty.call(
+    operatingExpenseCategories,
+    "repairs_maintenance_rate",
+  )
+    ? toFiniteNumber(operatingExpenseCategories.repairs_maintenance_rate)
+    : annualProjectedRent > 0 &&
+        toFiniteNumber(operatingExpenseCategories.repairs_maintenance) > 0
+      ? (toFiniteNumber(operatingExpenseCategories.repairs_maintenance) /
+          annualProjectedRent) *
+        100
+      : (dealAnalyzerSettings?.repairsRate ?? 5);
+  const propertyManagementRate = Object.prototype.hasOwnProperty.call(
+    operatingExpenseCategories,
+    "property_management_rate",
+  )
+    ? toFiniteNumber(operatingExpenseCategories.property_management_rate)
+    : annualProjectedRent > 0 &&
+        toFiniteNumber(operatingExpenseCategories.property_management) > 0
+      ? (toFiniteNumber(operatingExpenseCategories.property_management) /
+          annualProjectedRent) *
+        100
+      : (dealAnalyzerSettings?.managementRate ?? 0);
+  const currentRepairsMaintenance =
+    annualCurrentRent * (repairsMaintenanceRate / 100);
+  const currentPropertyManagement =
+    annualCurrentRent * (propertyManagementRate / 100);
+  const projectedRepairsMaintenance =
+    annualProjectedRent * (repairsMaintenanceRate / 100);
+  const projectedPropertyManagement =
+    annualProjectedRent * (propertyManagementRate / 100);
+  const currentItemizedOperatingExpenses =
+    annualFixedOperatingExpenses +
+    currentRepairsMaintenance +
+    currentPropertyManagement;
+  const projectedItemizedOperatingExpenses =
+    annualFixedOperatingExpenses +
+    projectedRepairsMaintenance +
+    projectedPropertyManagement;
 
   const operatingVacancyRate = dealAnalyzerSettings?.vacancyRate ?? 5;
   const currentVacancyLoss =
@@ -620,14 +664,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const currentNoi =
     annualCurrentRent -
     currentVacancyLoss -
-    annualItemizedOperatingExpenses;
+    currentItemizedOperatingExpenses;
 
   const currentCapRate =
     Number(askingPrice) > 0 ? currentNoi / Number(askingPrice) : null;
 
   const projectedVacancyLoss =
     annualProjectedRent * (operatingVacancyRate / 100);
-  const projectedOperatingExpenses = annualItemizedOperatingExpenses;
+  const projectedOperatingExpenses = projectedItemizedOperatingExpenses;
   const projectedNoi =
     annualProjectedRent -
     projectedVacancyLoss -
@@ -1135,28 +1179,34 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
             <label className="block">
               <span className={detailLabelClass}>
-                Repairs and Maintenance
+                Repairs and Maintenance %
               </span>
               <input
-                name="repairs_maintenance"
+                name="repairs_maintenance_rate"
                 type="number"
                 min="0"
-                step="1"
-                defaultValue={annualRepairsMaintenance || ""}
+                step="0.1"
+                defaultValue={repairsMaintenanceRate}
                 className={compactMoneyInputClass}
               />
+              <span className="mt-1 block text-xs text-slate-500">
+                {formatCurrency(projectedRepairsMaintenance)} at projected rent
+              </span>
             </label>
 
             <label className="block">
-              <span className={detailLabelClass}>Property Management</span>
+              <span className={detailLabelClass}>Property Management %</span>
               <input
-                name="property_management"
+                name="property_management_rate"
                 type="number"
                 min="0"
-                step="1"
-                defaultValue={annualPropertyManagement || ""}
+                step="0.1"
+                defaultValue={propertyManagementRate}
                 className={compactMoneyInputClass}
               />
+              <span className="mt-1 block text-xs text-slate-500">
+                {formatCurrency(projectedPropertyManagement)} at projected rent
+              </span>
             </label>
 
             <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2 lg:col-span-3">
@@ -1179,7 +1229,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 Total Annual Operating Expenses
               </p>
               <p className="text-2xl font-bold text-slate-950">
-                {formatCurrency(annualItemizedOperatingExpenses)}
+                {formatCurrency(projectedItemizedOperatingExpenses)}
               </p>
             </div>
             <button
@@ -1198,7 +1248,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           askingPrice={askingPrice}
           taxesAnnual={taxesAnnual}
           insuranceAnnual={insuranceAnnual}
-          operatingExpensesAnnual={annualItemizedOperatingExpenses}
+          operatingExpensesAnnual={projectedItemizedOperatingExpenses}
           projectedMonthlyRent={projectedMonthlyRent}
           totalRehab={totalRehab}
           ownerPaidUtilitiesAnnual={annualUtilities}
