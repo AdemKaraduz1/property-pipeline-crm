@@ -11,6 +11,16 @@ type VoiceSuggestion = {
   notes: string;
 };
 
+type SectionStep = {
+  key: string;
+  label: string;
+  description: string;
+};
+
+type SectionVoiceSuggestion = VoiceSuggestion & {
+  stepKey: string;
+};
+
 type OpenAIErrorBody = {
   error?: {
     code?: string | null;
@@ -99,6 +109,62 @@ function normalizeSuggestion(value: unknown): VoiceSuggestion {
         ? cleanWalkthroughNote(suggestion.notes)
         : "",
   };
+}
+
+function normalizeSectionSuggestion(
+  value: unknown,
+  allowedStepKeys: Set<string>,
+): SectionVoiceSuggestion | null {
+  const suggestion =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+  const stepKey = typeof suggestion.stepKey === "string"
+    ? suggestion.stepKey
+    : "";
+
+  if (!allowedStepKeys.has(stepKey)) return null;
+
+  return {
+    stepKey,
+    ...normalizeSuggestion(suggestion),
+  };
+}
+
+function parseSectionSteps(value: unknown): SectionStep[] {
+  if (typeof value !== "string" || !value.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+
+        const step = item as Record<string, unknown>;
+        const key = typeof step.key === "string" ? step.key.trim() : "";
+        const label = typeof step.label === "string" ? step.label.trim() : "";
+        const description =
+          typeof step.description === "string"
+            ? step.description.trim()
+            : "";
+
+        if (!key || !label) return [];
+
+        return [
+          {
+            key: key.slice(0, 180),
+            label: label.slice(0, 120),
+            description: description.slice(0, 260),
+          },
+        ];
+      })
+      .slice(0, 30);
+  } catch {
+    return [];
+  }
 }
 
 function transcriptOnlyResponse(transcript: string, warning: string) {
@@ -237,6 +303,8 @@ export async function POST(
   const stepDescription = String(formData.get("stepDescription") || "")
     .trim()
     .slice(0, 500);
+  const mode = String(formData.get("mode") || "step");
+  const sectionSteps = parseSectionSteps(formData.get("steps"));
 
   if (!(audio instanceof File) || audio.size === 0) {
     return NextResponse.json(
@@ -317,6 +385,137 @@ export async function POST(
       },
       { status: 422 },
     );
+  }
+
+  if (mode === "section" && sectionSteps.length > 0) {
+    let sectionExtractionResponse: Response;
+    const allowedStepKeys = new Set(sectionSteps.map((step) => step.key));
+
+    try {
+      sectionExtractionResponse = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_EXTRACTION_MODEL || "gpt-5.4-mini",
+          input: [
+            {
+              role: "system",
+              content:
+                "Extract a property walkthrough narration into checkpoint updates. Match each observation to exactly one provided checkpoint key. Do not invent checkpoints. Write notes as direct property observations, not transcript summaries. Never mention the speaker, transcript, recording, or voice note. If a repair cost is stated, include it inline in notes and set estimatedCost. Set estimatedCost to null unless a specific amount or clear numeric range is stated; for a range, use its midpoint and mention the range in notes. Set needsRehab true when work is needed, false when the narrated condition is clearly okay, and null when unclear.",
+            },
+            {
+              role: "user",
+              content: `Available checkpoints:\n${sectionSteps
+                .map(
+                  (step) =>
+                    `- ${step.key}: ${step.label}. ${step.description}`,
+                )
+                .join("\n")}\n\nNarration transcript:\n${transcript}`,
+            },
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name: "walkthrough_section_voice_note",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  updates: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        stepKey: {
+                          type: "string",
+                          enum: sectionSteps.map((step) => step.key),
+                        },
+                        needsRehab: {
+                          type: ["boolean", "null"],
+                        },
+                        estimatedCost: {
+                          type: ["number", "null"],
+                          minimum: 0,
+                        },
+                        notes: {
+                          type: "string",
+                        },
+                      },
+                      required: [
+                        "stepKey",
+                        "needsRehab",
+                        "estimatedCost",
+                        "notes",
+                      ],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["updates"],
+                additionalProperties: false,
+              },
+            },
+          },
+        }),
+      });
+    } catch {
+      return transcriptOnlyResponse(
+        transcript,
+        "The narration was transcribed, but its checkpoint updates could not be organized automatically.",
+      );
+    }
+
+    if (!sectionExtractionResponse.ok) {
+      const details = await openAIErrorDetails(sectionExtractionResponse);
+
+      console.error(
+        "Fast walkthrough extraction failed:",
+        openAIErrorMessage(details),
+      );
+
+      return transcriptOnlyResponse(
+        transcript,
+        "The narration was transcribed, but its checkpoint updates could not be organized automatically.",
+      );
+    }
+
+    const extraction = await sectionExtractionResponse.json();
+    const outputText = getResponseOutputText(extraction);
+    let sectionSuggestions: SectionVoiceSuggestion[] = [];
+
+    try {
+      const parsed = outputText ? JSON.parse(outputText) : null;
+      const updates =
+        parsed && typeof parsed === "object"
+          ? (parsed as { updates?: unknown }).updates
+          : null;
+
+      sectionSuggestions = Array.isArray(updates)
+        ? updates.flatMap((update) => {
+            const normalized = normalizeSectionSuggestion(
+              update,
+              allowedStepKeys,
+            );
+
+            return normalized ? [normalized] : [];
+          })
+        : [];
+    } catch {
+      sectionSuggestions = [];
+    }
+
+    return NextResponse.json({
+      success: true,
+      transcript,
+      sectionSuggestions,
+      warning:
+        sectionSuggestions.length === 0
+          ? "The narration was transcribed, but no checkpoint updates could be matched automatically."
+          : null,
+    });
   }
 
   let extractionResponse: Response;

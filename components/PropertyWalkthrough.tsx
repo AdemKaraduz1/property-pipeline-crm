@@ -50,6 +50,7 @@ type WalkthroughSection = {
 };
 
 type VoiceNoteStatus = "idle" | "recording" | "processing";
+type VoiceNoteScope = "step" | "section";
 type WalkthroughMode = "fast" | "detailed";
 
 type VoiceNoteSuggestion = {
@@ -58,6 +59,14 @@ type VoiceNoteSuggestion = {
   estimatedCost: number | null;
   notes: string;
   warning?: string | null;
+};
+
+type SectionVoiceSuggestion = {
+  stepKey: string;
+  stepLabel: string;
+  needsRehab: boolean | null;
+  estimatedCost: number | null;
+  notes: string;
 };
 
 function buildRoomSteps(unit: WalkthroughUnit): WalkthroughStep[] {
@@ -109,10 +118,18 @@ export function PropertyWalkthrough({
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceNoteStatus>("idle");
+  const [voiceScope, setVoiceScope] = useState<VoiceNoteScope>("step");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [voiceError, setVoiceError] = useState("");
   const [voiceSuggestion, setVoiceSuggestion] =
     useState<VoiceNoteSuggestion | null>(null);
+  const [sectionVoiceSuggestions, setSectionVoiceSuggestions] = useState<
+    SectionVoiceSuggestion[]
+  >([]);
+  const [sectionVoiceTranscript, setSectionVoiceTranscript] = useState("");
+  const [sectionVoiceWarning, setSectionVoiceWarning] = useState<string | null>(
+    null,
+  );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -159,6 +176,15 @@ export function PropertyWalkthrough({
     currentStep?.scope === "unit" && currentStep.unitId
       ? `unit:${currentStep.unitId}`
       : "common";
+
+  function getSectionSteps(sectionKey: string) {
+    return sectionKey === "common"
+      ? steps.filter((step) => step.scope === "common")
+      : steps.filter(
+          (step) =>
+            step.scope === "unit" && `unit:${step.unitId}` === sectionKey,
+        );
+  }
 
   useEffect(() => {
     if (voiceStatus !== "recording") return;
@@ -237,12 +263,19 @@ export function PropertyWalkthrough({
     setCurrentStepIndex(stepIndex);
     setSaveMessage("");
     setVoiceSuggestion(null);
+    setSectionVoiceSuggestions([]);
+    setSectionVoiceTranscript("");
+    setSectionVoiceWarning(null);
     setVoiceError("");
   }
 
-  async function startVoiceNote() {
+  async function startVoiceNote(scope: VoiceNoteScope = "step") {
     setVoiceError("");
     setVoiceSuggestion(null);
+    setSectionVoiceSuggestions([]);
+    setSectionVoiceTranscript("");
+    setSectionVoiceWarning(null);
+    setVoiceScope(scope);
 
     if (
       typeof window === "undefined" ||
@@ -328,9 +361,37 @@ export function PropertyWalkthrough({
 
       const extension = audioBlob.type.includes("mp4") ? "mp4" : "webm";
       const formData = new FormData();
+      const activeSectionSteps = getSectionSteps(currentSectionKey);
+      const sectionLabel =
+        currentSectionKey === "common"
+          ? "Outside & Common Areas"
+          : `Unit ${currentStep.unitLabel}`;
+
       formData.append("audio", audioBlob, `voice-note.${extension}`);
-      formData.append("stepLabel", currentStep.label);
-      formData.append("stepDescription", currentStep.description);
+      formData.append(
+        "stepLabel",
+        voiceScope === "section" ? sectionLabel : currentStep.label,
+      );
+      formData.append(
+        "stepDescription",
+        voiceScope === "section"
+          ? "Fast walkthrough section narration across multiple checkpoints."
+          : currentStep.description,
+      );
+
+      if (voiceScope === "section") {
+        formData.append("mode", "section");
+        formData.append(
+          "steps",
+          JSON.stringify(
+            activeSectionSteps.map((step) => ({
+              key: step.key,
+              label: step.label,
+              description: step.description,
+            })),
+          ),
+        );
+      }
 
       const response = await fetch(
         `/api/properties/${propertyId}/walkthrough/voice-note`,
@@ -351,13 +412,64 @@ export function PropertyWalkthrough({
               estimatedCost?: number | null;
               notes?: string;
             };
+            sectionSuggestions?: Array<{
+              stepKey?: string;
+              needsRehab?: boolean | null;
+              estimatedCost?: number | null;
+              notes?: string;
+            }>;
           })
         : null;
 
-      if (!response.ok || !result?.success || !result.suggestion) {
+      if (!response.ok || !result?.success) {
         throw new Error(
           result?.message || "The voice note could not be processed.",
         );
+      }
+
+      if (voiceScope === "section") {
+        const suggestions = (result.sectionSuggestions || []).flatMap(
+          (suggestion) => {
+            const matchedStep = activeSectionSteps.find(
+              (step) => step.key === suggestion.stepKey,
+            );
+
+            if (!matchedStep) return [];
+
+            return [
+              {
+                stepKey: matchedStep.key,
+                stepLabel: matchedStep.label,
+                needsRehab:
+                  suggestion.needsRehab === true
+                    ? true
+                    : suggestion.needsRehab === false
+                      ? false
+                      : null,
+                estimatedCost:
+                  typeof suggestion.estimatedCost === "number"
+                    ? suggestion.estimatedCost
+                    : null,
+                notes: suggestion.notes || "",
+              },
+            ];
+          },
+        );
+
+        setSectionVoiceSuggestions(suggestions);
+        setSectionVoiceTranscript(result.transcript || "");
+        setSectionVoiceWarning(result.warning || null);
+        setSaveMessage(
+          suggestions.length > 0
+            ? "Narration matched to checkpoints. Review and apply the updates."
+            : result.warning ||
+                "Narration transcribed, but no checkpoint updates were matched.",
+        );
+        return;
+      }
+
+      if (!result.suggestion) {
+        throw new Error("The voice note could not be processed.");
       }
 
       setVoiceSuggestion({
@@ -417,6 +529,44 @@ export function PropertyWalkthrough({
     updateItem(currentStep, update);
     setVoiceSuggestion(null);
     setSaveMessage("Voice note applied. Save this step to keep it.");
+  }
+
+  function applySectionVoiceSuggestions() {
+    if (sectionVoiceSuggestions.length === 0) return;
+
+    for (const suggestion of sectionVoiceSuggestions) {
+      const matchedStep = steps.find((step) => step.key === suggestion.stepKey);
+
+      if (!matchedStep) continue;
+
+      const existingItem = getItem(matchedStep);
+      const update: Partial<InspectionItem> = {};
+
+      if (suggestion.needsRehab !== null) {
+        update.needsRehab = suggestion.needsRehab;
+
+        if (suggestion.needsRehab === false) {
+          update.estimatedCost = 0;
+        }
+      }
+
+      if (suggestion.estimatedCost !== null) {
+        update.estimatedCost = suggestion.estimatedCost;
+      }
+
+      if (suggestion.notes) {
+        update.notes = existingItem.notes.trim()
+          ? `${existingItem.notes.trim()}\n${suggestion.notes}`
+          : suggestion.notes;
+      }
+
+      updateItem(matchedStep, update);
+    }
+
+    setSectionVoiceSuggestions([]);
+    setSectionVoiceTranscript("");
+    setSectionVoiceWarning(null);
+    setSaveMessage("Narration applied. Save the fast walkthrough to keep it.");
   }
 
   async function saveWalkthrough({
@@ -516,13 +666,7 @@ export function PropertyWalkthrough({
   }
 
   const currentItem = getItem(currentStep);
-  const sectionSteps =
-    currentSectionKey === "common"
-      ? steps.filter((step) => step.scope === "common")
-      : steps.filter(
-          (step) =>
-            step.scope === "unit" && `unit:${step.unitId}` === currentSectionKey,
-        );
+  const sectionSteps = getSectionSteps(currentSectionKey);
   const sectionAnsweredCount = sectionSteps.filter(
     (step) => getItem(step).needsRehab !== null,
   ).length;
@@ -535,11 +679,14 @@ export function PropertyWalkthrough({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-900">
-            Voice note for {currentStep.label}
+            {walkthroughMode === "fast"
+              ? `Narrate ${currentSectionKey === "common" ? "common areas" : `Unit ${currentStep.unitLabel}`}`
+              : `Voice note for ${currentStep.label}`}
           </p>
           <p className="text-xs text-slate-500">
-            Describe the condition, needed work, and any cost you want
-            recorded.
+            {walkthroughMode === "fast"
+              ? "Say each checkpoint out loud, like “living room ok, kitchen needs work, $500.”"
+              : "Describe the condition, needed work, and any cost you want recorded."}
           </p>
         </div>
 
@@ -565,12 +712,16 @@ export function PropertyWalkthrough({
         ) : (
           <button
             type="button"
-            onClick={startVoiceNote}
+            onClick={() =>
+              startVoiceNote(walkthroughMode === "fast" ? "section" : "step")
+            }
             disabled={isSaving}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:opacity-60"
           >
             <Mic className="h-4 w-4" />
-            Record Note
+            {walkthroughMode === "fast"
+              ? "Record Section Narration"
+              : "Record Note"}
           </button>
         )}
       </div>
@@ -629,6 +780,93 @@ export function PropertyWalkthrough({
             <button
               type="button"
               onClick={() => setVoiceSuggestion(null)}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(sectionVoiceSuggestions.length > 0 ||
+        sectionVoiceTranscript ||
+        sectionVoiceWarning) && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-900">
+            Suggested fast walkthrough updates
+          </p>
+
+          {sectionVoiceWarning && (
+            <p className="mt-2 text-xs text-amber-700">
+              {sectionVoiceWarning}
+            </p>
+          )}
+
+          {sectionVoiceSuggestions.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {sectionVoiceSuggestions.map((suggestion) => (
+                <div
+                  key={`${suggestion.stepKey}-${suggestion.notes}`}
+                  className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {suggestion.stepLabel}
+                    </p>
+                    {suggestion.needsRehab !== null && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                        {suggestion.needsRehab ? "Repair" : "OK"}
+                      </span>
+                    )}
+                    {suggestion.estimatedCost !== null && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                        ${suggestion.estimatedCost.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  {suggestion.notes && (
+                    <p className="mt-1 text-sm text-slate-700">
+                      {suggestion.notes}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-slate-600">
+              No checkpoint updates were matched. You can still view the
+              transcript and add notes manually.
+            </p>
+          )}
+
+          {sectionVoiceTranscript && (
+            <details className="mt-3 text-xs text-slate-500">
+              <summary className="cursor-pointer font-medium">
+                View transcript
+              </summary>
+              <p className="mt-2 whitespace-pre-wrap">
+                {sectionVoiceTranscript}
+              </p>
+            </details>
+          )}
+
+          <div className="mt-4 flex gap-2">
+            {sectionVoiceSuggestions.length > 0 && (
+              <button
+                type="button"
+                onClick={applySectionVoiceSuggestions}
+                className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Apply All Updates
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSectionVoiceSuggestions([]);
+                setSectionVoiceTranscript("");
+                setSectionVoiceWarning(null);
+              }}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Discard
@@ -727,8 +965,8 @@ export function PropertyWalkthrough({
                   : `Unit ${currentStep.unitLabel}`}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Tap the obvious status for each checkpoint. Select a row when
-                you want the voice note to apply there.
+                Narrate the whole section, or tap the obvious status for each
+                checkpoint when you want manual control.
               </p>
             </div>
             <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
