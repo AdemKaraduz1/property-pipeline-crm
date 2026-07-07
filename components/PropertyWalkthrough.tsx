@@ -50,6 +50,7 @@ type WalkthroughSection = {
 };
 
 type VoiceNoteStatus = "idle" | "recording" | "processing";
+type WalkthroughMode = "fast" | "detailed";
 
 type VoiceNoteSuggestion = {
   transcript: string;
@@ -103,6 +104,8 @@ export function PropertyWalkthrough({
   const [currentStepIndex, setCurrentStepIndex] = useState(
     initialData.currentStep || 0,
   );
+  const [walkthroughMode, setWalkthroughMode] =
+    useState<WalkthroughMode>("fast");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [voiceStatus, setVoiceStatus] = useState<VoiceNoteStatus>("idle");
@@ -228,6 +231,13 @@ export function PropertyWalkthrough({
         },
       };
     });
+  }
+
+  function selectStep(stepIndex: number) {
+    setCurrentStepIndex(stepIndex);
+    setSaveMessage("");
+    setVoiceSuggestion(null);
+    setVoiceError("");
   }
 
   async function startVoiceNote() {
@@ -506,13 +516,137 @@ export function PropertyWalkthrough({
   }
 
   const currentItem = getItem(currentStep);
+  const sectionSteps =
+    currentSectionKey === "common"
+      ? steps.filter((step) => step.scope === "common")
+      : steps.filter(
+          (step) =>
+            step.scope === "unit" && `unit:${step.unitId}` === currentSectionKey,
+        );
+  const sectionAnsweredCount = sectionSteps.filter(
+    (step) => getItem(step).needsRehab !== null,
+  ).length;
   const answeredCount = steps.filter(
     (step) => getItem(step).needsRehab !== null,
   ).length;
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
+  const voiceNotePanel = (
+    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            Voice note for {currentStep.label}
+          </p>
+          <p className="text-xs text-slate-500">
+            Describe the condition, needed work, and any cost you want
+            recorded.
+          </p>
+        </div>
+
+        {voiceStatus === "recording" ? (
+          <button
+            type="button"
+            onClick={stopAndProcessVoiceNote}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            <Square className="h-4 w-4 fill-current" />
+            Stop · {Math.floor(recordingSeconds / 60)}:
+            {String(recordingSeconds % 60).padStart(2, "0")}
+          </button>
+        ) : voiceStatus === "processing" ? (
+          <button
+            type="button"
+            disabled
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
+          >
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+            Transcribing...
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={startVoiceNote}
+            disabled={isSaving}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:opacity-60"
+          >
+            <Mic className="h-4 w-4" />
+            Record Note
+          </button>
+        )}
+      </div>
+
+      {voiceError && (
+        <p className="mt-3 text-sm font-medium text-red-700">
+          {voiceError}
+        </p>
+      )}
+
+      {voiceSuggestion && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-900">
+            Suggested walkthrough update
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            {voiceSuggestion.needsRehab !== null && (
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
+                {voiceSuggestion.needsRehab
+                  ? "Needs rehab"
+                  : "No rehab needed"}
+              </span>
+            )}
+            {voiceSuggestion.estimatedCost !== null && (
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-800">
+                ${voiceSuggestion.estimatedCost.toLocaleString()}
+              </span>
+            )}
+          </div>
+          {voiceSuggestion.notes && (
+            <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
+              {voiceSuggestion.notes}
+            </p>
+          )}
+          {voiceSuggestion.warning && (
+            <p className="mt-2 text-xs text-amber-700">
+              {voiceSuggestion.warning}
+            </p>
+          )}
+          <details className="mt-3 text-xs text-slate-500">
+            <summary className="cursor-pointer font-medium">
+              View transcript
+            </summary>
+            <p className="mt-2 whitespace-pre-wrap">
+              {voiceSuggestion.transcript}
+            </p>
+          </details>
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={applyVoiceSuggestion}
+              className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              Apply to {currentStep.label}
+            </button>
+            <button
+              type="button"
+              onClick={() => setVoiceSuggestion(null)}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div
+      className={
+        walkthroughMode === "fast"
+          ? "mx-auto max-w-5xl"
+          : "mx-auto max-w-2xl"
+      }
+    >
       <div className="mb-4">
         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
           <span className="font-medium text-slate-700">
@@ -528,39 +662,217 @@ export function PropertyWalkthrough({
         </div>
 
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <label
-            htmlFor="walkthrough-section"
-            className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500"
-          >
-            Jump to section
-          </label>
-          <select
-            id="walkthrough-section"
-            value={currentSectionKey}
-            onChange={(event) => {
-              const section = sections.find(
-                (option) => option.key === event.target.value,
-              );
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div>
+              <label
+                htmlFor="walkthrough-section"
+                className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500"
+              >
+                Jump to section
+              </label>
+              <select
+                id="walkthrough-section"
+                value={currentSectionKey}
+                onChange={(event) => {
+                  const section = sections.find(
+                    (option) => option.key === event.target.value,
+                  );
 
-              if (section) {
-                setCurrentStepIndex(section.stepIndex);
-                setSaveMessage("");
-                setVoiceSuggestion(null);
-                setVoiceError("");
-              }
-            }}
-            disabled={isSaving || voiceStatus !== "idle"}
-            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-60"
-          >
-            {sections.map((section) => (
-              <option key={section.key} value={section.key}>
-                {section.label}
-              </option>
-            ))}
-          </select>
+                  if (section) {
+                    selectStep(section.stepIndex);
+                  }
+                }}
+                disabled={isSaving || voiceStatus !== "idle"}
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-60"
+              >
+                {sections.map((section) => (
+                  <option key={section.key} value={section.key}>
+                    {section.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-100 p-1">
+              {(["fast", "detailed"] as WalkthroughMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setWalkthroughMode(mode)}
+                  disabled={isSaving || voiceStatus !== "idle"}
+                  className={`h-9 rounded-md px-3 text-sm font-semibold capitalize ${
+                    walkthroughMode === mode
+                      ? "bg-white text-slate-950 shadow-sm"
+                      : "text-slate-600 hover:text-slate-950"
+                  } disabled:opacity-60`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
+      {walkthroughMode === "fast" ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Fast walkthrough
+              </p>
+              <h2 className="mt-1 text-2xl font-bold text-slate-950">
+                {currentSectionKey === "common"
+                  ? "Outside & Common Areas"
+                  : `Unit ${currentStep.unitLabel}`}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Tap the obvious status for each checkpoint. Select a row when
+                you want the voice note to apply there.
+              </p>
+            </div>
+            <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+              {sectionAnsweredCount} / {sectionSteps.length} checked
+            </div>
+          </div>
+
+          {voiceNotePanel}
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-2">
+            {sectionSteps.map((step) => {
+              const item = getItem(step);
+              const stepIndex = steps.findIndex(
+                (candidate) => candidate.key === step.key,
+              );
+              const isActive = step.key === currentStep.key;
+
+              return (
+                <div
+                  key={step.key}
+                  className={`rounded-xl border p-3 ${
+                    isActive
+                      ? "border-slate-900 bg-slate-50 ring-2 ring-slate-100"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => selectStep(stepIndex)}
+                      className="min-w-0 text-left"
+                    >
+                      <p className="text-sm font-semibold text-slate-950">
+                        {step.label}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-slate-500">
+                        {step.description}
+                      </p>
+                    </button>
+                    {isActive && (
+                      <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                        Voice
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateItem(step, {
+                          needsRehab: false,
+                          estimatedCost: 0,
+                        })
+                      }
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                        item.needsRehab === false
+                          ? "border-green-500 bg-green-50 text-green-800"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      OK
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateItem(step, { needsRehab: true })}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                        item.needsRehab === true
+                          ? "border-amber-500 bg-amber-50 text-amber-900"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Repair
+                    </button>
+                  </div>
+
+                  {item.needsRehab === true && (
+                    <label className="mt-3 block">
+                      <span className="text-xs font-medium text-slate-700">
+                        Cost
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="1"
+                        value={item.estimatedCost || ""}
+                        onFocus={() => selectStep(stepIndex)}
+                        onChange={(event) =>
+                          updateItem(step, {
+                            estimatedCost: Number(event.target.value) || 0,
+                          })
+                        }
+                        placeholder="$0"
+                        className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                      />
+                    </label>
+                  )}
+
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-600">
+                      Notes {item.notes ? "added" : ""}
+                    </summary>
+                    <textarea
+                      rows={3}
+                      value={item.notes}
+                      onFocus={() => selectStep(stepIndex)}
+                      onChange={(event) =>
+                        updateItem(step, { notes: event.target.value })
+                      }
+                      placeholder="Quick observation, concern, or contractor note..."
+                      className="mt-2 w-full rounded-md border border-slate-300 px-2 py-2 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                    />
+                  </details>
+                </div>
+              );
+            })}
+          </div>
+
+          {saveMessage && (
+            <p className="mt-4 text-sm text-slate-500">{saveMessage}</p>
+          )}
+
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={() => saveWalkthrough({ exit: true })}
+              disabled={isSaving || voiceStatus !== "idle"}
+              className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Save Progress & Exit
+            </button>
+            <button
+              type="button"
+              onClick={() => saveWalkthrough()}
+              disabled={isSaving || voiceStatus !== "idle"}
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-slate-950 px-5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+            >
+              {isSaving ? "Saving..." : "Save Fast Walkthrough"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           {currentStep.scope === "common"
@@ -574,110 +886,7 @@ export function PropertyWalkthrough({
           {currentStep.description}
         </p>
 
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Voice note</p>
-              <p className="text-xs text-slate-500">
-                Describe the condition, needed work, and any cost you want
-                recorded.
-              </p>
-            </div>
-
-            {voiceStatus === "recording" ? (
-              <button
-                type="button"
-                onClick={stopAndProcessVoiceNote}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
-              >
-                <Square className="h-4 w-4 fill-current" />
-                Stop · {Math.floor(recordingSeconds / 60)}:
-                {String(recordingSeconds % 60).padStart(2, "0")}
-              </button>
-            ) : voiceStatus === "processing" ? (
-              <button
-                type="button"
-                disabled
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
-              >
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-                Transcribing...
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={startVoiceNote}
-                disabled={isSaving}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:opacity-60"
-              >
-                <Mic className="h-4 w-4" />
-                Record Note
-              </button>
-            )}
-          </div>
-
-          {voiceError && (
-            <p className="mt-3 text-sm font-medium text-red-700">
-              {voiceError}
-            </p>
-          )}
-
-          {voiceSuggestion && (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-              <p className="text-sm font-semibold text-slate-900">
-                Suggested walkthrough update
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {voiceSuggestion.needsRehab !== null && (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">
-                    {voiceSuggestion.needsRehab
-                      ? "Needs rehab"
-                      : "No rehab needed"}
-                  </span>
-                )}
-                {voiceSuggestion.estimatedCost !== null && (
-                  <span className="rounded-full bg-amber-50 px-2.5 py-1 font-medium text-amber-800">
-                    ${voiceSuggestion.estimatedCost.toLocaleString()}
-                  </span>
-                )}
-              </div>
-              {voiceSuggestion.notes && (
-                <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
-                  {voiceSuggestion.notes}
-                </p>
-              )}
-              {voiceSuggestion.warning && (
-                <p className="mt-2 text-xs text-amber-700">
-                  {voiceSuggestion.warning}
-                </p>
-              )}
-              <details className="mt-3 text-xs text-slate-500">
-                <summary className="cursor-pointer font-medium">
-                  View transcript
-                </summary>
-                <p className="mt-2 whitespace-pre-wrap">
-                  {voiceSuggestion.transcript}
-                </p>
-              </details>
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={applyVoiceSuggestion}
-                  className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                >
-                  Apply to This Step
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVoiceSuggestion(null)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        {voiceNotePanel}
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
@@ -804,6 +1013,8 @@ export function PropertyWalkthrough({
       >
         Save Progress & Exit
       </button>
+        </>
+      )}
     </div>
   );
 }
