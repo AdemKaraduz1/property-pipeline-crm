@@ -252,6 +252,11 @@ const mobileFieldClass =
 const sectionCardClass =
   "mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
 
+const disclosureSummaryClass =
+  "flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 [&::-webkit-details-marker]:hidden";
+
+const disclosureBodyClass = "mt-4 border-t border-slate-100 pt-4";
+
 const sectionTitleClass = "text-base font-semibold text-slate-950 sm:text-lg";
 
 const sectionDescriptionClass = "text-xs leading-relaxed text-slate-500 sm:text-sm";
@@ -1062,16 +1067,26 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       />
 
       {hasBuildingDetails && (
-        <div id="building" className={sectionCardClass}>
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <details id="building" open className={sectionCardClass}>
+          <summary className={disclosureSummaryClass}>
             <div>
               <h3 className={sectionTitleClass}>Building Details</h3>
+              <p className={sectionDescriptionClass}>
+                Specs, parcel details, systems, and exterior notes.
+              </p>
             </div>
 
-            <EditPropertyModal>
-              <PropertyEditForm property={property} />
-            </EditPropertyModal>
-          </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+              {valueOrDash(property.property_type)}
+            </span>
+          </summary>
+
+          <div className={disclosureBodyClass}>
+            <div className="mb-4 flex justify-end">
+              <EditPropertyModal>
+                <PropertyEditForm property={property} />
+              </EditPropertyModal>
+            </div>
 
           <div className="grid grid-cols-2 gap-x-3 gap-y-2 md:grid-cols-4 md:gap-4">
             <div>
@@ -1172,18 +1187,31 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-        </div>
+          </div>
+        </details>
       )}
 
-      <div id="operating-expenses" className={sectionCardClass}>
-        <div className="mb-4">
-          <h3 className={sectionTitleClass}>Operating Expenses</h3>
-          <p className={sectionDescriptionClass}>
-            Enter annual expenses. Utilities are calculated from the
-            owner-paid selections in each unit.
-          </p>
-        </div>
+      <details id="operating-expenses" open className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
+          <div>
+            <h3 className={sectionTitleClass}>Operating Expenses</h3>
+            <p className={sectionDescriptionClass}>
+              Enter annual expenses. Utilities are calculated from the
+              owner-paid selections in each unit.
+            </p>
+          </div>
 
+          <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
+              Annual Opex
+            </p>
+            <p className="text-lg font-bold text-slate-950 sm:text-xl">
+              {formatCurrency(projectedItemizedOperatingExpenses)}
+            </p>
+          </div>
+        </summary>
+
+        <div className={disclosureBodyClass}>
         <AutoSaveForm
           action={updateOperatingExpenses}
           draftKey={`property-pipeline:autosave:${id}:operating-expenses`}
@@ -1299,7 +1327,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </div>
           </div>
         </AutoSaveForm>
-      </div>
+        </div>
+      </details>
 
       <div id="analysis" className="scroll-mt-24">
         <DealAnalyzer
@@ -1335,14 +1364,25 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       />
 
       {property.broker_remarks && (
-        <div className={sectionCardClass}>
-          <p className="mb-2 text-sm font-semibold text-slate-700">
-            Broker Remarks
-          </p>
-          <p className="whitespace-pre-wrap text-slate-700">
-            {property.broker_remarks}
-          </p>
-        </div>
+        <details className={sectionCardClass}>
+          <summary className={disclosureSummaryClass}>
+            <div>
+              <h3 className={sectionTitleClass}>Broker Remarks</h3>
+              <p className={sectionDescriptionClass}>
+                Listing notes and agent-provided context.
+              </p>
+            </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+              Notes
+            </span>
+          </summary>
+
+          <div className={disclosureBodyClass}>
+            <p className="whitespace-pre-wrap text-slate-700">
+              {property.broker_remarks}
+            </p>
+          </div>
+        </details>
       )}
 
       <div id="units" className={sectionCardClass}>
@@ -1919,8 +1959,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      <div id="rehab" className={sectionCardClass}>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <details id="rehab" className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
           <div className="min-w-0 flex-1">
             <h3 className={sectionTitleClass}>Common Area Rehab</h3>
             <p className={sectionDescriptionClass}>
@@ -1936,8 +1976,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               {formatCurrency(commonRehabTotal)}
             </p>
           </div>
-        </div>
+        </summary>
 
+        <div className={disclosureBodyClass}>
         <AutoSaveForm
           action={updateCommonAreaRehab}
           draftKey={`property-pipeline:autosave:${id}:common-area-rehab`}
@@ -2020,9 +2061,33 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </p>
           </div>
         </AutoSaveForm>
-      </div>
+        </div>
+      </details>
 
-      <div id="programs" className="scroll-mt-24">
+      <details id="programs" className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
+          <div>
+            <h3 className={sectionTitleClass}>Programs</h3>
+            <p className={sectionDescriptionClass}>
+              CHA mobility status and FMR support.
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              property.is_mobility_area === true
+                ? "bg-green-50 text-green-700"
+                : "border border-slate-200 bg-slate-50 text-slate-600"
+            }`}
+          >
+            {property.is_mobility_area === true
+              ? "Mobility Area"
+              : property.mobility_checked_at
+                ? "Checked"
+                : "Not Checked"}
+          </span>
+        </summary>
+
+        <div className={disclosureBodyClass}>
         <MobilityFmrCard
           propertyId={id}
           isMobilityArea={property.is_mobility_area}
@@ -2032,7 +2097,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           mobilityLat={property.mobility_lat}
           mobilityLng={property.mobility_lng}
         />
-      </div>
+        </div>
+      </details>
 
     </AppShell>
   );
