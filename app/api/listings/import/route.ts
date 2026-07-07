@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  getNeighborhoodFromExtractedFields,
+  isNeighborhoodKey,
+} from "@/lib/neighborhoods";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -88,6 +92,14 @@ function parseCityStateZip(address: string | null) {
   };
 }
 
+function withoutEmptyNeighborhoods(value: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([key, fieldValue]) => {
+      return !isNeighborhoodKey(key) || toText(fieldValue) !== null;
+    })
+  );
+}
+
 export async function POST(request: Request) {
   try {
     if (!supabaseUrl || !supabaseServiceRoleKey || !defaultPropertyUserId) {
@@ -112,9 +124,12 @@ export async function POST(request: Request) {
 
     const listPrice = toNumber(payload.listPrice);
     const taxes = toNumber(payload.taxes);
-    const neighborhood = toText(payload.neighborhood);
+    const rawExtractedFields = asRecord(payload.allExtractedFields);
+    const neighborhood =
+      toText(payload.neighborhood) ||
+      getNeighborhoodFromExtractedFields(rawExtractedFields);
     const extractedFields = {
-      ...asRecord(payload.allExtractedFields),
+      ...withoutEmptyNeighborhoods(rawExtractedFields),
       ...(neighborhood ? { neighborhood } : {}),
     };
 

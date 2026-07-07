@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Archive, ArrowUpDown } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { getNeighborhoodFromExtractedFields } from "@/lib/neighborhoods";
 import {
   DndContext,
   DragEndEvent,
@@ -186,24 +187,7 @@ function formatStatusLabel(value: string | null | undefined) {
 }
 
 function getNeighborhood(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-
-  const metadata = value as Record<string, unknown>;
-  const neighborhoodEntry = Object.entries(metadata).find(([key]) =>
-    [
-      "neighborhood",
-      "neighbourhood",
-      "community area",
-      "community_area",
-      "redfin neighborhood",
-      "redfin_neighborhood",
-    ].includes(key.trim().toLowerCase()),
-  );
-  const neighborhood = String(neighborhoodEntry?.[1] || "")
-    .replace(/^neighbou?rhood\s*:\s*/i, "")
-    .trim();
-
-  return neighborhood && neighborhood.length <= 80 ? neighborhood : null;
+  return getNeighborhoodFromExtractedFields(value);
 }
 
 function getSortableNumber(value: unknown) {
