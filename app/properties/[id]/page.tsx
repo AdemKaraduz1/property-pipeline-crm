@@ -4,6 +4,7 @@ import { PropertyUnitForm } from "@/components/PropertyUnitForm";
 import { AddUnitModal } from "@/components/AddUnitModal";
 import { EditPropertyModal } from "@/components/EditPropertyModal";
 import { DealAnalyzer } from "@/components/DealAnalyzer";
+import { DealVerdict } from "@/components/DealVerdict";
 import { ProjectedFinancials } from "@/components/ProjectedFinancials";
 import { AutoSaveForm } from "@/components/AutoSaveForm";
 import { PropertyStatusUpdater } from "@/components/PropertyStatusUpdater";
@@ -547,6 +548,108 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     return { success: true };
   }
 
+  async function updateUnderwritingDiligence(formData: FormData) {
+    "use server";
+
+    const updateSupabase = await createClient();
+    const {
+      data: { user: updateUser },
+    } = await updateSupabase.auth.getUser();
+
+    if (!updateUser) {
+      return {
+        success: false,
+        message: "You must be signed in to save underwriting diligence.",
+      };
+    }
+
+    const { data: currentProperty } = await updateSupabase
+      .from("properties")
+      .select("all_extracted_fields")
+      .eq("id", id)
+      .eq("user_id", updateUser.id)
+      .single();
+
+    if (!currentProperty) {
+      return {
+        success: false,
+        message: "Could not load underwriting diligence.",
+      };
+    }
+
+    const currentMetadata = asRecord(currentProperty.all_extracted_fields);
+    const underwritingDiligence = {
+      rent_confidence:
+        parseTextInput(formData.get("rent_confidence")) || "unverified",
+      rent_source: parseTextInput(formData.get("rent_source")),
+      rent_comp_url: parseTextInput(formData.get("rent_comp_url")),
+      rent_notes: parseTextInput(formData.get("rent_notes")),
+      utility_allowance_monthly:
+        parseMoneyInput(formData.get("utility_allowance_monthly")) || 0,
+
+      post_purchase_taxes_annual: parseMoneyInput(
+        formData.get("post_purchase_taxes_annual"),
+      ),
+      lender_min_dscr: parseMoneyInput(formData.get("lender_min_dscr")) || 1.2,
+      loan_points_rate:
+        parseMoneyInput(formData.get("loan_points_rate")) || 0,
+      reserve_months: parseMoneyInput(formData.get("reserve_months")) || 0,
+      tax_notes: parseTextInput(formData.get("tax_notes")),
+
+      downside_rent_haircut_rate:
+        parseMoneyInput(formData.get("downside_rent_haircut_rate")) || 0,
+      downside_vacancy_rate:
+        parseMoneyInput(formData.get("downside_vacancy_rate")) || 0,
+      rehab_overrun_rate:
+        parseMoneyInput(formData.get("rehab_overrun_rate")) || 0,
+
+      risk_roof_age: formData.has("risk_roof_age"),
+      risk_masonry: formData.has("risk_masonry"),
+      risk_sewer_line: formData.has("risk_sewer_line"),
+      risk_electrical_service: formData.has("risk_electrical_service"),
+      risk_boiler_hvac: formData.has("risk_boiler_hvac"),
+      risk_lead_asbestos: formData.has("risk_lead_asbestos"),
+      risk_porch_code: formData.has("risk_porch_code"),
+      risk_permits: formData.has("risk_permits"),
+      legal_units_verified:
+        parseTextInput(formData.get("legal_units_verified")) || "unknown",
+      code_violation_check:
+        parseTextInput(formData.get("code_violation_check")) || "needs_check",
+      rehab_notes: parseTextInput(formData.get("rehab_notes")),
+
+      exit_strategy: parseTextInput(formData.get("exit_strategy")) || "hold",
+      hold_period_years:
+        parseMoneyInput(formData.get("hold_period_years")) || 0,
+      exit_cap_rate: parseMoneyInput(formData.get("exit_cap_rate")) || 0,
+      sale_cost_rate: parseMoneyInput(formData.get("sale_cost_rate")) || 0,
+      refi_ltv: parseMoneyInput(formData.get("refi_ltv")) || 0,
+      arv_estimate: parseMoneyInput(formData.get("arv_estimate")),
+    };
+
+    const { error: updateError } = await updateSupabase
+      .from("properties")
+      .update({
+        all_extracted_fields: {
+          ...currentMetadata,
+          underwriting_diligence: underwritingDiligence,
+        },
+      })
+      .eq("id", id)
+      .eq("user_id", updateUser.id);
+
+    if (updateError) {
+      console.error("Could not save underwriting diligence:", updateError);
+      return {
+        success: false,
+        message: "Could not save underwriting diligence.",
+      };
+    }
+
+    revalidatePath(`/properties/${id}`);
+    revalidatePath("/pipeline");
+    return { success: true };
+  }
+
   const { data: property, error: propertyError } = await supabase
     .from("properties")
     .select("*")
@@ -603,6 +706,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const rawDealAnalyzerSettings = asRecord(propertyMetadata.deal_analyzer);
   const dealAnalyzerSettings = parseDealAnalyzerSettings(
     rawDealAnalyzerSettings,
+  );
+  const underwritingDiligence = asRecord(
+    propertyMetadata.underwriting_diligence,
   );
   const hasWalkthroughProgress = Boolean(
     asRecord(propertyMetadata.walkthrough).updated_at,
@@ -888,6 +994,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             ["#building", "Building"],
             ["#operating-expenses", "Expenses"],
             ["#analysis", "Analysis"],
+            ["#diligence", "Verdict"],
             ["#units", `Units (${unitCount})`],
             ["#rehab", "Rehab"],
             ["#programs", "Programs"],
@@ -1207,6 +1314,25 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           initialSettings={dealAnalyzerSettings}
         />
       </div>
+
+      <DealVerdict
+        action={updateUnderwritingDiligence}
+        annualCurrentRent={annualCurrentRent}
+        annualProjectedRent={annualProjectedRent}
+        annualDebtService={projectedAnnualDebtService}
+        currentNoi={currentNoi}
+        projectedNoi={projectedNoi}
+        projectedOperatingExpenses={projectedOperatingExpenses}
+        projectedInterestRate={projectedInterestRate}
+        projectedLoanAmount={projectedLoanAmount}
+        projectedLoanTermYears={projectedLoanTermYears}
+        projectedPurchasePrice={projectedPurchasePrice}
+        taxesAnnual={taxesAnnual}
+        totalRehab={totalRehab}
+        underwriting={underwritingDiligence}
+        vacancyRate={operatingVacancyRate}
+        propertyId={id}
+      />
 
       {property.broker_remarks && (
         <div className={sectionCardClass}>
