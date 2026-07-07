@@ -286,11 +286,12 @@ export function DealVerdict({
         : "border-amber-200 bg-amber-50 text-amber-800";
 
   return (
-    <section
+    <details
       id="diligence"
-      className="mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+      open
+      className="group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
     >
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-slate-950 sm:text-lg">
             Deal Verdict
@@ -300,18 +301,25 @@ export function DealVerdict({
             rehab flags, and exit assumptions.
           </p>
         </div>
-        <span
-          className={`rounded-full border px-3 py-1 text-xs font-semibold ${verdictClass}`}
-        >
-          {verdict}
-        </span>
-      </div>
 
-      <AutoSaveForm
-        action={action}
-        draftKey={`property-pipeline:autosave:${propertyId}:underwriting-diligence`}
-        statusClassName="mt-3 text-right text-xs text-slate-500"
-      >
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${verdictClass}`}
+          >
+            {verdict}
+          </span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-base leading-none text-slate-500 transition group-open:rotate-45">
+            +
+          </span>
+        </div>
+      </summary>
+
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <AutoSaveForm
+          action={action}
+          draftKey={`property-pipeline:autosave:${propertyId}:underwriting-diligence`}
+          statusClassName="mt-3 text-right text-xs text-slate-500"
+        >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg bg-slate-50 p-3">
             <Metric
@@ -773,7 +781,8 @@ export function DealVerdict({
             </div>
           </Drawer>
         </div>
-      </AutoSaveForm>
-    </section>
+        </AutoSaveForm>
+      </div>
+    </details>
   );
 }

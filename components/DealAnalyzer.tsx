@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -595,15 +594,15 @@ export function DealAnalyzer({
   }, [isFinanced, propertyId, purchasePrice, results]);
 
   return (
-    <Card
-      size="sm"
-      className="mb-6 rounded-xl border-slate-200 bg-white sm:[--card-spacing:--spacing(8)]"
+    <details
+      open
+      className="group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8"
     >
-      <CardHeader>
+      <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="font-sans text-base font-semibold normal-case tracking-normal text-slate-950 sm:text-lg">
+          <h3 className="font-sans text-base font-semibold normal-case tracking-normal text-slate-950 sm:text-lg">
             Deal Analyzer
-          </CardTitle>
+          </h3>
           <p
             className={`text-xs ${
               saveStatus === "error" ? "text-red-600" : "text-slate-500"
@@ -618,13 +617,18 @@ export function DealAnalyzer({
             {saveStatus === "error" && "Could not save"}
           </p>
         </div>
-        <p className="text-xs leading-5 text-slate-500 sm:text-sm">
-          Compare cash and financed acquisitions using editable operating and
-          loan assumptions.
-        </p>
-      </CardHeader>
+        <div className="flex items-center gap-2">
+          <p className="max-w-xl text-xs leading-5 text-slate-500 sm:text-sm">
+            Compare cash and financed acquisitions using editable operating and
+            loan assumptions.
+          </p>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-base leading-none text-slate-500 transition group-open:rotate-45">
+            +
+          </span>
+        </div>
+      </summary>
 
-      <CardContent>
+      <div className="mt-4 border-t border-slate-100 pt-4">
         <div className={mobileAnalysisRailClass}>
           <section className={mobileAnalysisPanelClass}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
@@ -937,7 +941,7 @@ export function DealAnalyzer({
             </p>
           </section>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 }

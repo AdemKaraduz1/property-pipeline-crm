@@ -250,12 +250,15 @@ const mobileFieldClass =
   "h-8 w-full min-w-0 appearance-none rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
 const sectionCardClass =
-  "mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
+  "group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
 
 const disclosureSummaryClass =
   "flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 [&::-webkit-details-marker]:hidden";
 
 const disclosureBodyClass = "mt-4 border-t border-slate-100 pt-4";
+
+const disclosureIndicatorClass =
+  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-base leading-none text-slate-500 transition group-open:rotate-45";
 
 const sectionTitleClass = "text-base font-semibold text-slate-950 sm:text-lg";
 
@@ -886,11 +889,28 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </Link>
       </div>
 
-      <section
+      <details
         id="overview"
-        className="mb-6 scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+        open
+        className="group mb-6 scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       >
-        <div className="p-5 sm:p-6">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-5 sm:p-6 [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <h2 className="break-words text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+              {property.address || "Untitled Property"}
+            </h2>
+
+            {locationLine && (
+              <p className="mt-1 text-sm text-slate-600 sm:text-base">
+                {locationLine}
+              </p>
+            )}
+          </div>
+
+          <span className={disclosureIndicatorClass}>+</span>
+        </summary>
+
+        <div className="border-t border-slate-100 p-5 sm:p-6">
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
             <div className="min-w-0">
               <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -919,15 +939,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 )}
               </div>
 
-              <h2 className="break-words text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-                {property.address || "Untitled Property"}
-              </h2>
-
-              {locationLine && (
-                <p className="mt-1 text-sm text-slate-600 sm:text-base">
-                  {locationLine}
-                </p>
-              )}
+              <p className="text-sm font-semibold text-slate-700">
+                Property controls
+              </p>
             </div>
 
             <div className="rounded-xl bg-slate-50 p-4">
@@ -987,7 +1001,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         <div className="flex justify-end border-t border-slate-100 bg-slate-50/70 px-5 py-3 sm:px-6">
           <DeletePropertyButton propertyId={id} />
         </div>
-      </section>
+      </details>
 
       <nav
         aria-label="Property sections"
@@ -1015,15 +1029,19 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       </nav>
 
-      <div className={sectionCardClass}>
-        <div className="mb-4">
-          <h3 className={sectionTitleClass}>Current Financials</h3>
-          <p className={sectionDescriptionClass}>
-            Based on the current asking price, rents, and operating results.
-          </p>
-        </div>
+      <details open className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
+          <div>
+            <h3 className={sectionTitleClass}>Current Financials</h3>
+            <p className={sectionDescriptionClass}>
+              Based on the current asking price, rents, and operating results.
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <span className={disclosureIndicatorClass}>+</span>
+        </summary>
+
+        <div className={`${disclosureBodyClass} grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4`}>
           <div>
             <p className="text-sm text-slate-500">Current Asking Price</p>
             <p className="text-xl font-bold text-slate-950">
@@ -1054,7 +1072,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </p>
           </div>
         </div>
-      </div>
+      </details>
 
       <ProjectedFinancials
         propertyId={id}
@@ -1076,9 +1094,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               </p>
             </div>
 
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-              {valueOrDash(property.property_type)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                {valueOrDash(property.property_type)}
+              </span>
+              <span className={disclosureIndicatorClass}>+</span>
+            </div>
           </summary>
 
           <div className={disclosureBodyClass}>
@@ -1201,13 +1222,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </p>
           </div>
 
-          <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
-              Annual Opex
-            </p>
-            <p className="text-lg font-bold text-slate-950 sm:text-xl">
-              {formatCurrency(projectedItemizedOperatingExpenses)}
-            </p>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
+                Annual Opex
+              </p>
+              <p className="text-lg font-bold text-slate-950 sm:text-xl">
+                {formatCurrency(projectedItemizedOperatingExpenses)}
+              </p>
+            </div>
+            <span className={disclosureIndicatorClass}>+</span>
           </div>
         </summary>
 
@@ -1372,9 +1396,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 Listing notes and agent-provided context.
               </p>
             </div>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-              Notes
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                Notes
+              </span>
+              <span className={disclosureIndicatorClass}>+</span>
+            </div>
           </summary>
 
           <div className={disclosureBodyClass}>
@@ -1385,8 +1412,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </details>
       )}
 
-      <div id="units" className={sectionCardClass}>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <details id="units" open className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
           <div className="min-w-0 flex-1">
             <h3 className={sectionTitleClass}>Units</h3>
             <p className={sectionDescriptionClass}>
@@ -1394,13 +1421,23 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </p>
           </div>
 
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+              {unitCount} {unitCount === 1 ? "unit" : "units"}
+            </span>
+            <span className={disclosureIndicatorClass}>+</span>
+          </div>
+        </summary>
+
+        <div className={disclosureBodyClass}>
+          <div className="mb-4 flex justify-end">
           <AddUnitModal>
             <PropertyUnitForm
               propertyId={id}
               isMobilityArea={property.is_mobility_area === true}
             />
           </AddUnitModal>
-        </div>
+          </div>
 
         {unitsError && (
           <p className="mb-4 text-sm text-red-600">
@@ -1957,7 +1994,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </details>
 
       <details id="rehab" className={sectionCardClass}>
         <summary className={disclosureSummaryClass}>
@@ -1968,13 +2006,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </p>
           </div>
 
-          <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
-              Common Rehab Total
-            </p>
-            <p className="text-lg font-bold text-slate-950 sm:text-xl">
-              {formatCurrency(commonRehabTotal)}
-            </p>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
+                Common Rehab Total
+              </p>
+              <p className="text-lg font-bold text-slate-950 sm:text-xl">
+                {formatCurrency(commonRehabTotal)}
+              </p>
+            </div>
+            <span className={disclosureIndicatorClass}>+</span>
           </div>
         </summary>
 
@@ -2072,19 +2113,22 @@ export default async function PropertyDetailPage({ params }: PageProps) {
               CHA mobility status and FMR support.
             </p>
           </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-              property.is_mobility_area === true
-                ? "bg-green-50 text-green-700"
-                : "border border-slate-200 bg-slate-50 text-slate-600"
-            }`}
-          >
-            {property.is_mobility_area === true
-              ? "Mobility Area"
-              : property.mobility_checked_at
-                ? "Checked"
-                : "Not Checked"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                property.is_mobility_area === true
+                  ? "bg-green-50 text-green-700"
+                  : "border border-slate-200 bg-slate-50 text-slate-600"
+              }`}
+            >
+              {property.is_mobility_area === true
+                ? "Mobility Area"
+                : property.mobility_checked_at
+                  ? "Checked"
+                  : "Not Checked"}
+            </span>
+            <span className={disclosureIndicatorClass}>+</span>
+          </div>
         </summary>
 
         <div className={disclosureBodyClass}>

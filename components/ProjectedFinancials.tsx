@@ -74,19 +74,28 @@ export function ProjectedFinancials({
   }, [propertyId]);
 
   return (
-    <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-slate-950">
-          Projected Financials
-        </h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Uses the live Deal Analyzer purchase price, projected rents, and
-          saved itemized operating expenses.
-        </p>
-      </div>
+    <details
+      open
+      className="group mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-950">
+            Projected Financials
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Uses the live Deal Analyzer purchase price, projected rents, and
+            saved itemized operating expenses.
+          </p>
+        </div>
+
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-base leading-none text-slate-500 transition group-open:rotate-45">
+          +
+        </span>
+      </summary>
 
       <div
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+        className="mt-4 grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
         data-testid="projected-financials"
       >
         <div>
@@ -154,6 +163,6 @@ export function ProjectedFinancials({
           </p>
         </div>
       </div>
-    </div>
+    </details>
   );
 }
