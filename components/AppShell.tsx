@@ -33,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile header */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] md:hidden">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top))] md:hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <Home className="h-5 w-5 shrink-0 text-slate-900" />
@@ -50,12 +50,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Page content */}
-      <main className="p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:ml-64 md:p-8">
+      <main className="p-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:p-4 md:ml-64 md:p-8">
         {children}
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1.5 md:hidden">
         <div className="grid grid-cols-1 gap-1">
           <MobileNavLink
             href="/pipeline"

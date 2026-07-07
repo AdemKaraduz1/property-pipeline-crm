@@ -137,25 +137,25 @@ function Metric({
 }
 
 const mobileAnalysisRailClass =
-  "flex snap-x snap-mandatory items-start gap-3 overflow-x-auto pb-2 sm:block sm:space-y-8 sm:overflow-visible sm:pb-0";
+  "space-y-3 sm:space-y-8";
 
 const mobileAnalysisPanelClass =
-  "w-full min-w-full max-w-full shrink-0 snap-start overflow-hidden rounded-lg border border-slate-200 bg-white p-3 text-sm sm:min-w-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-none sm:[&_[data-slot=label]]:text-xs";
+  "w-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 text-sm sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-tight [&_[data-slot=label]]:tracking-normal sm:[&_[data-slot=label]]:text-xs sm:[&_[data-slot=label]]:tracking-wide";
 
 const analysisGridClass =
-  "grid min-w-0 grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4";
+  "grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4";
 
 const analysisMetricGridClass =
-  "grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4";
+  "grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4";
 
 const analysisInputClass =
-  "h-8 rounded-md border border-slate-200 bg-white px-2 py-1 text-sm shadow-sm sm:h-10 sm:border-transparent sm:border-b-input sm:bg-transparent sm:px-0 sm:shadow-none";
+  "h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-base shadow-sm sm:text-sm sm:border-transparent sm:border-b-input sm:bg-transparent sm:px-0 sm:shadow-none";
 
 const analysisSelectClass =
-  "mt-1 flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 shadow-sm sm:h-10 sm:px-3 sm:py-2 sm:shadow-none";
+  "mt-1 flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm sm:text-sm sm:shadow-none";
 
 const analysisHintClass =
-  "mt-1 text-[10px] leading-3.5 text-slate-500 sm:text-xs sm:leading-normal";
+  "mt-1.5 text-xs leading-4 text-slate-500 sm:leading-normal";
 
 export function DealAnalyzer({
   propertyId,
@@ -596,7 +596,7 @@ export function DealAnalyzer({
   return (
     <details
       open
-      className="group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8"
+      className="group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-8"
     >
       <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -635,7 +635,7 @@ export function DealAnalyzer({
               Purchase & Financing
             </h3>
             <div className={analysisGridClass}>
-              <div className="col-span-2 sm:col-span-1">
+              <div>
                 <Label htmlFor="purchase-method">Purchase Method</Label>
                 <select
                   id="purchase-method"
@@ -715,7 +715,7 @@ export function DealAnalyzer({
                       <button
                         type="button"
                         onClick={() => setCustomInterestRate(null)}
-                        className="mt-1 text-xs font-medium text-blue-700 hover:text-blue-900"
+                        className="mt-1.5 block text-left text-xs font-medium leading-4 text-blue-700 hover:text-blue-900"
                       >
                         Use daily market estimate
                       </button>
@@ -763,7 +763,7 @@ export function DealAnalyzer({
               Analysis Assumptions
             </h3>
             <div className={analysisGridClass}>
-              <div className="col-span-2 sm:col-span-1">
+              <div>
                 <Label htmlFor="operating-expenses">
                   Operating Expenses / Year
                 </Label>
