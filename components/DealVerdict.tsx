@@ -134,6 +134,12 @@ function Drawer({
   );
 }
 
+const verdictRailClass =
+  "flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] sm:block sm:space-y-4 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden";
+
+const verdictPanelClass =
+  "w-full min-w-full max-w-full shrink-0 snap-start overflow-hidden rounded-lg border border-slate-200 bg-white p-3 sm:min-w-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0";
+
 export function DealVerdict({
   action,
   annualCurrentRent,
@@ -320,66 +326,70 @@ export function DealVerdict({
           draftKey={`property-pipeline:autosave:${propertyId}:underwriting-diligence`}
           statusClassName="mt-3 text-right text-xs text-slate-500"
         >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg bg-slate-50 p-3">
-            <Metric
-              label="Downside Cash Flow"
-              value={formatCurrency(downsideCashFlow)}
-              note="+2% rate, rent haircut, vacancy stress"
-            />
-          </div>
-          <div className="rounded-lg bg-slate-50 p-3">
-            <Metric
-              label="DSCR +1% Rate"
-              value={formatRatio(stressedDscr)}
-              note={`${formatRatio(baseDscr)} before rate stress`}
-            />
-          </div>
-          <div className="rounded-lg bg-slate-50 p-3">
-            <Metric
-              label="Rent Proof"
-              value={
-                rentConfidence === "lease"
-                  ? "Lease"
-                  : rentConfidence === "comp"
-                    ? "Comp-backed"
-                    : rentConfidence === "fmr_verified"
-                      ? "FMR checked"
-                      : rentConfidence === "listing"
-                        ? "Listing"
-                        : "Unverified"
-              }
-              note={rentSource || "Add source below"}
-            />
-          </div>
-          <div className="rounded-lg bg-slate-50 p-3">
-            <Metric
-              label="Rehab Stress"
-              value={formatCurrency(rehabStressTotal)}
-              note={`${formatPercent(rehabOverrunRate)} overrun on ${formatCurrency(totalRehab)}`}
-            />
-          </div>
-        </div>
+          <div className={verdictRailClass}>
+            <section className={verdictPanelClass}>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="Downside Cash Flow"
+                    value={formatCurrency(downsideCashFlow)}
+                    note="+2% rate, rent haircut, vacancy stress"
+                  />
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="DSCR +1% Rate"
+                    value={formatRatio(stressedDscr)}
+                    note={`${formatRatio(baseDscr)} before rate stress`}
+                  />
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="Rent Proof"
+                    value={
+                      rentConfidence === "lease"
+                        ? "Lease"
+                        : rentConfidence === "comp"
+                          ? "Comp-backed"
+                          : rentConfidence === "fmr_verified"
+                            ? "FMR checked"
+                            : rentConfidence === "listing"
+                              ? "Listing"
+                              : "Unverified"
+                    }
+                    note={rentSource || "Add source below"}
+                  />
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="Rehab Stress"
+                    value={formatCurrency(rehabStressTotal)}
+                    note={`${formatPercent(rehabOverrunRate)} overrun on ${formatCurrency(totalRehab)}`}
+                  />
+                </div>
+              </div>
 
-        {(issues.length > 0 || hardStops.length > 0) && (
-          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Open Items
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {[...hardStops, ...issues].map((issue) => (
-                <span
-                  key={issue}
-                  className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-700"
-                >
-                  {issue}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+              {(issues.length > 0 || hardStops.length > 0) && (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Open Items
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {[...hardStops, ...issues].map((issue) => (
+                      <span
+                        key={issue}
+                        className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-700"
+                      >
+                        {issue}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
 
-        <div className="mt-4 space-y-3">
+            <section className={verdictPanelClass}>
+              <div className="space-y-3">
           <Drawer
             title="Scenario Stress"
             summary="As-is, stabilized, and downside views without crowding the main page."
@@ -780,7 +790,9 @@ export function DealVerdict({
               </div>
             </div>
           </Drawer>
-        </div>
+              </div>
+            </section>
+          </div>
         </AutoSaveForm>
       </div>
     </details>

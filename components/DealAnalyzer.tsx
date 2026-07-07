@@ -137,10 +137,10 @@ function Metric({
 }
 
 const mobileAnalysisRailClass =
-  "space-y-3 sm:space-y-8";
+  "flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] sm:block sm:space-y-8 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden";
 
 const mobileAnalysisPanelClass =
-  "w-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 text-sm sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-tight [&_[data-slot=label]]:tracking-normal sm:[&_[data-slot=label]]:text-xs sm:[&_[data-slot=label]]:tracking-wide";
+  "w-full min-w-full max-w-full shrink-0 snap-start overflow-hidden rounded-lg border border-slate-200 bg-white p-3 text-sm sm:min-w-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0 [&_[data-slot=label]]:text-[10px] [&_[data-slot=label]]:leading-tight [&_[data-slot=label]]:tracking-normal sm:[&_[data-slot=label]]:text-xs sm:[&_[data-slot=label]]:tracking-wide";
 
 const analysisGridClass =
   "grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4";
