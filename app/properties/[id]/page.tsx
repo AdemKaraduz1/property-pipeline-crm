@@ -16,6 +16,7 @@ import { PropertyEditForm } from "@/components/PropertyEditForm";
 import { MobilityFmrCard } from "@/components/MobilityFmrCard";
 import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
+import { PropertySummaryActions } from "@/components/PropertySummaryActions";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
 import {
   getMonthlyMortgagePayment,
@@ -856,6 +857,60 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       : property.mls_number
         ? `MLS #${property.mls_number}`
         : "";
+  const summaryFileName = `${(property.address || "property-deal")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "property-deal"}-summary.txt`;
+  const projectedCapRate =
+    projectedPurchasePrice > 0 ? projectedNoi / projectedPurchasePrice : null;
+  const unitSummaryLines = unitList.map((unit) => {
+    const currentRent = getCurrentRent(unit);
+    const projectedRent = getProjectedRent(unit);
+
+    return `- ${getUnitLabel(unit)}: ${getUnitBeds(unit) || 0} bed / ${
+      getUnitBaths(unit) || 0
+    } bath, current ${formatCurrency(currentRent)}, projected ${formatCurrency(
+      projectedRent,
+    )}, rehab ${formatCurrency(unit.rehab_estimate)}`;
+  });
+  const dealSummary = [
+    "Property Pipeline CRM Deal Summary",
+    "",
+    property.address || "Untitled Property",
+    locationLine,
+    property.mls_number ? `MLS: ${property.mls_number}` : null,
+    property.status ? `Status: ${property.status}` : null,
+    property.property_type ? `Property type: ${property.property_type}` : null,
+    "",
+    "Current View",
+    `Asking price: ${formatCurrency(askingPrice)}`,
+    `Current annual rent: ${formatCurrency(annualCurrentRent)}`,
+    `Current NOI: ${formatCurrency(currentNoi)}`,
+    `Current cap rate: ${
+      currentCapRate !== null ? `${(currentCapRate * 100).toFixed(2)}%` : "-"
+    }`,
+    "",
+    "Projected View",
+    `Projected purchase price: ${formatCurrency(projectedPurchasePrice)}`,
+    `Projected annual rent: ${formatCurrency(annualProjectedRent)}`,
+    `Projected NOI: ${formatCurrency(projectedNoi)}`,
+    `Projected cap rate: ${
+      projectedCapRate !== null
+        ? `${(projectedCapRate * 100).toFixed(2)}%`
+        : "-"
+    }`,
+    `Annual debt service: ${formatCurrency(projectedAnnualDebtService)}`,
+    `Total rehab: ${formatCurrency(totalRehab)}`,
+    "",
+    "Units",
+    unitSummaryLines.length > 0
+      ? unitSummaryLines.join("\n")
+      : "No units added.",
+    "",
+    "Planning note: Deal outputs are estimates for acquisition planning. Confirm taxes, financing, rents, insurance, code issues, and rehab costs before making offers.",
+  ]
+    .filter((line) => line !== null && line !== undefined && line !== "")
+    .join("\n");
 
   const hasBuildingDetails =
     hasValue(property.year_built) ||
@@ -995,6 +1050,22 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             {property.is_archived !== true && (
               <ArchivePropertyButton propertyId={id} />
             )}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2">
+              <p className="text-sm font-semibold text-slate-950">
+                Deal Summary
+              </p>
+              <p className="text-xs text-slate-500">
+                Copy, share, or save a lightweight snapshot for lenders,
+                partners, or your own records.
+              </p>
+            </div>
+            <PropertySummaryActions
+              fileName={summaryFileName}
+              summary={dealSummary}
+            />
           </div>
         </div>
 

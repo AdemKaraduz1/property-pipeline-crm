@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Home } from "lucide-react";
+import { Building2, Home, Settings } from "lucide-react";
 import { LogoutButton } from "@/components/LogoutButton";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -24,6 +24,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/pipeline"
             icon={<Building2 size={18} />}
             label="Pipeline"
+          />
+          <DesktopNavLink
+            href="/settings"
+            icon={<Settings size={18} />}
+            label="Settings"
           />
         </nav>
 
@@ -56,11 +61,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200 bg-white px-2 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1.5 md:hidden">
-        <div className="grid grid-cols-1 gap-1">
+        <div className="grid grid-cols-2 gap-1">
           <MobileNavLink
             href="/pipeline"
             icon={<Building2 size={20} />}
             label="Pipeline"
+          />
+          <MobileNavLink
+            href="/settings"
+            icon={<Settings size={20} />}
+            label="Settings"
           />
         </div>
       </nav>

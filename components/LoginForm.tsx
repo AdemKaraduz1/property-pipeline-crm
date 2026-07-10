@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -82,6 +83,15 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isLoggingIn}>
         {isLoggingIn ? "Signing in..." : "Sign In"}
       </Button>
+
+      <div className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-500">
+        <Link href="/privacy" className="hover:text-slate-900">
+          Privacy
+        </Link>
+        <Link href="/support" className="hover:text-slate-900">
+          Support
+        </Link>
+      </div>
     </form>
   );
 }

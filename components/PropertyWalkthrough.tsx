@@ -1,15 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+/* eslint-disable @next/next/no-img-element */
+
+import {
+  type ChangeEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
+  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  ImageIcon,
   LoaderCircle,
   Mic,
   Square,
+  Trash2,
+  X,
 } from "lucide-react";
 import {
   COMMON_REHAB_ITEMS,
@@ -69,6 +81,22 @@ type SectionVoiceSuggestion = {
   notes: string;
 };
 
+type WalkthroughPhoto = {
+  id: string;
+  url: string | null;
+  fileName: string;
+  contentType: string;
+  size: number;
+  stepKey: string | null;
+  stepLabel: string | null;
+  sectionKey: string | null;
+  sectionLabel: string | null;
+  createdAt: string;
+};
+
+type PhotoStatus = "idle" | "loading" | "uploading" | "deleting";
+type PhotoFilter = "section" | "all";
+
 function buildRoomSteps(unit: WalkthroughUnit): WalkthroughStep[] {
   const rooms: Array<{ id: string; label: string }> = [
     { id: "entry_hall", label: "Entry / Hall" },
@@ -121,6 +149,8 @@ export function PropertyWalkthrough({
   const [voiceScope, setVoiceScope] = useState<VoiceNoteScope>("step");
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [voiceError, setVoiceError] = useState("");
+  const [hasAcknowledgedVoiceUse, setHasAcknowledgedVoiceUse] =
+    useState(false);
   const [voiceSuggestion, setVoiceSuggestion] =
     useState<VoiceNoteSuggestion | null>(null);
   const [sectionVoiceSuggestions, setSectionVoiceSuggestions] = useState<
@@ -130,9 +160,18 @@ export function PropertyWalkthrough({
   const [sectionVoiceWarning, setSectionVoiceWarning] = useState<string | null>(
     null,
   );
+  const [photos, setPhotos] = useState<WalkthroughPhoto[]>([]);
+  const [photoStatus, setPhotoStatus] = useState<PhotoStatus>("idle");
+  const [photoFilter, setPhotoFilter] = useState<PhotoFilter>("section");
+  const [photoMessage, setPhotoMessage] = useState("");
+  const [photoError, setPhotoError] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<WalkthroughPhoto | null>(
+    null,
+  );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   const steps = useMemo<WalkthroughStep[]>(
     () => [
@@ -209,6 +248,54 @@ export function PropertyWalkthrough({
     [],
   );
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPhotos() {
+      setPhotoStatus("loading");
+      setPhotoError("");
+
+      try {
+        const response = await fetch(
+          `/api/properties/${propertyId}/walkthrough/photos`,
+        );
+        const result = (await response.json()) as {
+          success?: boolean;
+          message?: string;
+          photos?: WalkthroughPhoto[];
+        };
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Could not load walkthrough photos.");
+        }
+
+        if (isMounted) {
+          setPhotos(result.photos || []);
+        }
+      } catch (error) {
+        console.error(error);
+
+        if (isMounted) {
+          setPhotoError(
+            error instanceof Error
+              ? error.message
+              : "Could not load walkthrough photos.",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setPhotoStatus("idle");
+        }
+      }
+    }
+
+    loadPhotos();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [propertyId]);
+
   function getItem(step: WalkthroughStep) {
     if (step.scope === "common") {
       return normalizeInspectionItem(walkthrough.common[step.itemId]);
@@ -276,6 +363,22 @@ export function PropertyWalkthrough({
     setSectionVoiceTranscript("");
     setSectionVoiceWarning(null);
     setVoiceScope(scope);
+
+    const storedAcknowledgement =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("property-pipeline:voice-consent")
+        : null;
+
+    if (!hasAcknowledgedVoiceUse && storedAcknowledgement !== "accepted") {
+      const accepted = window.confirm(
+        "Property Pipeline will use your microphone to record this walkthrough note, transcribe it, and organize the property observations. Avoid recording private conversations or personal information.",
+      );
+
+      if (!accepted) return;
+
+      window.localStorage.setItem("property-pipeline:voice-consent", "accepted");
+      setHasAcknowledgedVoiceUse(true);
+    }
 
     if (
       typeof window === "undefined" ||
@@ -651,6 +754,101 @@ export function PropertyWalkthrough({
     }
   }
 
+  async function uploadWalkthroughPhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || !currentStep) return;
+
+    const sectionLabel =
+      currentSectionKey === "common"
+        ? "Outside & Common Areas"
+        : `Unit ${currentStep.unitLabel}`;
+    const formData = new FormData();
+
+    formData.append("photo", file);
+    formData.append("stepKey", currentStep.key);
+    formData.append("stepLabel", currentStep.label);
+    formData.append("sectionKey", currentSectionKey);
+    formData.append("sectionLabel", sectionLabel);
+
+    setPhotoStatus("uploading");
+    setPhotoError("");
+    setPhotoMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/properties/${propertyId}/walkthrough/photos`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+        photo?: WalkthroughPhoto;
+      };
+
+      if (!response.ok || !result.success || !result.photo) {
+        throw new Error(result.message || "Could not save the photo.");
+      }
+
+      setPhotos((current) => [
+        result.photo as WalkthroughPhoto,
+        ...current.filter((photo) => photo.id !== result.photo?.id),
+      ]);
+      setPhotoMessage(`Photo saved to ${currentStep.label}.`);
+      setPhotoFilter("section");
+    } catch (error) {
+      console.error(error);
+      setPhotoError(
+        error instanceof Error ? error.message : "Could not save the photo.",
+      );
+    } finally {
+      setPhotoStatus("idle");
+    }
+  }
+
+  async function deleteWalkthroughPhoto(photoId: string) {
+    const photo = photos.find((item) => item.id === photoId);
+
+    if (!photo) return;
+
+    const confirmed = window.confirm("Remove this walkthrough photo?");
+    if (!confirmed) return;
+
+    setPhotoStatus("deleting");
+    setPhotoError("");
+    setPhotoMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/properties/${propertyId}/walkthrough/photos?photoId=${encodeURIComponent(photoId)}`,
+        { method: "DELETE" },
+      );
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+      };
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Could not remove the photo.");
+      }
+
+      setPhotos((current) => current.filter((item) => item.id !== photoId));
+      setPhotoPreview((current) => (current?.id === photoId ? null : current));
+      setPhotoMessage("Photo removed.");
+    } catch (error) {
+      console.error(error);
+      setPhotoError(
+        error instanceof Error ? error.message : "Could not remove the photo.",
+      );
+    } finally {
+      setPhotoStatus("idle");
+    }
+  }
+
   if (!currentStep) {
     return (
       <div className="mx-auto max-w-xl rounded-xl border border-slate-200 bg-white p-6 text-center">
@@ -674,6 +872,176 @@ export function PropertyWalkthrough({
     (step) => getItem(step).needsRehab !== null,
   ).length;
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
+  const currentSectionLabel =
+    currentSectionKey === "common"
+      ? "Outside & Common Areas"
+      : `Unit ${currentStep.unitLabel}`;
+  const sectionPhotos = photos.filter(
+    (photo) =>
+      photo.sectionKey === currentSectionKey ||
+      photo.stepKey === currentStep.key,
+  );
+  const visiblePhotos = photoFilter === "section" ? sectionPhotos : photos;
+  const photoPanelTitle =
+    photoFilter === "section"
+      ? `${sectionPhotos.length} in this section`
+      : `${photos.length} total`;
+  const photoPanel = (
+    <details
+      className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      open
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+            <ImageIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-slate-950">
+              Walkthrough Photos
+            </p>
+            <p className="text-xs text-slate-500">
+              Take photos now, then pull them up later by section or across the
+              property.
+            </p>
+          </div>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          {photoPanelTitle}
+        </span>
+      </summary>
+
+      <div className="mt-4 border-t border-slate-200 pt-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-1">
+            {(["section", "all"] as PhotoFilter[]).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setPhotoFilter(filter)}
+                className={`h-9 rounded-md px-3 text-xs font-semibold ${
+                  photoFilter === filter
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-slate-600 hover:text-slate-950"
+                }`}
+              >
+                {filter === "section" ? "This section" : "All photos"}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={uploadWalkthroughPhoto}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={photoStatus === "uploading"}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
+            >
+              {photoStatus === "uploading" ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+              {photoStatus === "uploading"
+                ? "Saving Photo..."
+                : "Take / Upload Photo"}
+            </button>
+          </div>
+        </div>
+
+        <p className="mt-2 text-xs text-slate-500">
+          New photos save to {currentStep.label} in {currentSectionLabel}.
+        </p>
+
+        {photoError && (
+          <p className="mt-3 text-sm font-medium text-red-700">{photoError}</p>
+        )}
+        {photoMessage && !photoError && (
+          <p className="mt-3 text-sm font-medium text-slate-600">
+            {photoMessage}
+          </p>
+        )}
+
+        {photoStatus === "loading" ? (
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+            Loading photos...
+          </div>
+        ) : visiblePhotos.length > 0 ? (
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {visiblePhotos.map((photo) => {
+              const createdDate = new Date(photo.createdAt);
+              const dateLabel = Number.isNaN(createdDate.getTime())
+                ? "Saved photo"
+                : createdDate.toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                  });
+
+              return (
+                <div
+                  key={photo.id}
+                  className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPhotoPreview(photo)}
+                    className="block aspect-[4/3] w-full bg-slate-100"
+                    disabled={!photo.url}
+                  >
+                    {photo.url ? (
+                      <img
+                        src={photo.url}
+                        alt={photo.stepLabel || photo.fileName}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full items-center justify-center text-xs font-medium text-slate-500">
+                        Photo unavailable
+                      </span>
+                    )}
+                  </button>
+                  <div className="p-2">
+                    <p className="truncate text-xs font-semibold text-slate-900">
+                      {photo.stepLabel || photo.sectionLabel || "Walkthrough"}
+                    </p>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <p className="truncate text-[11px] text-slate-500">
+                        {dateLabel}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => deleteWalkthroughPhoto(photo.id)}
+                        disabled={photoStatus === "deleting"}
+                        aria-label="Delete walkthrough photo"
+                        className="rounded-md p-1 text-slate-400 hover:bg-white hover:text-red-600 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+            {photoFilter === "section"
+              ? "No photos saved for this section yet."
+              : "No walkthrough photos saved yet."}
+          </div>
+        )}
+      </div>
+    </details>
+  );
   const voiceNotePanel = (
     <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -687,6 +1055,10 @@ export function PropertyWalkthrough({
             {walkthroughMode === "fast"
               ? "Say each checkpoint out loud, like “living room ok, kitchen needs work, $500.”"
               : "Describe the condition, needed work, and any cost you want recorded."}
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+            Microphone audio is used to transcribe and organize this walkthrough
+            note.
           </p>
         </div>
 
@@ -975,6 +1347,7 @@ export function PropertyWalkthrough({
           </div>
 
           {voiceNotePanel}
+          {photoPanel}
 
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
             {sectionSteps.map((step) => {
@@ -1125,6 +1498,7 @@ export function PropertyWalkthrough({
         </p>
 
         {voiceNotePanel}
+        {photoPanel}
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
@@ -1252,6 +1626,57 @@ export function PropertyWalkthrough({
         Save Progress & Exit
       </button>
         </>
+      )}
+      {photoPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+          <div className="max-h-full w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-950">
+                  {photoPreview.stepLabel ||
+                    photoPreview.sectionLabel ||
+                    "Walkthrough photo"}
+                </p>
+                <p className="truncate text-xs text-slate-500">
+                  {photoPreview.sectionLabel || address}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPhotoPreview(null)}
+                aria-label="Close photo preview"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {photoPreview.url ? (
+              <img
+                src={photoPreview.url}
+                alt={photoPreview.stepLabel || photoPreview.fileName}
+                className="max-h-[75vh] w-full object-contain bg-slate-950"
+              />
+            ) : (
+              <div className="flex h-64 items-center justify-center text-sm text-slate-500">
+                This photo is unavailable right now.
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <p className="truncate text-xs text-slate-500">
+                {photoPreview.fileName}
+              </p>
+              <button
+                type="button"
+                onClick={() => deleteWalkthroughPhoto(photoPreview.id)}
+                disabled={photoStatus === "deleting"}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

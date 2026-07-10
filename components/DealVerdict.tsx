@@ -83,6 +83,33 @@ function getBoolean(value: unknown) {
   return value === true;
 }
 
+function getLoanPrincipalFromAnnualDebtService(
+  annualDebtService: number,
+  annualRatePercent: number,
+  termYears: number,
+) {
+  if (annualDebtService <= 0 || termYears <= 0) return null;
+
+  const monthlyPayment = annualDebtService / 12;
+  const paymentCount = termYears * 12;
+  const monthlyRate = annualRatePercent / 100 / 12;
+
+  if (monthlyRate === 0) return monthlyPayment * paymentCount;
+
+  const growthFactor = Math.pow(1 + monthlyRate, paymentCount);
+
+  return (
+    (monthlyPayment * (growthFactor - 1)) /
+    (monthlyRate * growthFactor)
+  );
+}
+
+function roundDownToThousand(value: number | null) {
+  if (value === null || !Number.isFinite(value) || value <= 0) return null;
+
+  return Math.floor(value / 1000) * 1000;
+}
+
 function Metric({
   label,
   value,
@@ -222,6 +249,7 @@ export function DealVerdict({
       : 0;
   const baseDscr =
     annualDebtService > 0 ? stabilizedNoiTaxAdjusted / annualDebtService : null;
+  const stabilizedCashFlow = stabilizedNoiTaxAdjusted - annualDebtService;
   const stressedDscr =
     annualDebtServicePlusOne > 0
       ? stabilizedNoiTaxAdjusted / annualDebtServicePlusOne
@@ -239,6 +267,57 @@ export function DealVerdict({
   const refiProceeds = Math.max(
     0,
     refiValue * (refiLtv / 100) - projectedLoanAmount,
+  );
+  const loanToValue =
+    projectedPurchasePrice > 0 && projectedLoanAmount > 0
+      ? projectedLoanAmount / projectedPurchasePrice
+      : null;
+  const debtSupportedPrices = [
+    baseDscr !== null && lenderMinDscr > 0
+      ? getLoanPrincipalFromAnnualDebtService(
+          stabilizedNoiTaxAdjusted / lenderMinDscr,
+          projectedInterestRate + 1,
+          projectedLoanTermYears,
+        )
+      : null,
+    getLoanPrincipalFromAnnualDebtService(
+      downsideNoi,
+      projectedInterestRate + 2,
+      projectedLoanTermYears,
+    ),
+    getLoanPrincipalFromAnnualDebtService(
+      stabilizedNoiTaxAdjusted,
+      projectedInterestRate,
+      projectedLoanTermYears,
+    ),
+  ]
+    .filter(
+      (principal): principal is number =>
+        principal !== null && Number.isFinite(principal) && principal > 0,
+    )
+    .map((principal) =>
+      loanToValue !== null && loanToValue > 0 ? principal / loanToValue : null,
+    )
+    .filter(
+      (price): price is number =>
+        price !== null && Number.isFinite(price) && price > 0,
+    );
+  const debtSupportedPrice =
+    debtSupportedPrices.length > 0 ? Math.min(...debtSupportedPrices) : null;
+  const incomeSupportedPrice =
+    exitCapRate > 0
+      ? Math.max(
+          0,
+          stabilizedNoiTaxAdjusted / (exitCapRate / 100) - rehabStressTotal,
+        )
+      : null;
+  const suggestedGoodDealPrice = roundDownToThousand(
+    Math.min(
+      ...[debtSupportedPrice, incomeSupportedPrice].filter(
+        (price): price is number =>
+          price !== null && Number.isFinite(price) && price > 0,
+      ),
+    ),
   );
 
   const activeRiskFlags = REHAB_RISK_FLAGS.filter(([id]) =>
@@ -278,18 +357,83 @@ export function DealVerdict({
     issues.push("Multiple rehab risk flags are active.");
   }
 
-  const verdict =
-    hardStops.length >= 2
-      ? "High risk"
-      : hardStops.length > 0 || issues.length > 1
-        ? "Needs diligence"
-        : "Offer-ready";
-  const verdictClass =
-    verdict === "Offer-ready"
+  let dealScore = 100;
+
+  dealScore -= hardStops.length * 28;
+  dealScore -= issues.length * 9;
+
+  if (baseDscr !== null && baseDscr < lenderMinDscr) {
+    dealScore -= 12;
+  }
+
+  if (stabilizedCashFlow < 0) {
+    dealScore -= 18;
+  }
+
+  if (rentConfidence === "unverified") {
+    dealScore -= 8;
+  }
+
+  if (activeRiskFlags.length > 0) {
+    dealScore -= Math.min(16, activeRiskFlags.length * 4);
+  }
+
+  dealScore = Math.max(0, Math.min(100, Math.round(dealScore)));
+
+  const positiveSignals: string[] = [];
+
+  if (stabilizedCashFlow > 0) {
+    positiveSignals.push("Stabilized cash flow is positive.");
+  }
+
+  if (baseDscr !== null && baseDscr >= lenderMinDscr) {
+    positiveSignals.push("Base DSCR meets the lender target.");
+  }
+
+  if (stressedDscr !== null && stressedDscr >= lenderMinDscr) {
+    positiveSignals.push("DSCR still works after a 1% rate stress.");
+  }
+
+  if (["lease", "comp", "fmr_verified"].includes(rentConfidence)) {
+    positiveSignals.push("Rent assumptions have stronger support.");
+  }
+
+  if (activeRiskFlags.length === 0) {
+    positiveSignals.push("No major rehab risk flags are selected.");
+  }
+
+  const dealCall =
+    hardStops.length >= 2 || dealScore < 45
+      ? "Bad deal"
+      : hardStops.length === 0 && dealScore >= 75
+        ? "Good deal"
+        : "Needs review";
+  const dealCallSummary =
+    dealCall === "Good deal"
+      ? "The deal clears the main stress checks based on your saved assumptions."
+      : dealCall === "Bad deal"
+        ? "The deal has major blockers based on your saved assumptions."
+        : "The deal is close enough to keep reviewing, but it is not clean yet.";
+  const dealCallClass =
+    dealCall === "Good deal"
       ? "border-green-200 bg-green-50 text-green-800"
-      : verdict === "High risk"
+      : dealCall === "Bad deal"
         ? "border-red-200 bg-red-50 text-red-800"
         : "border-amber-200 bg-amber-50 text-amber-800";
+  const topDecisionReasons =
+    dealCall === "Good deal"
+      ? positiveSignals.slice(0, 3)
+      : [...hardStops, ...issues].slice(0, 3);
+  const currentPriceWorks =
+    suggestedGoodDealPrice !== null &&
+    projectedPurchasePrice > 0 &&
+    projectedPurchasePrice <= suggestedGoodDealPrice &&
+    dealCall === "Good deal";
+  const suggestedPriceGap =
+    suggestedGoodDealPrice !== null && projectedPurchasePrice > 0
+      ? Math.max(0, projectedPurchasePrice - suggestedGoodDealPrice)
+      : null;
+  const nonPriceItems = issues.slice(0, 2);
 
   return (
     <details
@@ -310,9 +454,9 @@ export function DealVerdict({
 
         <div className="flex items-center gap-2">
           <span
-            className={`rounded-full border px-3 py-1 text-xs font-semibold ${verdictClass}`}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${dealCallClass}`}
           >
-            {verdict}
+            {dealCall}
           </span>
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white text-base leading-none text-slate-500 transition group-open:rotate-45">
             +
@@ -328,6 +472,80 @@ export function DealVerdict({
         >
           <div className={verdictRailClass}>
             <section className={verdictPanelClass}>
+              <div className={`mb-3 rounded-lg border p-3 ${dealCallClass}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
+                      Deal Call
+                    </p>
+                    <p className="mt-1 text-2xl font-bold">{dealCall}</p>
+                    <p className="mt-1 text-xs leading-relaxed">
+                      {dealCallSummary}
+                    </p>
+                  </div>
+                  <div className="rounded-full bg-white/70 px-3 py-1 text-sm font-bold">
+                    {dealScore}/100
+                  </div>
+                </div>
+
+                {topDecisionReasons.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-xs leading-relaxed">
+                    {topDecisionReasons.map((reason) => (
+                      <li key={reason}>- {reason}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="mb-3 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <Metric
+                    label="Analyzed Price"
+                    value={formatCurrency(projectedPurchasePrice)}
+                    note="Current price in the Deal Analyzer"
+                  />
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <Metric
+                    label="Suggested Good-Deal Price"
+                    value={
+                      currentPriceWorks
+                        ? "Current price works"
+                        : formatCurrency(suggestedGoodDealPrice)
+                    }
+                    note={
+                      suggestedGoodDealPrice === null
+                        ? "Add more rent, debt, and expense data"
+                        : suggestedPriceGap && suggestedPriceGap > 0
+                          ? `${formatCurrency(suggestedPriceGap)} below analyzed price`
+                          : "Based on stress DSCR, downside cash flow, and target yield"
+                    }
+                  />
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <Metric
+                    label="Target Basis"
+                    value={
+                      debtSupportedPrice !== null
+                        ? "Debt + income"
+                        : "Income yield"
+                    }
+                    note={`${formatPercent(exitCapRate)} target yield after stressed rehab`}
+                  />
+                </div>
+              </div>
+
+              {dealCall !== "Good deal" && nonPriceItems.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                  <p className="font-semibold">
+                    Price alone may not fully fix this deal.
+                  </p>
+                  <p className="mt-1">
+                    Also clear: {nonPriceItems.join(" ")}
+                  </p>
+                </div>
+              )}
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-slate-50 p-3">
                   <Metric
