@@ -200,7 +200,7 @@ function InfoTip({
       ref={wrapperRef}
       onMouseEnter={showInfo}
       onMouseLeave={() => setHovered(false)}
-      className={`${className} z-30`}
+      className={`${className} ${visible ? "z-[100]" : "z-30"}`}
     >
       <button
         type="button"
@@ -216,7 +216,7 @@ function InfoTip({
       {visible && (
         <span
           role="tooltip"
-          className="absolute right-0 top-7 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-3 text-left text-[11px] font-normal leading-relaxed text-slate-600 shadow-xl"
+          className="absolute right-0 top-7 z-[110] w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-3 text-left text-[11px] font-normal leading-relaxed text-slate-600 shadow-xl"
         >
           {info}
         </span>
