@@ -262,42 +262,38 @@ export function PropertySummaryActions({
   function makeTable(title: string, lines: string[], x: number, y: number) {
     const width = 250;
     const commands: string[] = [
-      makeRect(x, y - 18, width, 22, { fill: "0.08 0.11 0.18" }),
-      makeRect(x, y - 18, width, 22, { stroke: "0.08 0.11 0.18" }),
-      makeText(title, x + 10, y - 12, {
+      makeText(title, x, y, {
         font: "F2",
-        size: 11,
-        color: "1 1 1",
+        size: 12,
+        color: "0.08 0.11 0.18",
       }),
+      makeRect(x, y - 10, 38, 2, { fill: "0.15 0.38 0.92" }),
+      makeLine(x, y - 16, x + width, y - 16, "0.88 0.91 0.95"),
     ];
-    let cursorY = y - 40;
+    let cursorY = y - 36;
 
-    lines.forEach((line, rowIndex) => {
+    lines.forEach((line) => {
       const [label, value] = splitLabelValue(line);
       const valueLines = wrapSummaryLine(value, 28).slice(0, 3);
-      const rowHeight = Math.max(28, valueLines.length * 12 + 12);
+      const rowHeight = Math.max(24, valueLines.length * 11 + 10);
 
-      commands.push(
-        makeRect(x, cursorY - rowHeight + 8, width, rowHeight, {
-          fill: rowIndex % 2 === 0 ? "0.98 0.99 1" : "1 1 1",
-          stroke: "0.84 0.88 0.93",
-        }),
-      );
       commands.push(
         makeText(label, x + 10, cursorY, {
           font: "F2",
           size: 8,
-          color: "0.31 0.38 0.49",
+          color: "0.42 0.49 0.60",
         }),
       );
       valueLines.forEach((valueLine, valueIndex) => {
         commands.push(
-          makeText(valueLine, x + 110, cursorY - valueIndex * 12, {
-            size: 9,
+          makeText(valueLine, x + 126, cursorY - valueIndex * 11, {
+            font: "F2",
+            size: 9.5,
             color: "0.08 0.11 0.18",
           }),
         );
       });
+      commands.push(makeLine(x, cursorY - rowHeight + 7, x + width, cursorY - rowHeight + 7, "0.93 0.95 0.97"));
       cursorY -= rowHeight;
     });
 
@@ -314,11 +310,14 @@ export function PropertySummaryActions({
   ) {
     const dark = options.dark === true;
     const fill = dark ? "0.08 0.11 0.18" : "0.98 0.99 1";
-    const stroke = dark ? "0.08 0.11 0.18" : "0.84 0.88 0.93";
+    const stroke = dark ? "0.08 0.11 0.18" : "0.92 0.95 0.98";
     const labelColor = dark ? "0.68 0.78 0.92" : "0.45 0.52 0.63";
     const valueColor = dark ? "1 1 1" : "0.08 0.11 0.18";
     const commands = [
       makeRect(x, y, width, 58, { fill, stroke }),
+      makeRect(x, y + 56, width, 2, {
+        fill: options.accent || (dark ? "0.15 0.38 0.92" : "0.86 0.91 0.98"),
+      }),
       makeText(label.toUpperCase(), x + 12, y + 38, {
         font: "F2",
         size: 7,
@@ -330,10 +329,6 @@ export function PropertySummaryActions({
         color: valueColor,
       }),
     ];
-
-    if (options.accent) {
-      commands.push(makeRect(x, y, 4, 58, { fill: options.accent }));
-    }
 
     return commands.join("\n");
   }
@@ -452,24 +447,24 @@ export function PropertySummaryActions({
         dark: true,
       }),
     );
-    pageCommands.push(
-      makeMetricCard("Projected Cap", projectedCapRate, 44, 532, 104, {
-        accent: "0.05 0.59 0.38",
-      }),
-    );
-    pageCommands.push(
-      makeMetricCard("Debt Service", annualDebtService, 158, 532, 114),
-    );
-    pageCommands.push(
-      makeMetricCard("Total Rehab", totalRehab, 282, 532, 94),
-    );
+    pageCommands.push(makeText(
+      `Projected cap ${projectedCapRate}   |   Debt service ${annualDebtService}   |   Rehab ${totalRehab}`,
+      44,
+      580,
+      {
+        font: "F2",
+        size: 8.5,
+        color: "0.42 0.49 0.60",
+      },
+    ));
+    pageCommands.push(makeLine(44, 566, 376, 566, "0.88 0.91 0.95"));
 
-    const currentTable = makeTable("Current View", sections.currentLines, 44, 452);
+    const currentTable = makeTable("Current View", sections.currentLines, 44, 526);
     const projectedTable = makeTable(
       "Projected View",
       sections.projectedLines,
       318,
-      452,
+      526,
     );
     pageCommands.push(...currentTable.commands, ...projectedTable.commands);
 
