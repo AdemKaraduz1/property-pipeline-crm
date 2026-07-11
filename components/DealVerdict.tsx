@@ -439,6 +439,8 @@ export function DealVerdict({
   );
   const taxNotes = getString(inputs.tax_notes);
   const lenderMinDscr = getNumber(inputs.lender_min_dscr, 1.25);
+  const rateStressStepOne = getNumber(inputs.rate_stress_step_one, 1);
+  const rateStressStepTwo = getNumber(inputs.rate_stress_step_two, 2);
   const loanPointsRate = getNumber(inputs.loan_points_rate, 1);
   const reserveMonths = getNumber(inputs.reserve_months, 6);
   const downsideRentHaircutRate = getNumber(inputs.downside_rent_haircut_rate, 10);
@@ -505,7 +507,7 @@ export function DealVerdict({
     projectedLoanAmount > 0
       ? getMonthlyMortgagePayment(
           projectedLoanAmount,
-          projectedInterestRate + 1,
+          projectedInterestRate + rateStressStepOne,
           projectedLoanTermYears,
         ) * 12
       : 0;
@@ -513,7 +515,7 @@ export function DealVerdict({
     projectedLoanAmount > 0
       ? getMonthlyMortgagePayment(
           projectedLoanAmount,
-          projectedInterestRate + 2,
+          projectedInterestRate + rateStressStepTwo,
           projectedLoanTermYears,
         ) * 12
       : 0;
@@ -562,13 +564,13 @@ export function DealVerdict({
     baseDscr !== null && lenderMinDscr > 0
       ? getLoanPrincipalFromAnnualDebtService(
           stabilizedNoiTaxAdjusted / lenderMinDscr,
-          projectedInterestRate + 1,
+          projectedInterestRate + rateStressStepOne,
           projectedLoanTermYears,
         )
       : null,
     getLoanPrincipalFromAnnualDebtService(
       downsideNoi,
-      projectedInterestRate + 2,
+      projectedInterestRate + rateStressStepTwo,
       projectedLoanTermYears,
     ),
     getLoanPrincipalFromAnnualDebtService(
@@ -753,7 +755,9 @@ export function DealVerdict({
   }
 
   if (stressedDscr !== null && stressedDscr >= Math.max(lenderMinDscr, 1.25)) {
-    positiveSignals.push("DSCR still works after a 1% rate stress.");
+    positiveSignals.push(
+      `DSCR still works after a ${rateStressStepOne}% rate stress.`,
+    );
   }
 
   if (["lease", "comp", "fmr_verified"].includes(rentConfidence)) {
@@ -878,8 +882,14 @@ export function DealVerdict({
                   <DscrStressChart
                     scenarios={[
                       { label: "Base", dscr: baseDscr },
-                      { label: "+1% Rate", dscr: stressedDscr },
-                      { label: "+2% Rate", dscr: stressedDscrPlusTwo },
+                      {
+                        label: `+${rateStressStepOne}% Rate`,
+                        dscr: stressedDscr,
+                      },
+                      {
+                        label: `+${rateStressStepTwo}% Rate`,
+                        dscr: stressedDscrPlusTwo,
+                      },
                       {
                         label: "Downside",
                         sublabel: "rent + vacancy + rate",
@@ -1021,16 +1031,16 @@ export function DealVerdict({
                   <Metric
                     label="Downside Cash Flow"
                     value={formatCurrency(downsideCashFlow)}
-                    note={`+2% rate, rent haircut, vacancy stress, ${formatCurrency(annualCapexReserve)} CapEx reserve`}
-                    info="This is annual cash flow after a harsher scenario: interest rate rises by 2 points, rent is reduced by your downside haircut, vacancy is increased, and the CapEx reserve is still subtracted (repairs don't get cheaper just because rent collections drop). Negative here is a major warning sign."
+                    note={`+${rateStressStepTwo}% rate, rent haircut, vacancy stress, ${formatCurrency(annualCapexReserve)} CapEx reserve`}
+                    info={`This is annual cash flow after a harsher scenario: interest rate rises by ${rateStressStepTwo} points (edit this below if your financing is fixed and you are not refinancing), rent is reduced by your downside haircut, vacancy is increased, and the CapEx reserve is still subtracted (repairs don't get cheaper just because rent collections drop). Negative here is a major warning sign.`}
                   />
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
                   <Metric
-                    label="DSCR +1% Rate"
+                    label={`DSCR +${rateStressStepOne}% Rate`}
                     value={formatRatio(stressedDscr)}
                     note={`${formatRatio(baseDscr)} before rate stress`}
-                    info="DSCR means net operating income divided by annual debt service. This version tests whether the deal still covers the loan if the interest rate is 1 point higher. Many lenders want roughly 1.20x or better."
+                    info={`DSCR means net operating income divided by annual debt service. This version tests whether the deal still covers the loan if the interest rate is ${rateStressStepOne} point(s) higher — edit the rate stress steps below if this loan is fixed for your full hold and you have no refinance risk. Many lenders want roughly 1.20x or better.`}
                   />
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
@@ -1388,6 +1398,40 @@ export function DealVerdict({
                   defaultValue={lenderMinDscr}
                   className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
                 />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">
+                  Rate Stress Step 1 %
+                </span>
+                <input
+                  name="rate_stress_step_one"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  defaultValue={rateStressStepOne}
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                />
+                <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
+                  Points added to your rate for the lighter stress check.
+                </span>
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">
+                  Rate Stress Step 2 %
+                </span>
+                <input
+                  name="rate_stress_step_two"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  defaultValue={rateStressStepTwo}
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                />
+                <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
+                  Points added for the downside scenario and the max-price
+                  calc. Set both to 0 if your loan is fixed for the whole
+                  hold with no refinance planned.
+                </span>
               </label>
               <label className="block">
                 <span className="text-xs font-medium text-slate-700">
