@@ -19,6 +19,7 @@ import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 import { PropertySummaryActions } from "@/components/PropertySummaryActions";
 import { PropertyRentRollBridge } from "@/components/PropertyRentRollBridge";
+import { UnitLeaseExpirationField } from "@/components/UnitLeaseExpirationField";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
 import { ADDITIONAL_INCOME_ITEMS, getAdditionalIncomeTotal } from "@/lib/income";
 import {
@@ -28,7 +29,7 @@ import {
 } from "@/lib/deal-analyzer";
 import { calculateChicagoFmr } from "@/lib/fmr";
 import { getNeighborhoodFromExtractedFields } from "@/lib/neighborhoods";
-import { MONTH_TO_MONTH_LABEL, isMonthToMonth } from "@/lib/lease";
+import { MONTH_TO_MONTH_LABEL } from "@/lib/lease";
 
 type PageProps = {
   params: Promise<{
@@ -171,11 +172,6 @@ function roundDownToThousand(value: number | null) {
   if (value === null || !Number.isFinite(value) || value <= 0) return null;
 
   return Math.floor(value / 1000) * 1000;
-}
-
-function formatDateInput(value: string | null | undefined) {
-  if (!value || isMonthToMonth(value)) return "";
-  return String(value).slice(0, 10);
 }
 
 function getDefaultInsuranceAnnual(unitCount: number) {
@@ -2099,25 +2095,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600">
                           Lease Exp.
                         </span>
-                        <input
-                          form={formId}
-                          name={`${unit.id}__lease_expiration`}
-                          type="date"
-                          defaultValue={formatDateInput(unit.lease_expiration)}
-                          className={mobileFieldClass}
-                          aria-label="Lease expiration"
+                        <UnitLeaseExpirationField
+                          formId={formId}
+                          unitId={unit.id}
+                          leaseExpiration={unit.lease_expiration}
+                          inputClassName={mobileFieldClass}
+                          wrapCheckboxInLabel={false}
                         />
-                        <span className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600">
-                          <input
-                            form={formId}
-                            name={`${unit.id}__lease_mtm`}
-                            type="checkbox"
-                            defaultChecked={isMonthToMonth(unit.lease_expiration)}
-                            className="h-3.5 w-3.5 rounded border-slate-300"
-                            aria-label="Month-to-month lease"
-                          />
-                          Month-to-month
-                        </span>
                       </label>
 
                       <label className="block min-w-0">
@@ -2364,29 +2348,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         </td>
 
                         <td className="py-3 pr-2">
-                          <input
-                            form={formId}
-                            name={`${unit.id}__lease_expiration`}
-                            type="date"
-                            defaultValue={formatDateInput(
-                              unit.lease_expiration,
-                            )}
-                            className={dateInlineInputClass}
-                            aria-label="Lease expiration"
+                          <UnitLeaseExpirationField
+                            formId={formId}
+                            unitId={unit.id}
+                            leaseExpiration={unit.lease_expiration}
+                            inputClassName={dateInlineInputClass}
                           />
-                          <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600">
-                            <input
-                              form={formId}
-                              name={`${unit.id}__lease_mtm`}
-                              type="checkbox"
-                              defaultChecked={isMonthToMonth(
-                                unit.lease_expiration,
-                              )}
-                              className="h-3.5 w-3.5 rounded border-slate-300"
-                              aria-label="Month-to-month lease"
-                            />
-                            Month-to-month
-                          </label>
                         </td>
 
                         <td className="py-3 pr-2">

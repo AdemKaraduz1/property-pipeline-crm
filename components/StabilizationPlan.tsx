@@ -12,7 +12,7 @@ import {
   type StabilizationUnitSettings,
 } from "@/lib/stabilization";
 import { StabilizationCurveChart } from "@/components/DealVerdictCharts";
-import { isMonthToMonth } from "@/lib/lease";
+import { getMonthToMonthTurnoverDate, isMonthToMonth } from "@/lib/lease";
 
 type StabilizationUnitProp = {
   id: string;
@@ -53,8 +53,10 @@ function getDefaultTurnoverDate(
   leaseExpiration: string | null,
   planStartDate: string,
 ) {
-  if (leaseExpiration && !isMonthToMonth(leaseExpiration)) {
-    return leaseExpiration;
+  if (leaseExpiration) {
+    return isMonthToMonth(leaseExpiration)
+      ? getMonthToMonthTurnoverDate()
+      : leaseExpiration;
   }
 
   return planStartDate;
