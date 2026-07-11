@@ -107,6 +107,7 @@ export function PropertySummaryActions({
       "Return Summary",
       "NOI Bridge",
       "Investment Position",
+      "Property Details",
       "Key Diligence Before Offer",
       "Units",
     ];
@@ -150,6 +151,7 @@ export function PropertySummaryActions({
       returnLines: getSectionLines("Return Summary"),
       noiBridgeLines: getSectionLines("NOI Bridge"),
       investmentLines: getSectionLines("Investment Position"),
+      propertyDetailsLines: getSectionLines("Property Details"),
       diligenceLines: getSectionLines("Key Diligence Before Offer"),
       unitLines: getSectionLines("Units"),
       note,
@@ -377,44 +379,45 @@ export function PropertySummaryActions({
     return { commands, bottomY: cursorY };
   }
 
-  function makeBulletList(
-    lines: string[],
+  function makeDetailGrid(
+    items: { label: string; value: string }[],
     x: number,
     y: number,
-    maxCharacters: number,
-    maxRows: number,
+    columns: number,
+    columnWidth: number,
+    rowHeight: number,
   ) {
     const commands: string[] = [];
-    let cursorY = y;
-    let rows = 0;
+    const maxValueCharacters = 18;
 
-    for (const line of lines) {
-      if (rows >= maxRows) break;
+    items.forEach((item, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const cellX = x + column * columnWidth;
+      const cellY = y - row * rowHeight;
+      const rawValue = item.value || "-";
+      const displayValue =
+        rawValue.length > maxValueCharacters
+          ? `${rawValue.slice(0, maxValueCharacters - 3)}...`
+          : rawValue;
 
-      const text = line.replace(/^- /, "");
-      const wrappedLines = wrapSummaryLine(text, maxCharacters).slice(0, 2);
+      commands.push(
+        makeText(item.label.toUpperCase(), cellX, cellY, {
+          font: "F2",
+          size: 7,
+          color: "0.45 0.52 0.63",
+        }),
+      );
+      commands.push(
+        makeText(displayValue, cellX, cellY - 14, {
+          font: "F2",
+          size: 9.5,
+          color: "0.08 0.11 0.18",
+        }),
+      );
+    });
 
-      wrappedLines.forEach((wrappedLine, lineIndex) => {
-        if (rows >= maxRows) return;
-
-        if (lineIndex === 0) {
-          commands.push(makeText("-", x, cursorY, {
-            font: "F2",
-            size: 8,
-            color: "0.15 0.38 0.92",
-          }));
-        }
-        commands.push(makeText(wrappedLine, x + 10, cursorY, {
-          size: 7.7,
-          color: "0.20 0.25 0.34",
-        }));
-        cursorY -= 10;
-        rows += 1;
-      });
-      cursorY -= 2;
-    }
-
-    return { commands, bottomY: cursorY };
+    return commands.join("\n");
   }
 
   async function buildPdfBlob() {
@@ -482,6 +485,39 @@ export function PropertySummaryActions({
     const operatingExpenses = getLineValue(
       sections.noiBridgeLines,
       "Operating expenses",
+    );
+    const neighborhood = getLineValue(
+      sections.propertyDetailsLines,
+      "Neighborhood",
+    );
+    const yearBuilt = getLineValue(sections.propertyDetailsLines, "Year built");
+    const totalSqft = getLineValue(sections.propertyDetailsLines, "Total sqft");
+    const pricePerUnit = getLineValue(
+      sections.propertyDetailsLines,
+      "Price per unit",
+    );
+    const downPayment = getLineValue(
+      sections.propertyDetailsLines,
+      "Down payment",
+    );
+    const loanAmount = getLineValue(
+      sections.propertyDetailsLines,
+      "Loan amount",
+    );
+    const taxesAnnual = getLineValue(
+      sections.propertyDetailsLines,
+      "Taxes annual",
+    );
+    const insuranceAnnual = getLineValue(
+      sections.propertyDetailsLines,
+      "Insurance annual",
+    );
+    const lotSize = getLineValue(sections.propertyDetailsLines, "Lot size");
+    const units = getLineValue(sections.propertyDetailsLines, "Units");
+    const parking = getLineValue(sections.propertyDetailsLines, "Parking");
+    const currentCapRate = getLineValue(
+      sections.currentLines,
+      "Current cap rate",
     );
 
     pageCommands.push(makeRect(0, 0, pageWidth, pageHeight, { fill: "1 1 1" }));
@@ -619,7 +655,7 @@ export function PropertySummaryActions({
         ],
         332,
         504,
-        { width: 216, labelWidth: 86, rowHeight: 13, valueSize: 7.8 },
+        { width: 216, labelWidth: 112, rowHeight: 13, valueSize: 7.8 },
       ).commands,
     );
 
@@ -669,20 +705,40 @@ export function PropertySummaryActions({
 
     pageCommands.push(
       makeRect(44, 66, 524, 204, {
-        fill: "1 0.99 0.94",
-        stroke: "0.95 0.78 0.43",
+        fill: "0.98 0.99 1",
+        stroke: "0.90 0.93 0.96",
       }),
     );
-    pageCommands.push(makeSectionHeading("Key Diligence Before Offer", 58, 246, 492));
+    pageCommands.push(makeSectionHeading("Property Details", 58, 246, 492));
     pageCommands.push(
       makeText(`Primary risk: ${primaryRisk}`, 58, 224, {
         font: "F2",
         size: 8.2,
-        color: "0.50 0.25 0.05",
+        color: "0.42 0.49 0.60",
       }),
     );
     pageCommands.push(
-      ...makeBulletList(sections.diligenceLines, 58, 206, 84, 12).commands,
+      makeDetailGrid(
+        [
+          { label: "Neighborhood", value: neighborhood },
+          { label: "Year Built", value: yearBuilt },
+          { label: "Total Sqft", value: totalSqft },
+          { label: "Lot Size", value: lotSize },
+          { label: "Units", value: units },
+          { label: "Price / Unit", value: pricePerUnit },
+          { label: "Down Payment", value: downPayment },
+          { label: "Loan Amount", value: loanAmount },
+          { label: "Taxes (Annual)", value: taxesAnnual },
+          { label: "Insurance (Annual)", value: insuranceAnnual },
+          { label: "Parking", value: parking },
+          { label: "Current Cap Rate", value: currentCapRate },
+        ],
+        58,
+        202,
+        4,
+        123,
+        44,
+      ),
     );
 
     if (sections.note) {

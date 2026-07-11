@@ -24,6 +24,7 @@ import {
   parseDealAnalyzerSettings,
 } from "@/lib/deal-analyzer";
 import { calculateChicagoFmr } from "@/lib/fmr";
+import { getNeighborhoodFromExtractedFields } from "@/lib/neighborhoods";
 
 type PageProps = {
   params: Promise<{
@@ -990,6 +991,18 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       projectedRent,
     )}, rehab ${formatCurrency(unit.rehab_estimate)}`;
   });
+  const neighborhood = getNeighborhoodFromExtractedFields(propertyMetadata);
+  const pricePerUnit =
+    unitCount > 0 && Number(askingPrice) > 0
+      ? Number(askingPrice) / unitCount
+      : null;
+  const hasGardenOrBasementUnit = unitList.some((unit) => {
+    const label = getUnitLabel(unit).trim().toUpperCase();
+    return label === "G" || label.includes("GARDEN") || label.includes("BASEMENT");
+  });
+  const primaryRiskText = hasGardenOrBasementUnit
+    ? "Legal status of garden unit and achievement of projected rents"
+    : "Achievement of projected rents and verification of legal unit count";
   const dealSummary = [
     "Property Pipeline CRM Deal Summary",
     "",
@@ -1041,7 +1054,22 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     `Target purchase price: ${formatCurrency(projectedPurchasePrice)}`,
     `Target offer range: ${formatCurrency(offerRangeLow)}-${formatCurrency(offerRangeHigh)}`,
     `Maximum price: ${formatCurrency(maximumPurchasePrice)}`,
-    "Primary risk: Legal status of garden unit and achievement of projected rents",
+    `Primary risk: ${primaryRiskText}`,
+    "",
+    "Property Details",
+    `Neighborhood: ${neighborhood || "-"}`,
+    `Year built: ${property.year_built ?? "-"}`,
+    `Total sqft: ${formatNumber(property.sqft)}`,
+    `Lot size: ${property.lot_size ?? "-"}`,
+    `Units: ${unitCount}`,
+    `Price per unit: ${
+      pricePerUnit !== null ? formatCurrency(pricePerUnit) : "-"
+    }`,
+    `Down payment: ${formatCurrency(projectedDownPayment)}`,
+    `Loan amount: ${formatCurrency(projectedLoanAmount)}`,
+    `Taxes annual: ${formatCurrency(taxesAnnual)}`,
+    `Insurance annual: ${formatCurrency(insuranceAnnual)}`,
+    `Parking: ${property.parking ?? "-"}`,
     "",
     "Key Diligence Before Offer",
     "- Confirm the garden unit is a legal fourth dwelling unit and obtain applicable permits.",
