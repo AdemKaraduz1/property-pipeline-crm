@@ -554,7 +554,7 @@ export function PropertySummaryActions({
         ],
         58,
         506,
-        { width: 216, labelWidth: 104, rowHeight: 15, valueSize: 8 },
+        { width: 216, labelWidth: 104, rowHeight: 20, valueSize: 8 },
       ).commands,
     );
 
