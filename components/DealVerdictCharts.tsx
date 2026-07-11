@@ -336,3 +336,163 @@ export function NoiCashFlowBridge({ items }: NoiCashFlowBridgeProps) {
     </svg>
   );
 }
+
+type StabilizationCurvePoint = {
+  monthLabel: string;
+  cumulativeCashFlow: number;
+};
+
+type StabilizationCurveChartProps = {
+  months: StabilizationCurvePoint[];
+  stabilizationMonthIndex: number | null;
+};
+
+export function StabilizationCurveChart({
+  months,
+  stabilizationMonthIndex,
+}: StabilizationCurveChartProps) {
+  const width = 560;
+  const height = 210;
+  const paddingLeft = 12;
+  const paddingRight = 12;
+  const paddingTop = 20;
+  const paddingBottom = 36;
+  const plotWidth = width - paddingLeft - paddingRight;
+  const plotHeight = height - paddingTop - paddingBottom;
+
+  if (months.length === 0) {
+    return null;
+  }
+
+  const values = months.map((month) => month.cumulativeCashFlow);
+  const maxValue = Math.max(0, ...values);
+  const minValue = Math.min(0, ...values);
+  const valueRange = Math.max(1, maxValue - minValue);
+  const headroom = valueRange * 0.15;
+  const scaleMax = maxValue + headroom;
+  const scaleMin = minValue - headroom;
+  const scaleRange = Math.max(1, scaleMax - scaleMin);
+
+  function xFor(index: number) {
+    return months.length <= 1
+      ? paddingLeft + plotWidth / 2
+      : paddingLeft + (index / (months.length - 1)) * plotWidth;
+  }
+
+  function yFor(value: number) {
+    return paddingTop + plotHeight - ((value - scaleMin) / scaleRange) * plotHeight;
+  }
+
+  const zeroY = yFor(0);
+  const linePath = months
+    .map((month, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(month.cumulativeCashFlow)}`)
+    .join(" ");
+
+  let troughIndex = 0;
+  months.forEach((month, index) => {
+    if (month.cumulativeCashFlow < months[troughIndex].cumulativeCashFlow) {
+      troughIndex = index;
+    }
+  });
+
+  const finalIndex = months.length - 1;
+  const tickStep = Math.max(1, Math.ceil(months.length / 6));
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="w-full"
+      role="img"
+      aria-label="Cumulative cash flow from acquisition through stabilization"
+    >
+      <line
+        x1={paddingLeft}
+        y1={zeroY}
+        x2={width - paddingRight}
+        y2={zeroY}
+        stroke="#cbd5e1"
+        strokeWidth={1}
+      />
+
+      {stabilizationMonthIndex !== null && (
+        <>
+          <line
+            x1={xFor(stabilizationMonthIndex)}
+            y1={paddingTop}
+            x2={xFor(stabilizationMonthIndex)}
+            y2={paddingTop + plotHeight}
+            stroke="#16a34a"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+          />
+          <text
+            x={xFor(stabilizationMonthIndex)}
+            y={paddingTop - 6}
+            textAnchor="middle"
+            fontSize={9}
+            fontWeight={700}
+            fill="#16a34a"
+          >
+            Stabilized
+          </text>
+        </>
+      )}
+
+      <path d={linePath} fill="none" stroke="#1d4ed8" strokeWidth={2} />
+
+      <circle
+        cx={xFor(troughIndex)}
+        cy={yFor(months[troughIndex].cumulativeCashFlow)}
+        r={3.5}
+        fill={months[troughIndex].cumulativeCashFlow < 0 ? "#dc2626" : "#1d4ed8"}
+      />
+      <text
+        x={xFor(troughIndex)}
+        y={yFor(months[troughIndex].cumulativeCashFlow) + (months[troughIndex].cumulativeCashFlow < 0 ? 18 : -10)}
+        textAnchor="middle"
+        fontSize={10}
+        fontWeight={700}
+        fill="#0f172a"
+      >
+        {formatCurrencyCompact(months[troughIndex].cumulativeCashFlow)}
+      </text>
+
+      {finalIndex !== troughIndex && (
+        <>
+          <circle
+            cx={xFor(finalIndex)}
+            cy={yFor(months[finalIndex].cumulativeCashFlow)}
+            r={3.5}
+            fill="#1d4ed8"
+          />
+          <text
+            x={xFor(finalIndex)}
+            y={yFor(months[finalIndex].cumulativeCashFlow) - 10}
+            textAnchor="end"
+            fontSize={10}
+            fontWeight={700}
+            fill="#0f172a"
+          >
+            {formatCurrencyCompact(months[finalIndex].cumulativeCashFlow)}
+          </text>
+        </>
+      )}
+
+      {months.map((month, index) =>
+        index % tickStep === 0 || index === finalIndex ? (
+          <text
+            key={month.monthLabel + index}
+            x={xFor(index)}
+            y={paddingTop + plotHeight + 16}
+            textAnchor="middle"
+            fontSize={8.5}
+            fontWeight={600}
+            fill="#64748b"
+          >
+            {month.monthLabel}
+          </text>
+        ) : null,
+      )}
+    </svg>
+  );
+}

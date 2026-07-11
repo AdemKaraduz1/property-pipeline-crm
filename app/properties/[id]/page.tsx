@@ -5,6 +5,7 @@ import { AddUnitModal } from "@/components/AddUnitModal";
 import { EditPropertyModal } from "@/components/EditPropertyModal";
 import { DealAnalyzer } from "@/components/DealAnalyzer";
 import { DealVerdict } from "@/components/DealVerdict";
+import { StabilizationPlan } from "@/components/StabilizationPlan";
 import { ProjectedFinancials } from "@/components/ProjectedFinancials";
 import { AutoSaveForm } from "@/components/AutoSaveForm";
 import { PropertyStatusUpdater } from "@/components/PropertyStatusUpdater";
@@ -1100,6 +1101,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     projectedRent: Number(getProjectedRent(unit) || 0),
     leaseExpiration: unit.lease_expiration || null,
   }));
+  const stabilizationUnits = unitList.map((unit) => ({
+    id: unit.id,
+    label: getUnitLabel(unit),
+    currentRent: Number(getCurrentRent(unit) || 0),
+    projectedRent: Number(getProjectedRent(unit) || 0),
+    rehabEstimate: Number(unit.rehab_estimate || 0),
+    leaseExpiration: unit.lease_expiration || null,
+  }));
   const inferredRecordedUnitCount = getUnitCountFromText(property.property_type);
 
   const hasBuildingDetails =
@@ -1282,6 +1291,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             ["#operating-expenses", "Expenses"],
             ["#analysis", "Analysis"],
             ["#diligence", "Verdict"],
+            ["#stabilization", "Stabilization"],
             ["#units", `Units (${unitCount})`],
             ["#rehab", "Rehab"],
             ["#programs", "Programs"],
@@ -1662,6 +1672,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         inferredRecordedUnitCount={inferredRecordedUnitCount}
         propertyType={property.property_type || null}
         units={verdictUnits}
+      />
+
+      <StabilizationPlan
+        propertyId={id}
+        units={stabilizationUnits}
+        annualFixedOperatingExpenses={annualFixedOperatingExpenses}
+        repairsMaintenanceRate={repairsMaintenanceRate}
+        propertyManagementRate={propertyManagementRate}
+        annualDebtService={projectedAnnualDebtService}
+        savedPlan={propertyMetadata.stabilization_plan}
       />
 
       {property.broker_remarks && (
