@@ -108,6 +108,7 @@ export function PropertySummaryActions({
       "NOI Bridge",
       "Investment Position",
       "Property Details",
+      "Common Area Rehab",
       "Key Diligence Before Offer",
       "Units",
     ];
@@ -151,6 +152,7 @@ export function PropertySummaryActions({
       returnLines: getSectionLines("Return Summary"),
       noiBridgeLines: getSectionLines("NOI Bridge"),
       investmentLines: getSectionLines("Investment Position"),
+      commonAreaRehabLines: getSectionLines("Common Area Rehab"),
       diligenceLines: getSectionLines("Key Diligence Before Offer"),
       unitLines: getSectionLines("Units"),
       note,
@@ -401,12 +403,6 @@ export function PropertySummaryActions({
       year: "numeric",
     });
     const askingPrice = getLineValue(sections.currentLines, "Asking price");
-    const targetPurchasePrice =
-      getLineValue(sections.projectedLines, "Analyzed purchase price") !== "-"
-        ? getLineValue(sections.projectedLines, "Analyzed purchase price")
-        : getLineValue(sections.projectedLines, "Target purchase price") !== "-"
-          ? getLineValue(sections.projectedLines, "Target purchase price")
-          : getLineValue(sections.projectedLines, "Projected purchase price");
     const projectedAnnualRent = getLineValue(
       sections.projectedLines,
       "Projected annual rent",
@@ -456,6 +452,24 @@ export function PropertySummaryActions({
     const operatingExpenses = getLineValue(
       sections.noiBridgeLines,
       "Operating expenses",
+    );
+    const commonRehabContingency = getLineValue(
+      sections.commonAreaRehabLines,
+      "Contingency",
+    );
+    const commonRehabTotal = getLineValue(
+      sections.commonAreaRehabLines,
+      "Common area rehab total",
+    );
+    const commonRehabNotes = getLineValue(
+      sections.commonAreaRehabLines,
+      "Rehab notes",
+    );
+    const commonRehabItemLines = sections.commonAreaRehabLines.filter(
+      (line) =>
+        !line.toLowerCase().startsWith("contingency:") &&
+        !line.toLowerCase().startsWith("common area rehab total:") &&
+        !line.toLowerCase().startsWith("rehab notes:"),
     );
 
     pageCommands.push(makeRect(0, 0, pageWidth, pageHeight, { fill: "1 1 1" }));
@@ -533,16 +547,9 @@ export function PropertySummaryActions({
       }),
     );
     pageCommands.push(
-      makeMetricCard(
-        "Analyzed Purchase Price",
-        targetPurchasePrice,
-        158,
-        604,
-        114,
-        {
-          accent: "0.15 0.38 0.92",
-        },
-      ),
+      makeMetricCard("Maximum Price", maximumPrice, 158, 604, 114, {
+        accent: "0.15 0.38 0.92",
+      }),
     );
     pageCommands.push(
       makeMetricCard("Projected NOI", projectedNoi, 282, 604, 94, {
@@ -562,7 +569,7 @@ export function PropertySummaryActions({
     pageCommands.push(makeLine(44, 566, 376, 566, "0.88 0.91 0.95"));
 
     pageCommands.push(
-      makeRect(44, 440, 250, 106, {
+      makeRect(44, 466, 250, 80, {
         fill: "0.98 0.99 1",
         stroke: "0.90 0.93 0.96",
       }),
@@ -572,13 +579,12 @@ export function PropertySummaryActions({
       ...makeKeyValueRows(
         [
           `Asking price: ${askingPrice}`,
-          `Analyzed purchase price: ${targetPurchasePrice}`,
           `Offer range: ${targetOfferRange}`,
-          `Maximum purchase price: ${maximumPrice}`,
+          `Maximum price: ${maximumPrice}`,
         ],
         58,
         506,
-        { width: 216, labelWidth: 104, rowHeight: 20, valueSize: 8 },
+        { width: 216, labelWidth: 104, rowHeight: 15, valueSize: 8 },
       ).commands,
     );
 
@@ -647,6 +653,69 @@ export function PropertySummaryActions({
       });
       cursorY -= wrappedLines.length > 1 ? 24 : 17;
     });
+
+    if (commonRehabItemLines.length > 0) {
+      const rehabHeadingY = cursorY - 14;
+
+      pageCommands.push(
+        makeSectionHeading("Common Area Rehab", marginX, rehabHeadingY, 524),
+      );
+
+      const rehabColumns = 2;
+      const rehabColumnWidth = 262;
+      const rehabRowHeight = 14;
+      const rehabContentY = rehabHeadingY - 22;
+
+      commonRehabItemLines.slice(0, 10).forEach((line, index) => {
+        const [label, value] = splitLabelValue(line);
+        const column = index % rehabColumns;
+        const row = Math.floor(index / rehabColumns);
+        const x = marginX + column * rehabColumnWidth;
+        const y = rehabContentY - row * rehabRowHeight;
+
+        pageCommands.push(
+          makeText(label, x, y, {
+            font: "F2",
+            size: 8,
+            color: "0.35 0.42 0.53",
+          }),
+        );
+        pageCommands.push(
+          makeText(value, x + 170, y, {
+            font: "F2",
+            size: 8,
+            color: "0.08 0.11 0.18",
+          }),
+        );
+      });
+
+      const rehabRowsUsed = Math.ceil(
+        Math.min(commonRehabItemLines.length, 10) / rehabColumns,
+      );
+      const rehabSummaryY = rehabContentY - rehabRowsUsed * rehabRowHeight - 8;
+
+      pageCommands.push(
+        makeText(
+          `Contingency: ${commonRehabContingency}   |   Common Area Rehab Total: ${commonRehabTotal}`,
+          marginX,
+          rehabSummaryY,
+          { font: "F2", size: 8.5, color: "0.08 0.11 0.18" },
+        ),
+      );
+
+      if (commonRehabNotes !== "-") {
+        wrapSummaryLine(commonRehabNotes, 100)
+          .slice(0, 2)
+          .forEach((line, index) => {
+            pageCommands.push(
+              makeText(line, marginX, rehabSummaryY - 14 - index * 10, {
+                size: 7.5,
+                color: "0.42 0.49 0.60",
+              }),
+            );
+          });
+      }
+    }
 
     if (sections.note) {
       wrapSummaryLine(sections.note, 102).slice(0, 2).forEach((line, index) => {

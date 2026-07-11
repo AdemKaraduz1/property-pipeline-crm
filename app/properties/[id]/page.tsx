@@ -1127,6 +1127,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     `Insurance annual: ${formatCurrency(insuranceAnnual)}`,
     `Parking: ${property.parking ?? "-"}`,
     "",
+    "Common Area Rehab",
+    ...COMMON_REHAB_ITEMS.filter(
+      (item) => toFiniteNumber(commonRehabItems[item.id]) > 0,
+    ).map(
+      (item) =>
+        `${item.label}: ${formatCurrency(toFiniteNumber(commonRehabItems[item.id]))}`,
+    ),
+    `Contingency: ${commonRehabContingency}%`,
+    `Common area rehab total: ${formatCurrency(commonRehabTotal)}`,
+    commonRehabNotes ? `Rehab notes: ${commonRehabNotes}` : null,
+    "",
     "Key Diligence Before Offer",
     "- Confirm the garden unit is a legal fourth dwelling unit and obtain applicable permits.",
     "- Obtain current leases, rent roll, security deposits, payment history, and lease expiration dates.",
