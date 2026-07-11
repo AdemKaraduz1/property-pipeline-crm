@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Info } from "lucide-react";
 import { AutoSaveForm } from "@/components/AutoSaveForm";
 import {
   DEAL_ANALYZER_PROJECTION_EVENT,
@@ -126,13 +127,30 @@ function Metric({
   label,
   value,
   note,
+  info,
 }: {
   label: string;
   value: string;
   note?: string;
+  info?: string;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="relative min-w-0 pr-8">
+      {info && (
+        <span className="group absolute right-0 top-0">
+          <span
+            tabIndex={0}
+            title={info}
+            aria-label={`${label} details`}
+            className="inline-flex h-6 w-6 cursor-help items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:border-slate-300 hover:text-slate-700 focus:border-slate-400 focus:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          >
+            <Info className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+          <span className="pointer-events-none invisible absolute right-0 top-7 z-20 w-72 rounded-lg border border-slate-200 bg-white p-3 text-left text-xs font-normal leading-relaxed text-slate-600 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+            {info}
+          </span>
+        </span>
+      )}
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
         {label}
       </p>
@@ -147,17 +165,30 @@ function Metric({
 function Drawer({
   title,
   summary,
+  info,
   children,
 }: {
   title: string;
   summary: string;
+  info?: string;
   children: React.ReactNode;
 }) {
   return (
     <details className="group rounded-lg border border-slate-200 bg-slate-50/60">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-sm font-semibold text-slate-900 sm:px-4">
         <span className="min-w-0">
-          <span className="block">{title}</span>
+          <span className="flex items-center gap-2">
+            <span className="block">{title}</span>
+            {info && (
+              <span
+                title={info}
+                aria-label={`${title} details`}
+                className="inline-flex h-6 w-6 cursor-help items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:text-slate-700"
+              >
+                <Info className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
+            )}
+          </span>
           <span className="mt-0.5 block text-xs font-normal leading-relaxed text-slate-500">
             {summary}
           </span>
@@ -594,6 +625,7 @@ export function DealVerdict({
                     label="Analyzed Price"
                     value={formatCurrency(projectedPurchasePrice)}
                     note="Current price in the Deal Analyzer"
+                    info="This is the purchase price currently being tested in Deal Analyzer. Changing the analyzer purchase price updates this number and the verdict math."
                   />
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -611,6 +643,7 @@ export function DealVerdict({
                           ? `${formatCurrency(suggestedPriceGap)} below analyzed price`
                           : "Based on stress DSCR, downside cash flow, and target yield"
                     }
+                    info="This is the highest price the model thinks still works as a good deal based on debt coverage, downside cash flow, target yield, and stressed rehab. If it says current price works, the analyzed price is already at or below that threshold."
                   />
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -622,6 +655,7 @@ export function DealVerdict({
                         : "Income yield"
                     }
                     note={`${formatPercent(exitCapRate)} target yield after stressed rehab`}
+                    info="This tells you which constraint is driving the suggested good-deal price. Debt + income means both lender coverage and income yield are part of the limit. Income yield means the target return is the main limit."
                   />
                 </div>
               </div>
@@ -643,6 +677,7 @@ export function DealVerdict({
                     label="Downside Cash Flow"
                     value={formatCurrency(downsideCashFlow)}
                     note="+2% rate, rent haircut, vacancy stress"
+                    info="This is annual cash flow after a harsher scenario: interest rate rises by 2 points, rent is reduced by your downside haircut, and vacancy is increased. Negative here is a major warning sign."
                   />
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
@@ -650,6 +685,7 @@ export function DealVerdict({
                     label="DSCR +1% Rate"
                     value={formatRatio(stressedDscr)}
                     note={`${formatRatio(baseDscr)} before rate stress`}
+                    info="DSCR means net operating income divided by annual debt service. This version tests whether the deal still covers the loan if the interest rate is 1 point higher. Many lenders want roughly 1.20x or better."
                   />
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
@@ -667,6 +703,7 @@ export function DealVerdict({
                               : "Unverified"
                     }
                     note={rentSource || "Add source below"}
+                    info="This grades how reliable your projected rents are. Lease, comp-backed, or FMR checked rents are stronger than listing-only or unverified rents."
                   />
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
@@ -674,6 +711,7 @@ export function DealVerdict({
                     label="Rehab Stress"
                     value={formatCurrency(rehabStressTotal)}
                     note={`${formatPercent(rehabOverrunRate)} overrun on ${formatCurrency(totalRehab)}`}
+                    info="This adds your rehab overrun percentage to the current rehab estimate. It helps show what the deal looks like if repairs come in higher than expected."
                   />
                 </div>
               </div>
@@ -702,6 +740,7 @@ export function DealVerdict({
           <Drawer
             title="Scenario Stress"
             summary="As-is, stabilized, and downside views without crowding the main page."
+            info="This section compares three versions of the deal: current/as-is income, stabilized income after your projected assumptions, and downside income after rent and vacancy stress. Use it to see whether the deal still survives when assumptions get tougher."
           >
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-md bg-white p-3">
@@ -709,6 +748,7 @@ export function DealVerdict({
                   label="As-Is NOI"
                   value={formatCurrency(currentNoi)}
                   note={`${formatCurrency(annualCurrentRent)} current annual rent`}
+                  info="As-is NOI uses current rent, current operating assumptions, vacancy, taxes, insurance, utilities, repairs, and management. It is the current income picture before your upside plan."
                 />
               </div>
               <div className="rounded-md bg-white p-3">
@@ -716,6 +756,7 @@ export function DealVerdict({
                   label="Stabilized NOI"
                   value={formatCurrency(stabilizedNoiTaxAdjusted)}
                   note={`${formatCurrency(adjustedProjectedRent)} rent after utility allowance`}
+                  info="Stabilized NOI uses your projected rent and operating assumptions, then adjusts for utility allowance and any post-purchase tax change you entered."
                 />
               </div>
               <div className="rounded-md bg-white p-3">
@@ -723,6 +764,7 @@ export function DealVerdict({
                   label="Downside NOI"
                   value={formatCurrency(downsideNoi)}
                   note={`${formatPercent(downsideVacancyRate)} vacancy, ${formatPercent(downsideRentHaircutRate)} rent haircut`}
+                  info="Downside NOI reduces projected rent by your rent haircut and applies the downside vacancy rate. It shows income if the rent plan is too optimistic or leasing is slower."
                 />
               </div>
             </div>
