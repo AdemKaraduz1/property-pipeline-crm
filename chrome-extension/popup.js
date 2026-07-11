@@ -223,6 +223,7 @@ async function saveToPropertyPipeline() {
     sqft: document.getElementById("sqft").value,
     mlsNumber: document.getElementById("mlsNumber").value,
     description: document.getElementById("description").value,
+    listingPhotoUrl: capturedData.listingPhotoUrl || "",
 
     propertyType: capturedData.propertyType || "",
     yearBuilt: capturedData.yearBuilt || "",
@@ -339,6 +340,87 @@ function extractListingDataFromPage() {
       document.querySelector(`meta[name="${name}"]`)?.content ||
       ""
     );
+  }
+
+  function normalizeImageUrl(value) {
+    try {
+      if (!value) return "";
+
+      const url = new URL(value, sourceUrl);
+
+      if (!["http:", "https:"].includes(url.protocol)) return "";
+
+      return url.toString();
+    } catch {
+      return "";
+    }
+  }
+
+  function getImageFromJson(value) {
+    if (!value) return "";
+
+    if (typeof value === "string") {
+      return normalizeImageUrl(value);
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const imageUrl = getImageFromJson(item);
+
+        if (imageUrl) return imageUrl;
+      }
+
+      return "";
+    }
+
+    if (typeof value !== "object") return "";
+
+    for (const [key, item] of Object.entries(value)) {
+      if (/image|photo|thumbnail/i.test(key)) {
+        const imageUrl = getImageFromJson(item);
+
+        if (imageUrl) return imageUrl;
+      }
+    }
+
+    return "";
+  }
+
+  function findMainListingPhotoUrl(jsonLdItems) {
+    const metaImage =
+      normalizeImageUrl(getMeta("og:image:secure_url")) ||
+      normalizeImageUrl(getMeta("og:image")) ||
+      normalizeImageUrl(getMeta("twitter:image")) ||
+      normalizeImageUrl(getMeta("image"));
+
+    if (metaImage) return metaImage;
+
+    for (const item of jsonLdItems) {
+      const imageUrl = getImageFromJson(item);
+
+      if (imageUrl) return imageUrl;
+    }
+
+    const imageCandidates = [...document.images]
+      .map((image) => ({
+        src:
+          normalizeImageUrl(image.currentSrc) ||
+          normalizeImageUrl(image.src) ||
+          normalizeImageUrl(image.getAttribute("data-src")),
+        width: image.naturalWidth || image.width || 0,
+        height: image.naturalHeight || image.height || 0,
+        alt: cleanText(image.alt || ""),
+      }))
+      .filter((image) => {
+        if (!image.src || image.width < 260 || image.height < 160) return false;
+        if (/logo|icon|avatar|map|staticmap|sprite/i.test(image.src)) return false;
+        if (/logo|map|agent|avatar/i.test(image.alt)) return false;
+
+        return true;
+      })
+      .sort((a, b) => b.width * b.height - a.width * a.height);
+
+    return imageCandidates[0]?.src || "";
   }
 
   function firstMatch(patterns) {
@@ -482,9 +564,11 @@ function extractListingDataFromPage() {
             text.length <= 80 &&
             !/^neighbou?rhoods?$/i.test(text)
         ) || "";
+    const listingPhotoUrl = findMainListingPhotoUrl(jsonLdItems);
 
     return {
       sourceSite: "redfin",
+      listingPhotoUrl,
       neighborhood,
       address,
       listPrice: listing.offers?.price || getTestIdText("abp-price"),
@@ -518,6 +602,7 @@ function extractListingDataFromPage() {
         redfin_last_reviewed: listing.lastReviewed || "",
         redfin_latitude: residence.geo?.latitude || "",
         redfin_longitude: residence.geo?.longitude || "",
+        listing_photo_url: listingPhotoUrl,
         neighborhood,
         redfin_property_details: detailItems
       }
@@ -1228,6 +1313,8 @@ function extractListingDataFromPage() {
 
   const jsonLdItems = parseJsonLd();
   const redfinListing = getRedfinListingData(jsonLdItems);
+  const listingPhotoUrl =
+    redfinListing?.listingPhotoUrl || findMainListingPhotoUrl(jsonLdItems);
   const labelValuePairs = collectLabelValuePairs();
 
   const jsonListing =
@@ -1495,6 +1582,7 @@ function extractListingDataFromPage() {
     listingAgentPhone: cleanText(listingAgentPhone),
 
     description: cleanText(description),
+    listingPhotoUrl: cleanText(listingPhotoUrl),
 
     unitInformation,
 
@@ -1503,6 +1591,7 @@ function extractListingDataFromPage() {
       ? redfinListing.allExtractedFields
       : {
           ...labelValuePairs,
+          listing_photo_url: cleanText(listingPhotoUrl),
           neighborhood: cleanText(neighborhood)
         },
     rawText: rawText.slice(0, 30000)

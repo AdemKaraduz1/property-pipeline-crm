@@ -1,5 +1,14 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { AutoSaveForm } from "@/components/AutoSaveForm";
-import { getMonthlyMortgagePayment } from "@/lib/deal-analyzer";
+import {
+  DEAL_ANALYZER_PROJECTION_EVENT,
+  PROPERTY_RENT_ROLL_EVENT,
+  getMonthlyMortgagePayment,
+  type DealAnalyzerProjection,
+  type PropertyRentRollUpdate,
+} from "@/lib/deal-analyzer";
 import { asRecord } from "@/lib/rehab";
 
 type SaveUnderwritingAction = (formData: FormData) => Promise<{
@@ -13,6 +22,9 @@ type DealVerdictProps = {
   annualProjectedRent: number;
   annualDebtService: number;
   currentNoi: number;
+  annualFixedOperatingExpenses: number;
+  repairsMaintenanceRate: number;
+  propertyManagementRate: number;
   projectedNoi: number;
   projectedOperatingExpenses: number;
   projectedInterestRate: number;
@@ -169,22 +181,94 @@ const verdictPanelClass =
 
 export function DealVerdict({
   action,
-  annualCurrentRent,
-  annualProjectedRent,
-  annualDebtService,
-  currentNoi,
-  projectedNoi,
-  projectedOperatingExpenses,
-  projectedInterestRate,
-  projectedLoanAmount,
-  projectedLoanTermYears,
-  projectedPurchasePrice,
+  annualCurrentRent: initialAnnualCurrentRent,
+  annualProjectedRent: initialAnnualProjectedRent,
+  annualDebtService: initialAnnualDebtService,
+  currentNoi: initialCurrentNoi,
+  annualFixedOperatingExpenses,
+  repairsMaintenanceRate,
+  propertyManagementRate,
+  projectedNoi: initialProjectedNoi,
+  projectedOperatingExpenses: initialProjectedOperatingExpenses,
+  projectedInterestRate: initialProjectedInterestRate,
+  projectedLoanAmount: initialProjectedLoanAmount,
+  projectedLoanTermYears: initialProjectedLoanTermYears,
+  projectedPurchasePrice: initialProjectedPurchasePrice,
   taxesAnnual,
   totalRehab,
   underwriting,
-  vacancyRate,
+  vacancyRate: initialVacancyRate,
   propertyId,
 }: DealVerdictProps) {
+  const [liveProjection, setLiveProjection] =
+    useState<DealAnalyzerProjection | null>(null);
+  const [liveRentRoll, setLiveRentRoll] =
+    useState<PropertyRentRollUpdate | null>(null);
+  const activeProjection =
+    liveProjection?.propertyId === propertyId ? liveProjection : null;
+  const activeRentRoll =
+    liveRentRoll?.propertyId === propertyId ? liveRentRoll : null;
+  const vacancyRate = activeProjection?.vacancyRate ?? initialVacancyRate;
+  const annualCurrentRent =
+    activeRentRoll?.annualCurrentRent ?? initialAnnualCurrentRent;
+  const annualProjectedRent =
+    activeProjection?.annualGrossRent ??
+    activeRentRoll?.annualProjectedRent ??
+    initialAnnualProjectedRent;
+  const projectedPurchasePrice =
+    activeProjection?.purchasePrice ?? initialProjectedPurchasePrice;
+  const projectedOperatingExpenses =
+    activeProjection?.operatingExpenses ?? initialProjectedOperatingExpenses;
+  const projectedNoi = activeProjection?.noiAnnual ?? initialProjectedNoi;
+  const annualDebtService =
+    activeProjection?.annualDebtService ?? initialAnnualDebtService;
+  const projectedInterestRate =
+    activeProjection?.interestRate ?? initialProjectedInterestRate;
+  const projectedLoanAmount =
+    activeProjection?.loanAmount ?? initialProjectedLoanAmount;
+  const projectedLoanTermYears =
+    activeProjection?.loanTermYears ?? initialProjectedLoanTermYears;
+  const currentNoi =
+    activeRentRoll && activeRentRoll.annualCurrentRent !== initialAnnualCurrentRent
+      ? annualCurrentRent -
+        annualCurrentRent * (vacancyRate / 100) -
+        (annualFixedOperatingExpenses +
+          annualCurrentRent * (repairsMaintenanceRate / 100) +
+          annualCurrentRent * (propertyManagementRate / 100))
+      : initialCurrentNoi;
+
+  useEffect(() => {
+    function handleProjectionUpdate(event: Event) {
+      const detail = (event as CustomEvent<DealAnalyzerProjection>).detail;
+
+      if (detail?.propertyId === propertyId) {
+        setLiveProjection(detail);
+      }
+    }
+
+    function handleRentRollUpdate(event: Event) {
+      const detail = (event as CustomEvent<PropertyRentRollUpdate>).detail;
+
+      if (detail?.propertyId === propertyId) {
+        setLiveRentRoll(detail);
+      }
+    }
+
+    window.addEventListener(
+      DEAL_ANALYZER_PROJECTION_EVENT,
+      handleProjectionUpdate,
+    );
+    window.addEventListener(PROPERTY_RENT_ROLL_EVENT, handleRentRollUpdate);
+
+    return () => {
+      window.removeEventListener(
+        DEAL_ANALYZER_PROJECTION_EVENT,
+        handleProjectionUpdate,
+      );
+      window.removeEventListener(PROPERTY_RENT_ROLL_EVENT, handleRentRollUpdate);
+    };
+  }, [propertyId]);
+
   const inputs = asRecord(underwriting);
   const rentConfidence = getString(inputs.rent_confidence, "unverified");
   const rentSource = getString(inputs.rent_source);
@@ -410,9 +494,9 @@ export function DealVerdict({
         : "Needs review";
   const dealCallSummary =
     dealCall === "Good deal"
-      ? "The deal clears the main stress checks based on your saved assumptions."
+      ? "The deal clears the main stress checks based on your current assumptions."
       : dealCall === "Bad deal"
-        ? "The deal has major blockers based on your saved assumptions."
+        ? "The deal has major blockers based on your current assumptions."
         : "The deal is close enough to keep reviewing, but it is not clean yet.";
   const dealCallClass =
     dealCall === "Good deal"
@@ -487,6 +571,13 @@ export function DealVerdict({
                     {dealScore}/100
                   </div>
                 </div>
+
+                <p className="mt-2 text-[11px] leading-relaxed opacity-85">
+                  Score starts at 100 and subtracts for modeled blockers,
+                  weak rent proof, DSCR misses, negative stress cash flow, and
+                  rehab/legal/code risk. It is a screening score, not a
+                  guarantee.
+                </p>
 
                 {topDecisionReasons.length > 0 && (
                   <ul className="mt-3 space-y-1 text-xs leading-relaxed">

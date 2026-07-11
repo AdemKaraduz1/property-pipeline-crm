@@ -119,6 +119,7 @@ export async function POST(request: Request) {
 
     const mlsNumber = toText(payload.mlsNumber);
     const sourceUrl = toText(payload.sourceUrl);
+    const listingPhotoUrl = toText(payload.listingPhotoUrl);
     const rawAddress = toText(payload.address);
     const parsedAddress = parseCityStateZip(rawAddress);
 
@@ -131,6 +132,7 @@ export async function POST(request: Request) {
     const extractedFields = {
       ...withoutEmptyNeighborhoods(rawExtractedFields),
       ...(neighborhood ? { neighborhood } : {}),
+      ...(listingPhotoUrl ? { listing_photo_url: listingPhotoUrl } : {}),
     };
 
     const propertyPayload = {

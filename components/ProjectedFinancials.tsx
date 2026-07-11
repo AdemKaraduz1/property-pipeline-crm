@@ -43,6 +43,10 @@ export function ProjectedFinancials({
     annualDebtService,
     cashFlowAfterDebt: projectedNoi - annualDebtService,
     isFinanced,
+    interestRate: 0,
+    loanAmount: 0,
+    loanTermYears: 0,
+    vacancyRate: 0,
   };
   const [liveProjection, setLiveProjection] =
     useState<DealAnalyzerProjection | null>(null);

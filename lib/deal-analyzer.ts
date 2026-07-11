@@ -4,6 +4,8 @@ export type PurchaseMethod = "financed" | "cash";
 
 export const DEAL_ANALYZER_PROJECTION_EVENT =
   "property-pipeline:deal-analyzer-projection";
+export const PROPERTY_RENT_ROLL_EVENT =
+  "property-pipeline:property-rent-roll";
 
 export type DealAnalyzerProjection = {
   propertyId: string;
@@ -15,6 +17,18 @@ export type DealAnalyzerProjection = {
   annualDebtService: number;
   cashFlowAfterDebt: number;
   isFinanced: boolean;
+  interestRate: number;
+  loanAmount: number;
+  loanTermYears: number;
+  vacancyRate: number;
+};
+
+export type PropertyRentRollUpdate = {
+  propertyId: string;
+  currentMonthlyRent: number;
+  projectedMonthlyRent: number;
+  annualCurrentRent: number;
+  annualProjectedRent: number;
 };
 
 export type DealAnalyzerSettings = {

@@ -17,6 +17,7 @@ import { MobilityFmrCard } from "@/components/MobilityFmrCard";
 import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 import { PropertySummaryActions } from "@/components/PropertySummaryActions";
+import { PropertyRentRollBridge } from "@/components/PropertyRentRollBridge";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
 import {
   getMonthlyMortgagePayment,
@@ -854,13 +855,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       ? `${property.city || ""}${property.city && property.state ? ", " : ""}${
           property.state || ""
         } ${property.zip || ""}`.trim()
-      : property.mls_number
-        ? `MLS #${property.mls_number}`
-        : "";
+      : "";
   const summaryFileName = `${(property.address || "property-deal")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "property-deal"}-summary.txt`;
+    .replace(/^-|-$/g, "") || "property-deal"}-summary.pdf`;
   const projectedCapRate =
     projectedPurchasePrice > 0 ? projectedNoi / projectedPurchasePrice : null;
   const unitSummaryLines = unitList.map((unit) => {
@@ -911,6 +910,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   ]
     .filter((line) => line !== null && line !== undefined && line !== "")
     .join("\n");
+  const liveRentRollUnits = unitList.map((unit) => ({
+    id: unit.id,
+    currentRent: Number(getCurrentRent(unit) || 0),
+    projectedRent: Number(getProjectedRent(unit) || 0),
+  }));
 
   const hasBuildingDetails =
     hasValue(property.year_built) ||
@@ -935,6 +939,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   return (
     <AppShell>
+      <PropertyRentRollBridge
+        propertyId={id}
+        units={liveRentRollUnits}
+        fallbackAnnualCurrentRent={Number(property.gross_income || 0)}
+      />
+
       <div className="mb-4">
         <Link
           href="/pipeline"
@@ -1058,11 +1068,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 Deal Summary
               </p>
               <p className="text-xs text-slate-500">
-                Copy, share, or save a lightweight snapshot for lenders,
-                partners, or your own records.
+                Share or save a PDF snapshot for lenders, partners, or your
+                own records.
               </p>
             </div>
             <PropertySummaryActions
+              propertyId={id}
               fileName={summaryFileName}
               summary={dealSummary}
             />
@@ -1445,6 +1456,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         annualProjectedRent={annualProjectedRent}
         annualDebtService={projectedAnnualDebtService}
         currentNoi={currentNoi}
+        annualFixedOperatingExpenses={annualFixedOperatingExpenses}
+        repairsMaintenanceRate={repairsMaintenanceRate}
+        propertyManagementRate={propertyManagementRate}
         projectedNoi={projectedNoi}
         projectedOperatingExpenses={projectedOperatingExpenses}
         projectedInterestRate={projectedInterestRate}

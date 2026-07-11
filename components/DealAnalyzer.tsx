@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   DEAL_ANALYZER_PROJECTION_EVENT,
+  PROPERTY_RENT_ROLL_EVENT,
   getMonthlyMortgagePayment,
   parseDealAnalyzerSettings,
 } from "@/lib/deal-analyzer";
 import type {
   DealAnalyzerProjection,
   DealAnalyzerSettings,
+  PropertyRentRollUpdate,
   PurchaseMethod,
 } from "@/lib/deal-analyzer";
 
@@ -211,6 +213,11 @@ export function DealAnalyzer({
   const [targetCapRate, setTargetCapRate] = useState(
     initialSettings?.targetCapRate ?? 8,
   );
+  const [liveProjectedMonthlyRent, setLiveProjectedMonthlyRent] = useState<
+    number | null
+  >(null);
+  const activeProjectedMonthlyRent =
+    liveProjectedMonthlyRent ?? projectedMonthlyRent;
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -256,6 +263,22 @@ export function DealAnalyzer({
   useEffect(() => {
     latestSettings.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    function handleRentRollUpdate(event: Event) {
+      const detail = (event as CustomEvent<PropertyRentRollUpdate>).detail;
+
+      if (detail?.propertyId === propertyId) {
+        setLiveProjectedMonthlyRent(detail.projectedMonthlyRent);
+      }
+    }
+
+    window.addEventListener(PROPERTY_RENT_ROLL_EVENT, handleRentRollUpdate);
+
+    return () => {
+      window.removeEventListener(PROPERTY_RENT_ROLL_EVENT, handleRentRollUpdate);
+    };
+  }, [propertyId]);
 
   const persistSettings = useCallback(
     async (
@@ -472,7 +495,7 @@ export function DealAnalyzer({
 
   const results = useMemo(() => {
     const price = Math.max(0, purchasePrice);
-    const annualGrossRent = projectedMonthlyRent * 12;
+    const annualGrossRent = activeProjectedMonthlyRent * 12;
     const vacancyLoss = annualGrossRent * (vacancyRate / 100);
     const effectiveGrossIncome = annualGrossRent - vacancyLoss;
     const managementExpense = effectiveGrossIncome * (managementRate / 100);
@@ -552,7 +575,7 @@ export function DealAnalyzer({
     };
   }, [
     purchasePrice,
-    projectedMonthlyRent,
+    activeProjectedMonthlyRent,
     vacancyRate,
     managementRate,
     repairsRate,
@@ -584,6 +607,10 @@ export function DealAnalyzer({
       annualDebtService: results.annualDebtService,
       cashFlowAfterDebt: results.noiAnnual - results.annualDebtService,
       isFinanced,
+      interestRate,
+      loanAmount: results.loanAmount,
+      loanTermYears,
+      vacancyRate,
     };
 
     window.dispatchEvent(
@@ -591,7 +618,15 @@ export function DealAnalyzer({
         detail: projection,
       }),
     );
-  }, [isFinanced, propertyId, purchasePrice, results]);
+  }, [
+    interestRate,
+    isFinanced,
+    loanTermYears,
+    propertyId,
+    purchasePrice,
+    results,
+    vacancyRate,
+  ]);
 
   return (
     <details
@@ -907,7 +942,7 @@ export function DealAnalyzer({
             <div className={analysisMetricGridClass}>
               <Metric
                 label="Projected Monthly Rent"
-                value={formatCurrency(projectedMonthlyRent)}
+                value={formatCurrency(activeProjectedMonthlyRent)}
               />
               <Metric
                 label="Annual Gross Rent"
