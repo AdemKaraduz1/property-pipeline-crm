@@ -135,8 +135,10 @@ function InfoTip({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement | null>(null);
   const id = useId();
+  const visible = open || hovered;
 
   useEffect(() => {
     function handleOpen(event: Event) {
@@ -184,21 +186,37 @@ function InfoTip({
     });
   }
 
+  function showInfo() {
+    setHovered(true);
+    window.dispatchEvent(
+      new CustomEvent(INFO_TIP_OPEN_EVENT, {
+        detail: { id },
+      }),
+    );
+  }
+
   return (
-    <span ref={wrapperRef} className={`${className} z-30`}>
+    <span
+      ref={wrapperRef}
+      onMouseEnter={showInfo}
+      onMouseLeave={() => setHovered(false)}
+      className={`${className} z-30`}
+    >
       <button
         type="button"
-        aria-expanded={open}
+        aria-expanded={visible}
         aria-label={`${label} details`}
         onClick={toggleInfo}
+        onFocus={showInfo}
+        onBlur={() => setHovered(false)}
         className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-slate-300 hover:text-slate-700 focus:border-slate-400 focus:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200"
       >
         <Info className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
-      {open && (
+      {visible && (
         <span
           role="tooltip"
-          className="absolute right-0 top-7 z-40 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-3 text-left text-[11px] font-normal leading-relaxed text-slate-600 shadow-lg"
+          className="absolute right-0 top-7 z-50 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-3 text-left text-[11px] font-normal leading-relaxed text-slate-600 shadow-xl"
         >
           {info}
         </span>
@@ -276,7 +294,7 @@ const verdictRailClass =
   "flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] sm:block sm:space-y-4 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden";
 
 const verdictPanelClass =
-  "w-full min-w-full max-w-full shrink-0 snap-start overflow-hidden rounded-lg border border-slate-200 bg-white p-3 sm:min-w-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0";
+  "w-full min-w-full max-w-full shrink-0 snap-start overflow-visible rounded-lg border border-slate-200 bg-white p-3 sm:min-w-0 sm:max-w-none sm:border-0 sm:bg-transparent sm:p-0";
 
 export function DealVerdict({
   action,
