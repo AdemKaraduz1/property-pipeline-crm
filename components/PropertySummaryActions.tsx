@@ -551,8 +551,14 @@ export function PropertySummaryActions({
       }),
     );
 
+    const headerDetailLines = sections.propertyLines.filter(
+      (line) =>
+        !line.toLowerCase().startsWith("status:") &&
+        !line.toLowerCase().startsWith("property type:"),
+    );
+
     let detailsY = 684;
-    sections.propertyLines.slice(0, 4).forEach((line) => {
+    headerDetailLines.slice(0, 4).forEach((line) => {
       pageCommands.push(
         makeText(line, marginX, detailsY, {
           size: 8,

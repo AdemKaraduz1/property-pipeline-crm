@@ -1089,16 +1089,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       : null,
   );
   const maximumPurchasePrice = downsideBreakevenPurchasePrice;
-  const targetCapRate = dealAnalyzerSettings?.targetCapRate ?? 8;
-  const valueByTargetCapRate =
-    targetCapRate > 0 ? projectedNoi / (targetCapRate / 100) : 0;
-  const capRateMaxPurchasePrice = Math.max(
-    0,
-    (valueByTargetCapRate - Math.max(0, totalRehab)) /
-      (1 + projectedAcquisitionCostsRate / 100),
-  );
+  // Starting offer is always a discount off the maximum (never above it), so
+  // the two numbers can never invert regardless of underwriting inputs.
   const startingOfferPriceRaw =
-    capRateMaxPurchasePrice > 0 ? capRateMaxPurchasePrice * 0.9 : null;
+    maximumPurchasePrice !== null && maximumPurchasePrice > 0
+      ? maximumPurchasePrice * 0.9
+      : null;
   const startingOfferPrice = roundDownToThousand(
     startingOfferPriceRaw !== null && Number(askingPrice) > 0
       ? Math.min(startingOfferPriceRaw, Number(askingPrice))
