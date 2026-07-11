@@ -14,7 +14,6 @@ import {
 import { asRecord } from "@/lib/rehab";
 import {
   BreakEvenOccupancyGauge,
-  CashOnCashChart,
   NoiCashFlowBridge,
 } from "@/components/DealVerdictCharts";
 
@@ -533,23 +532,6 @@ export function DealVerdict({
   const loanPoints = projectedLoanAmount * (loanPointsRate / 100);
   const monthlyDebtService = annualDebtService / 12;
   const reserveRequirement = monthlyDebtService * reserveMonths;
-  const stressedCashFlow =
-    stabilizedNoiTaxAdjusted - annualCapexReserve - annualDebtServicePlusOne;
-  const stressedCashFlowPlusTwo =
-    stabilizedNoiTaxAdjusted - annualCapexReserve - annualDebtServicePlusTwo;
-  const cashInvested =
-    Math.max(0, projectedPurchasePrice - projectedLoanAmount) +
-    Math.max(0, totalRehab) +
-    Math.max(0, loanPoints) +
-    Math.max(0, reserveRequirement);
-  const baseCashOnCash =
-    cashInvested > 0 ? stabilizedCashFlow / cashInvested : null;
-  const stressedCashOnCash =
-    cashInvested > 0 ? stressedCashFlow / cashInvested : null;
-  const stressedCashOnCashPlusTwo =
-    cashInvested > 0 ? stressedCashFlowPlusTwo / cashInvested : null;
-  const downsideCashOnCash =
-    cashInvested > 0 ? downsideCashFlow / cashInvested : null;
   const breakEvenOccupancyRate =
     annualProjectedRent > 0
       ? ((projectedOperatingExpenses +
@@ -903,7 +885,7 @@ export function DealVerdict({
                 )}
               </div>
 
-              <div className="mb-3 grid gap-3 lg:grid-cols-3">
+              <div className="mb-3 grid gap-3 lg:grid-cols-2">
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Break-Even Occupancy
@@ -915,42 +897,6 @@ export function DealVerdict({
                   <BreakEvenOccupancyGauge
                     breakEvenOccupancyRate={breakEvenOccupancyRate}
                     underwrittenOccupancyRate={underwrittenOccupancyRate}
-                  />
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Cash-on-Cash Return
-                  </p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                    Green clears a strong 8% return, amber is tight, red is
-                    negative or thin.
-                  </p>
-                  <CashOnCashChart
-                    scenarios={[
-                      { label: "Base", cashOnCashReturn: baseCashOnCash },
-                      {
-                        label:
-                          rateStressStepOne > 0
-                            ? `+${rateStressStepOne}% Rate`
-                            : "No Stress",
-                        cashOnCashReturn: stressedCashOnCash,
-                      },
-                      {
-                        label:
-                          rateStressStepTwo > 0
-                            ? `+${rateStressStepTwo}% Rate`
-                            : "No Stress",
-                        cashOnCashReturn: stressedCashOnCashPlusTwo,
-                      },
-                      {
-                        label: "Downside",
-                        sublabel:
-                          rateStressStepTwo > 0
-                            ? "rent + vacancy + rate"
-                            : "rent + vacancy",
-                        cashOnCashReturn: downsideCashOnCash,
-                      },
-                    ]}
                   />
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3">

@@ -98,6 +98,26 @@ export function PropertySummaryActions({
     return match ? splitLabelValue(match)[1] : "-";
   }
 
+  function parseUnitLine(line: string) {
+    const match = line
+      .replace(/^-\s*/, "")
+      .match(
+        /^(.+?):\s*([\d.]+)\s*bed\s*\/\s*([\d.]+)\s*bath,\s*current\s*(.+?),\s*projected\s*(.+?),\s*rehab\s*(.+)$/i,
+      );
+
+    if (!match) return null;
+
+    const [, label, beds, baths, current, projected, rehab] = match;
+
+    return {
+      label: label.trim(),
+      bedsBaths: `${beds}bd / ${baths}ba`,
+      current: current.trim(),
+      projected: projected.trim(),
+      rehab: rehab.trim(),
+    };
+  }
+
   function parseSummarySections() {
     const lines = summary.split("\n").map((line) => line.trim());
     const title = lines[0] || "Property Pipeline CRM Deal Summary";
@@ -296,31 +316,40 @@ export function PropertySummaryActions({
     x: number,
     y: number,
     width: number,
-    options: { accent?: string; dark?: boolean } = {},
+    options: { accent?: string; dark?: boolean; height?: number } = {},
   ) {
     const dark = options.dark === true;
+    const height = options.height ?? 58;
     const fill = dark ? "0.08 0.11 0.18" : "0.98 0.99 1";
     const stroke = dark ? "0.08 0.11 0.18" : "0.92 0.95 0.98";
     const labelColor = dark ? "0.68 0.78 0.92" : "0.45 0.52 0.63";
     const valueColor = dark ? "1 1 1" : "0.08 0.11 0.18";
     const commands = [
-      makeRect(x, y, width, 58, { fill, stroke }),
-      makeRect(x, y + 56, width, 2, {
+      makeRect(x, y, width, height, { fill, stroke }),
+      makeRect(x, y + height - 2, width, 2, {
         fill: options.accent || (dark ? "0.15 0.38 0.92" : "0.86 0.91 0.98"),
       }),
-      makeText(label.toUpperCase(), x + 12, y + 38, {
+      makeText(label.toUpperCase(), x + 12, y + height - 20, {
         font: "F2",
         size: 7,
         color: labelColor,
       }),
       makeText(value, x + 12, y + 17, {
         font: "F2",
-        size: value.length > 14 ? 11 : 14,
+        size: value.length > 12 ? 11 : 14,
         color: valueColor,
       }),
     ];
 
     return commands.join("\n");
+  }
+
+  function makeEqualColumns(count: number, totalWidth: number, gap: number) {
+    const width = (totalWidth - gap * (count - 1)) / count;
+    return Array.from({ length: count }, (_, index) => ({
+      x: index * (width + gap),
+      width,
+    }));
   }
 
   function makeSectionHeading(title: string, x: number, y: number, width = 240) {
@@ -396,6 +425,7 @@ export function PropertySummaryActions({
     const pageWidth = 612;
     const pageHeight = 792;
     const marginX = 44;
+    const contentWidth = pageWidth - marginX * 2;
     const sections = parseSummarySections();
     const pdfPhoto = await getPdfPhoto();
     const pageCommands: string[] = [];
@@ -485,39 +515,54 @@ export function PropertySummaryActions({
         !line.toLowerCase().startsWith("rehab notes:"),
     );
 
-    pageCommands.push(makeRect(0, 0, pageWidth, pageHeight, { fill: "1 1 1" }));
-    pageCommands.push(makeRect(0, 692, pageWidth, 100, { fill: "0.06 0.09 0.16" }));
-    pageCommands.push(makeRect(0, 688, pageWidth, 4, { fill: "0.15 0.38 0.92" }));
-    pageCommands.push(makeText("PROPERTY PIPELINE CRM", marginX, 764, {
-      font: "F2",
-      size: 10,
-      color: "0.68 0.78 0.92",
-    }));
-    pageCommands.push(makeText("Investment Deal Summary", marginX, 738, {
-      font: "F2",
-      size: 24,
-      color: "1 1 1",
-    }));
-    pageCommands.push(makeText(`Prepared ${reportDate}`, 472, 764, {
-      size: 8,
-      color: "0.68 0.78 0.92",
-    }));
-    pageCommands.push(makeText(sections.address, marginX, 714, {
-      font: "F2",
-      size: 13,
-      color: "0.88 0.93 1",
-    }));
+    // ---- Header ----
+    const headerHeight = 156;
+    const headerBottom = pageHeight - headerHeight;
 
-    let detailsY = 666;
+    pageCommands.push(makeRect(0, 0, pageWidth, pageHeight, { fill: "1 1 1" }));
+    pageCommands.push(
+      makeRect(0, headerBottom, pageWidth, headerHeight, {
+        fill: "0.06 0.09 0.16",
+      }),
+    );
+    pageCommands.push(
+      makeRect(0, headerBottom - 4, pageWidth, 4, { fill: "0.15 0.38 0.92" }),
+    );
+    pageCommands.push(
+      makeText(
+        `PROPERTY PIPELINE CRM   |   Prepared ${reportDate}`,
+        marginX,
+        764,
+        { font: "F2", size: 9, color: "0.68 0.78 0.92" },
+      ),
+    );
+    pageCommands.push(
+      makeText("Investment Deal Summary", marginX, 735, {
+        font: "F2",
+        size: 23,
+        color: "1 1 1",
+      }),
+    );
+    pageCommands.push(
+      makeText(sections.address, marginX, 705, {
+        font: "F2",
+        size: 14,
+        color: "0.88 0.93 1",
+      }),
+    );
+
+    let detailsY = 684;
     sections.propertyLines.slice(0, 4).forEach((line) => {
-      pageCommands.push(makeText(line, marginX, detailsY, {
-        size: 8,
-        color: "0.45 0.52 0.63",
-      }));
-      detailsY -= 12;
+      pageCommands.push(
+        makeText(line, marginX, detailsY, {
+          size: 8,
+          color: "0.58 0.66 0.78",
+        }),
+      );
+      detailsY -= 11;
     });
 
-    const photoBox = { x: 390, y: 596, width: 178, height: 112 };
+    const photoBox = { x: 390, y: 650, width: 178, height: 128 };
     pageCommands.push(
       makeRect(photoBox.x, photoBox.y, photoBox.width, photoBox.height, {
         fill: "0.94 0.96 0.98",
@@ -540,54 +585,102 @@ export function PropertySummaryActions({
       );
     } else {
       pageCommands.push(
-        makeText("Property photo", photoBox.x + 48, photoBox.y + 68, {
+        makeText("Property photo", photoBox.x + 48, photoBox.y + 74, {
           font: "F2",
           size: 10,
           color: "0.31 0.38 0.49",
         }),
       );
       pageCommands.push(
-        makeText("Listing or walkthrough image", photoBox.x + 30, photoBox.y + 50, {
+        makeText("Listing or walkthrough image", photoBox.x + 30, photoBox.y + 58, {
           size: 8,
           color: "0.45 0.52 0.63",
         }),
       );
     }
 
-    pageCommands.push(
-      makeMetricCard("Asking Price", askingPrice, 44, 604, 104, {
-        accent: "0.15 0.38 0.92",
-      }),
-    );
-    pageCommands.push(
-      makeMetricCard("Maximum Price", maximumPrice, 158, 604, 114, {
-        accent: "0.15 0.38 0.92",
-      }),
-    );
-    pageCommands.push(
-      makeMetricCard("Projected NOI", projectedNoi, 282, 604, 94, {
-        dark: true,
-      }),
-    );
-    pageCommands.push(makeText(
-      `Projected cap ${projectedCapRate}   |   Debt service ${annualDebtService}   |   Rehab ${totalRehab}`,
-      44,
-      580,
+    // ---- Hero metrics ----
+    const heroHeight = 58;
+    const heroY = headerBottom - 4 - 16 - heroHeight;
+    const heroColumns = makeEqualColumns(4, contentWidth, 10);
+    const heroCards: Array<{
+      label: string;
+      value: string;
+      options: { accent?: string; dark?: boolean };
+    }> = [
       {
-        font: "F2",
-        size: 8.5,
-        color: "0.42 0.49 0.60",
+        label: "Asking Price",
+        value: askingPrice,
+        options: { accent: "0.15 0.38 0.92" },
       },
-    ));
-    pageCommands.push(makeLine(44, 566, 376, 566, "0.88 0.91 0.95"));
+      {
+        label: "Starting Offer",
+        value: startingOfferPrice,
+        options: { accent: "0.16 0.62 0.42" },
+      },
+      {
+        label: "Maximum Price",
+        value: maximumPrice,
+        options: { accent: "0.15 0.38 0.92" },
+      },
+      { label: "Projected NOI", value: projectedNoi, options: { dark: true } },
+    ];
+
+    heroCards.forEach((card, index) => {
+      const column = heroColumns[index];
+      pageCommands.push(
+        makeMetricCard(
+          card.label,
+          card.value,
+          marginX + column.x,
+          heroY,
+          column.width,
+          { ...card.options, height: heroHeight },
+        ),
+      );
+    });
 
     pageCommands.push(
-      makeRect(44, 466, 250, 80, {
-        fill: "0.98 0.99 1",
-        stroke: "0.90 0.93 0.96",
-      }),
+      makeText(
+        `Projected cap ${projectedCapRate}   |   Debt service ${annualDebtService}   |   Rehab ${totalRehab}`,
+        marginX,
+        heroY - 20,
+        { font: "F2", size: 8.5, color: "0.42 0.49 0.60" },
+      ),
     );
-    pageCommands.push(makeSectionHeading("Investment Position", 58, 526, 220));
+    pageCommands.push(
+      makeLine(
+        marginX,
+        heroY - 34,
+        marginX + contentWidth,
+        heroY - 34,
+        "0.88 0.91 0.95",
+      ),
+    );
+
+    // ---- Investment Position / Return Summary ----
+    const boxesTop = heroY - 34 - 16;
+    const investmentBoxHeight = 84;
+    const returnBoxHeight = 110;
+    const boxColumnWidth = (contentWidth - 24) / 2;
+
+    pageCommands.push(
+      makeRect(
+        marginX,
+        boxesTop - investmentBoxHeight,
+        boxColumnWidth,
+        investmentBoxHeight,
+        { fill: "0.98 0.99 1", stroke: "0.90 0.93 0.96" },
+      ),
+    );
+    pageCommands.push(
+      makeSectionHeading(
+        "Investment Position",
+        marginX + 14,
+        boxesTop - 14,
+        boxColumnWidth - 28,
+      ),
+    );
     pageCommands.push(
       ...makeKeyValueRows(
         [
@@ -595,19 +688,33 @@ export function PropertySummaryActions({
           `Starting offer: ${startingOfferPrice}`,
           `Maximum price: ${maximumPrice}`,
         ],
-        58,
-        506,
-        { width: 216, labelWidth: 104, rowHeight: 15, valueSize: 8 },
+        marginX + 14,
+        boxesTop - 34,
+        {
+          width: boxColumnWidth - 28,
+          labelWidth: 104,
+          rowHeight: 15,
+          valueSize: 8,
+        },
       ).commands,
     );
 
+    const returnBoxX = marginX + boxColumnWidth + 24;
+
     pageCommands.push(
-      makeRect(318, 440, 250, 106, {
+      makeRect(returnBoxX, boxesTop - returnBoxHeight, boxColumnWidth, returnBoxHeight, {
         fill: "0.98 0.99 1",
         stroke: "0.90 0.93 0.96",
       }),
     );
-    pageCommands.push(makeSectionHeading("Return Summary", 332, 526, 220));
+    pageCommands.push(
+      makeSectionHeading(
+        "Return Summary",
+        returnBoxX + 14,
+        boxesTop - 14,
+        boxColumnWidth - 28,
+      ),
+    );
     pageCommands.push(
       ...makeKeyValueRows(
         [
@@ -617,60 +724,133 @@ export function PropertySummaryActions({
           `Cash required: ${cashRequired}`,
           `Financing: ${financingAssumption}`,
         ],
-        332,
-        506,
-        { width: 216, labelWidth: 112, rowHeight: 15, valueSize: 7.8 },
+        returnBoxX + 14,
+        boxesTop - 34,
+        {
+          width: boxColumnWidth - 28,
+          labelWidth: 112,
+          rowHeight: 15,
+          valueSize: 7.8,
+        },
       ).commands,
     );
 
+    // ---- NOI calculation bar ----
+    const boxesBottom =
+      boxesTop - Math.max(investmentBoxHeight, returnBoxHeight);
+    const noiBarHeight = 36;
+    const noiBarTop = boxesBottom - 16;
+
     pageCommands.push(
-      makeRect(44, 396, 524, 36, {
+      makeRect(marginX, noiBarTop - noiBarHeight, contentWidth, noiBarHeight, {
         fill: "0.96 0.98 1",
         stroke: "0.86 0.91 0.98",
       }),
     );
-    pageCommands.push(makeText("NOI CALCULATION", 58, 418, {
-      font: "F2",
-      size: 8,
-      color: "0.25 0.34 0.47",
-    }));
+    pageCommands.push(
+      makeText("NOI CALCULATION", marginX + 14, noiBarTop - 14, {
+        font: "F2",
+        size: 8,
+        color: "0.25 0.34 0.47",
+      }),
+    );
+
     const hasAdditionalIncome =
       additionalIncomeBridge !== "-" && additionalIncomeBridge !== "$0";
 
-    pageCommands.push(makeText(
-      `Gross rent ${projectedAnnualRent}  |  Vacancy ${vacancy}${
-        hasAdditionalIncome ? `  |  Other income ${additionalIncomeBridge}` : ""
-      }  |  Operating expenses ${operatingExpenses}  |  NOI ${projectedNoi}`,
-      58,
-      403,
-      {
-        font: "F2",
-        size: 8.3,
-        color: "0.08 0.11 0.18",
-      },
-    ));
+    pageCommands.push(
+      makeText(
+        `Gross rent ${projectedAnnualRent}  |  Vacancy ${vacancy}${
+          hasAdditionalIncome ? `  |  Other income ${additionalIncomeBridge}` : ""
+        }  |  Operating expenses ${operatingExpenses}  |  NOI ${projectedNoi}`,
+        marginX + 14,
+        noiBarTop - 29,
+        { font: "F2", size: 8.3, color: "0.08 0.11 0.18" },
+      ),
+    );
 
-    pageCommands.push(makeSectionHeading("Unit Rent Roll", 44, 366, 524));
-    let cursorY = 342;
+    // ---- Unit Rent Roll ----
+    const unitsHeadingY = noiBarTop - noiBarHeight - 16;
+
+    pageCommands.push(
+      makeSectionHeading("Unit Rent Roll", marginX, unitsHeadingY, contentWidth),
+    );
+
+    const unitColumns = [
+      { label: "UNIT", x: marginX, width: 90 },
+      { label: "BD / BA", x: marginX + 90, width: 80 },
+      { label: "CURRENT", x: marginX + 170, width: 110 },
+      { label: "PROJECTED", x: marginX + 280, width: 110 },
+      { label: "REHAB", x: marginX + 390, width: 134 },
+    ];
+    const unitsTableHeaderY = unitsHeadingY - 22;
+
+    unitColumns.forEach((column) => {
+      pageCommands.push(
+        makeText(column.label, column.x, unitsTableHeaderY, {
+          font: "F2",
+          size: 7,
+          color: "0.45 0.52 0.63",
+        }),
+      );
+    });
+    pageCommands.push(
+      makeLine(
+        marginX,
+        unitsTableHeaderY - 6,
+        marginX + contentWidth,
+        unitsTableHeaderY - 6,
+        "0.88 0.91 0.95",
+      ),
+    );
+
+    const unitRowHeight = 17;
+    let unitRowY = unitsTableHeaderY - 20;
 
     sections.unitLines.slice(0, 5).forEach((line, index) => {
-      const wrappedLines = wrapSummaryLine(line.replace(/^- /, ""), 92).slice(0, 2);
+      const parsed = parseUnitLine(line);
 
       pageCommands.push(
-        makeRect(marginX, cursorY - 6, 524, wrappedLines.length > 1 ? 28 : 17, {
+        makeRect(marginX, unitRowY - 5, contentWidth, unitRowHeight, {
           fill: index % 2 === 0 ? "0.98 0.99 1" : "1 1 1",
         }),
       );
-      wrappedLines.forEach((wrappedLine, lineIndex) => {
+
+      if (parsed) {
         pageCommands.push(
-          makeText(wrappedLine, marginX + 8, cursorY - lineIndex * 10, {
+          makeText(parsed.label, unitColumns[0].x + 6, unitRowY, {
+            font: "F2",
+            size: 8,
+            color: "0.15 0.20 0.28",
+          }),
+        );
+        [parsed.bedsBaths, parsed.current, parsed.projected, parsed.rehab].forEach(
+          (value, columnIndex) => {
+            pageCommands.push(
+              makeText(
+                value,
+                unitColumns[columnIndex + 1].x + 6,
+                unitRowY,
+                { size: 8, color: "0.30 0.37 0.47" },
+              ),
+            );
+          },
+        );
+      } else {
+        const wrapped = wrapSummaryLine(line.replace(/^- /, ""), 92).slice(0, 1);
+
+        pageCommands.push(
+          makeText(wrapped[0] || "", marginX + 6, unitRowY, {
             size: 7.8,
             color: "0.20 0.25 0.34",
           }),
         );
-      });
-      cursorY -= wrappedLines.length > 1 ? 24 : 17;
+      }
+
+      unitRowY -= unitRowHeight;
     });
+
+    let cursorY = unitRowY - 3;
 
     const hasCommonRehabContent =
       commonRehabItemLines.length > 0 || commonRehabNotes !== "-";
@@ -806,21 +986,46 @@ export function PropertySummaryActions({
             );
           });
       }
+
+      cursorY = incomeSummaryY - (additionalIncomeNotes !== "-" ? 34 : 10);
     }
+
+    const footerDividerY = Math.min(62, cursorY - 10);
+
+    pageCommands.push(
+      makeLine(
+        marginX,
+        footerDividerY,
+        marginX + contentWidth,
+        footerDividerY,
+        "0.90 0.93 0.96",
+      ),
+    );
+
+    const noteBaseY = footerDividerY - 14;
 
     if (sections.note) {
       wrapSummaryLine(sections.note, 102).slice(0, 2).forEach((line, index) => {
-        pageCommands.push(makeText(line, marginX, 48 - index * 10, {
+        pageCommands.push(makeText(line, marginX, noteBaseY - index * 10, {
           size: 7,
           color: "0.45 0.52 0.63",
         }));
       });
     }
 
-    pageCommands.push(makeText("Planning estimate - verify before making offers.", marginX, 28, {
+    const disclaimerY = sections.note ? noteBaseY - 20 : noteBaseY;
+
+    pageCommands.push(makeText("Planning estimate - verify before making offers.", marginX, disclaimerY, {
       size: 7,
       color: "0.45 0.52 0.63",
     }));
+    pageCommands.push(
+      makeText("Property Pipeline CRM", marginX + contentWidth - 92, disclaimerY, {
+        font: "F2",
+        size: 7,
+        color: "0.60 0.67 0.78",
+      }),
+    );
 
     const content = pageCommands.join("\n");
     const objects: Array<Uint8Array[]> = [
