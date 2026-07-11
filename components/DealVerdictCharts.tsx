@@ -182,6 +182,252 @@ export function DscrStressChart({
   );
 }
 
+type CashOnCashScenario = {
+  label: string;
+  sublabel?: string;
+  cashOnCashReturn: number | null;
+};
+
+type CashOnCashChartProps = {
+  scenarios: CashOnCashScenario[];
+};
+
+function getCashOnCashStatus(value: number): MetricStatus {
+  if (value >= 0.08) return "good";
+  if (value >= 0.05) return "caution";
+  return "bad";
+}
+
+export function CashOnCashChart({ scenarios }: CashOnCashChartProps) {
+  const width = 480;
+  const height = 200;
+  const paddingLeft = 34;
+  const paddingRight = 12;
+  const paddingTop = 22;
+  const paddingBottom = 34;
+  const plotWidth = width - paddingLeft - paddingRight;
+  const plotHeight = height - paddingTop - paddingBottom;
+
+  const finiteValues = scenarios
+    .map((scenario) => scenario.cashOnCashReturn)
+    .filter((value): value is number => value !== null && Number.isFinite(value));
+  const maxValue = Math.max(0.08, ...finiteValues, 0) * 1.2;
+  const minValue = Math.min(0, ...finiteValues) * 1.2;
+  const valueRange = Math.max(0.01, maxValue - minValue);
+
+  function yFor(value: number) {
+    return paddingTop + plotHeight - ((value - minValue) / valueRange) * plotHeight;
+  }
+
+  const barCount = scenarios.length;
+  const barGap = 14;
+  const barWidth = (plotWidth - barGap * (barCount - 1)) / barCount;
+  const zeroY = yFor(0);
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="w-full"
+      role="img"
+      aria-label="Cash-on-cash return by scenario, compared against breakeven"
+    >
+      <line
+        x1={paddingLeft}
+        y1={zeroY}
+        x2={width - paddingRight}
+        y2={zeroY}
+        stroke="#94a3b8"
+        strokeWidth={1.5}
+        strokeDasharray="4 3"
+      />
+      <text
+        x={width - paddingRight}
+        y={zeroY - 5}
+        textAnchor="end"
+        fontSize={9.5}
+        fontWeight={600}
+        fill="#475569"
+      >
+        Breakeven 0%
+      </text>
+
+      {scenarios.map((scenario, index) => {
+        const x = paddingLeft + index * (barWidth + barGap);
+        const centerX = x + barWidth / 2;
+
+        if (
+          scenario.cashOnCashReturn === null ||
+          !Number.isFinite(scenario.cashOnCashReturn)
+        ) {
+          return (
+            <g key={scenario.label}>
+              <text
+                x={centerX}
+                y={paddingTop + plotHeight / 2}
+                textAnchor="middle"
+                fontSize={10}
+                fill="#94a3b8"
+              >
+                N/A
+              </text>
+              <text
+                x={centerX}
+                y={paddingTop + plotHeight + 16}
+                textAnchor="middle"
+                fontSize={9.5}
+                fontWeight={600}
+                fill="#334155"
+              >
+                {scenario.label}
+              </text>
+            </g>
+          );
+        }
+
+        const value = scenario.cashOnCashReturn;
+        const barTop = yFor(Math.max(value, 0));
+        const barBottom = yFor(Math.min(value, 0));
+        const barHeight = Math.max(1, barBottom - barTop);
+        const status = getCashOnCashStatus(value);
+        const labelY = value >= 0 ? barTop - 6 : barBottom + 14;
+
+        return (
+          <g key={scenario.label}>
+            <rect
+              x={x}
+              y={barTop}
+              width={barWidth}
+              height={barHeight}
+              rx={3}
+              fill={statusFill[status]}
+            />
+            <text
+              x={centerX}
+              y={labelY}
+              textAnchor="middle"
+              fontSize={11}
+              fontWeight={700}
+              fill="#0f172a"
+            >
+              {`${(value * 100).toFixed(1)}%`}
+            </text>
+            <text
+              x={centerX}
+              y={paddingTop + plotHeight + 16}
+              textAnchor="middle"
+              fontSize={9.5}
+              fontWeight={600}
+              fill="#334155"
+            >
+              {scenario.label}
+            </text>
+            {scenario.sublabel && (
+              <text
+                x={centerX}
+                y={paddingTop + plotHeight + 27}
+                textAnchor="middle"
+                fontSize={8}
+                fill="#94a3b8"
+              >
+                {scenario.sublabel}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+type BreakEvenOccupancyGaugeProps = {
+  breakEvenOccupancyRate: number;
+  underwrittenOccupancyRate: number;
+};
+
+export function BreakEvenOccupancyGauge({
+  breakEvenOccupancyRate,
+  underwrittenOccupancyRate,
+}: BreakEvenOccupancyGaugeProps) {
+  const width = 480;
+  const height = 96;
+  const paddingLeft = 12;
+  const paddingRight = 12;
+  const trackY = 40;
+  const trackHeight = 22;
+  const plotWidth = width - paddingLeft - paddingRight;
+
+  const maxScale = Math.max(
+    100,
+    breakEvenOccupancyRate + 10,
+    underwrittenOccupancyRate + 10,
+  );
+
+  function xFor(percent: number) {
+    return (
+      paddingLeft + (Math.max(0, Math.min(percent, maxScale)) / maxScale) * plotWidth
+    );
+  }
+
+  const cushion = underwrittenOccupancyRate - breakEvenOccupancyRate;
+  const status: MetricStatus = cushion >= 10 ? "good" : cushion >= 0 ? "caution" : "bad";
+  const filledX = xFor(underwrittenOccupancyRate);
+  const breakEvenX = xFor(breakEvenOccupancyRate);
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="w-full"
+      role="img"
+      aria-label={`Underwritten occupancy ${underwrittenOccupancyRate.toFixed(1)} percent versus a break-even occupancy of ${breakEvenOccupancyRate.toFixed(1)} percent`}
+    >
+      <rect
+        x={paddingLeft}
+        y={trackY}
+        width={plotWidth}
+        height={trackHeight}
+        rx={6}
+        fill="#e2e8f0"
+      />
+      <rect
+        x={paddingLeft}
+        y={trackY}
+        width={Math.max(0, filledX - paddingLeft)}
+        height={trackHeight}
+        rx={6}
+        fill={statusFill[status]}
+      />
+      <line
+        x1={breakEvenX}
+        y1={trackY - 7}
+        x2={breakEvenX}
+        y2={trackY + trackHeight + 7}
+        stroke="#0f172a"
+        strokeWidth={2}
+      />
+      <text
+        x={breakEvenX}
+        y={trackY - 12}
+        textAnchor="middle"
+        fontSize={9.5}
+        fontWeight={700}
+        fill="#0f172a"
+      >
+        {`Break-even ${breakEvenOccupancyRate.toFixed(1)}%`}
+      </text>
+      <text
+        x={Math.min(Math.max(filledX, 40), width - paddingRight - 4)}
+        y={trackY + trackHeight + 18}
+        textAnchor="end"
+        fontSize={9.5}
+        fontWeight={700}
+        fill="#334155"
+      >
+        {`Underwritten ${underwrittenOccupancyRate.toFixed(1)}%`}
+      </text>
+    </svg>
+  );
+}
+
 type BridgeItem =
   | { label: string; type: "total"; value: number }
   | { label: string; type: "delta"; value: number };

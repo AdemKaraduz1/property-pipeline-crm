@@ -12,7 +12,11 @@ import {
   type PropertyRentRollUpdate,
 } from "@/lib/deal-analyzer";
 import { asRecord } from "@/lib/rehab";
-import { DscrStressChart, NoiCashFlowBridge } from "@/components/DealVerdictCharts";
+import {
+  BreakEvenOccupancyGauge,
+  CashOnCashChart,
+  NoiCashFlowBridge,
+} from "@/components/DealVerdictCharts";
 
 type SaveUnderwritingAction = (formData: FormData) => Promise<{
   success: boolean;
@@ -518,12 +522,6 @@ export function DealVerdict({
     annualDebtService > 0 ? legalUnitNoi / annualDebtService : null;
   const legalUnitCashFlow =
     legalUnitNoi - annualCapexReserve - annualDebtService;
-  const stressedDscrPlusTwo =
-    annualDebtServicePlusTwo > 0
-      ? stabilizedNoiTaxAdjusted / annualDebtServicePlusTwo
-      : null;
-  const downsideDscr =
-    annualDebtServicePlusTwo > 0 ? downsideNoi / annualDebtServicePlusTwo : null;
   const bridgeVacancyLoss = annualProjectedRent * (vacancyRate / 100);
   const bridgeNoi =
     annualProjectedRent -
@@ -533,6 +531,32 @@ export function DealVerdict({
   const bridgeCashFlow = bridgeNoi - annualCapexReserve - annualDebtService;
   const rehabStressTotal = totalRehab * (1 + rehabOverrunRate / 100);
   const loanPoints = projectedLoanAmount * (loanPointsRate / 100);
+  const stressedCashFlow =
+    stabilizedNoiTaxAdjusted - annualCapexReserve - annualDebtServicePlusOne;
+  const stressedCashFlowPlusTwo =
+    stabilizedNoiTaxAdjusted - annualCapexReserve - annualDebtServicePlusTwo;
+  const cashInvested =
+    Math.max(0, projectedPurchasePrice - projectedLoanAmount) +
+    Math.max(0, totalRehab) +
+    Math.max(0, loanPoints);
+  const baseCashOnCash =
+    cashInvested > 0 ? stabilizedCashFlow / cashInvested : null;
+  const stressedCashOnCash =
+    cashInvested > 0 ? stressedCashFlow / cashInvested : null;
+  const stressedCashOnCashPlusTwo =
+    cashInvested > 0 ? stressedCashFlowPlusTwo / cashInvested : null;
+  const downsideCashOnCash =
+    cashInvested > 0 ? downsideCashFlow / cashInvested : null;
+  const breakEvenOccupancyRate =
+    annualProjectedRent > 0
+      ? ((projectedOperatingExpenses +
+          annualDebtService +
+          annualCapexReserve -
+          additionalIncomeAnnual) /
+          annualProjectedRent) *
+        100
+      : 0;
+  const underwrittenOccupancyRate = Math.max(0, 100 - vacancyRate);
   const monthlyDebtService = annualDebtService / 12;
   const reserveRequirement = monthlyDebtService * reserveMonths;
   const exitValue =
@@ -878,31 +902,44 @@ export function DealVerdict({
                 )}
               </div>
 
-              <div className="mb-3 grid gap-3 lg:grid-cols-2">
+              <div className="mb-3 grid gap-3 lg:grid-cols-3">
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    DSCR Stress Test
+                    Break-Even Occupancy
                   </p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-                    Green clears the lender minimum comfortably, amber is
-                    tight, red misses it.
+                    The occupancy needed to cover expenses, debt service, and
+                    capex, versus what you underwrote.
                   </p>
-                  <DscrStressChart
+                  <BreakEvenOccupancyGauge
+                    breakEvenOccupancyRate={breakEvenOccupancyRate}
+                    underwrittenOccupancyRate={underwrittenOccupancyRate}
+                  />
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Cash-on-Cash Return
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                    Green clears a strong 8% return, amber is tight, red is
+                    negative or thin.
+                  </p>
+                  <CashOnCashChart
                     scenarios={[
-                      { label: "Base", dscr: baseDscr },
+                      { label: "Base", cashOnCashReturn: baseCashOnCash },
                       {
                         label:
                           rateStressStepOne > 0
                             ? `+${rateStressStepOne}% Rate`
                             : "No Stress",
-                        dscr: stressedDscr,
+                        cashOnCashReturn: stressedCashOnCash,
                       },
                       {
                         label:
                           rateStressStepTwo > 0
                             ? `+${rateStressStepTwo}% Rate`
                             : "No Stress",
-                        dscr: stressedDscrPlusTwo,
+                        cashOnCashReturn: stressedCashOnCashPlusTwo,
                       },
                       {
                         label: "Downside",
@@ -910,10 +947,9 @@ export function DealVerdict({
                           rateStressStepTwo > 0
                             ? "rent + vacancy + rate"
                             : "rent + vacancy",
-                        dscr: downsideDscr,
+                        cashOnCashReturn: downsideCashOnCash,
                       },
                     ]}
-                    lenderMinDscr={lenderMinDscr}
                   />
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
