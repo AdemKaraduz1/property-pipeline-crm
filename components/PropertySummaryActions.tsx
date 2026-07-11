@@ -354,6 +354,7 @@ export function PropertySummaryActions({
     lines.forEach((line) => {
       const [label, value] = splitLabelValue(line);
       const valueLines = wrapSummaryLine(value, 34).slice(0, 2);
+      const rowAdvance = Math.max(rowHeight, valueLines.length * 9 + 6);
 
       commands.push(
         makeText(label.toUpperCase(), x, cursorY, {
@@ -371,8 +372,16 @@ export function PropertySummaryActions({
           }),
         );
       });
-      commands.push(makeLine(x, cursorY - rowHeight + 5, x + width, cursorY - rowHeight + 5, "0.94 0.96 0.98"));
-      cursorY -= Math.max(rowHeight, valueLines.length * 9 + 6);
+      commands.push(
+        makeLine(
+          x,
+          cursorY - rowAdvance + 7,
+          x + width,
+          cursorY - rowAdvance + 7,
+          "0.94 0.96 0.98",
+        ),
+      );
+      cursorY -= rowAdvance;
     });
 
     return { commands, bottomY: cursorY };
