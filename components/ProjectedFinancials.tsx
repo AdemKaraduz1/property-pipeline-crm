@@ -152,7 +152,7 @@ export function ProjectedFinancials({
 
         <div>
           <p className="text-sm text-slate-500">
-            Annual Cash Flow After Debt Service
+            Cash Flow Before CapEx Reserve
           </p>
           <p
             className="text-xl font-bold text-slate-950"
@@ -162,7 +162,7 @@ export function ProjectedFinancials({
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {projection.isFinanced
-              ? `NOI minus ${formatCurrency(projection.annualDebtService)} annual mortgage payments`
+              ? `NOI minus ${formatCurrency(projection.annualDebtService)} annual mortgage payments; see Return Summary for cash flow after CapEx reserve`
               : "Cash purchase—no mortgage debt service"}
           </p>
         </div>

@@ -461,6 +461,8 @@ export function DealVerdict({
   const modeledTaxesAnnual = postPurchaseTaxesAnnual ?? currentTaxes;
   const taxDelta =
     modeledTaxesAnnual - currentTaxes;
+  const hasUnexpectedTaxDecrease =
+    postPurchaseTaxesAnnual !== null && taxDelta < 0;
   const stabilizedNoiTaxAdjusted = projectedNoi - taxDelta - utilityAllowanceAnnual;
   const recordedUnitCount =
     savedRecordedUnitCount !== null
@@ -637,6 +639,12 @@ export function DealVerdict({
 
   if (postPurchaseTaxesAnnual === null) {
     issues.push("Post-sale tax exposure is not modeled.");
+  }
+
+  if (hasUnexpectedTaxDecrease) {
+    hardStops.push(
+      "Post-sale taxes are modeled below current taxes, which inflates NOI.",
+    );
   }
 
   if (unitCountMismatch) {
@@ -906,10 +914,10 @@ export function DealVerdict({
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-slate-50 p-3">
                   <Metric
-                    label="Downside Cash Flow"
+                    label="Downside Cash Flow (Before CapEx)"
                     value={formatCurrency(downsideCashFlow)}
-                    note="+2% rate, rent haircut, vacancy stress"
-                    info="This is annual cash flow after a harsher scenario: interest rate rises by 2 points, rent is reduced by your downside haircut, and vacancy is increased. Negative here is a major warning sign."
+                    note="+2% rate, rent haircut, vacancy stress; excludes CapEx reserve"
+                    info="This is annual cash flow after a harsher scenario: interest rate rises by 2 points, rent is reduced by your downside haircut, and vacancy is increased. It does not subtract the CapEx reserve, so the real downside cash flow is lower than this. Negative here is a major warning sign."
                   />
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
@@ -981,16 +989,18 @@ export function DealVerdict({
                     info="This tracks whether commonly missed operating expenses have been confirmed. Water/sewer, garbage, reserves, and management stress are treated as key checks."
                   />
                 </div>
-                <div className="rounded-lg bg-slate-50 p-3">
+                <div
+                  className={`rounded-lg p-3 ${hasUnexpectedTaxDecrease ? "border border-red-200 bg-red-50" : "bg-slate-50"}`}
+                >
                   <Metric
                     label="Post-Sale Taxes"
                     value={formatCurrency(modeledTaxesAnnual)}
                     note={
                       taxDelta === 0
-                        ? "No tax stress delta"
-                        : `${formatCurrency(taxDelta)} change vs current`
+                        ? `Same as current taxes (${formatCurrency(currentTaxes)})`
+                        : `Current ${formatCurrency(currentTaxes)}, ${taxDelta > 0 ? "+" : ""}${formatCurrency(taxDelta)}${hasUnexpectedTaxDecrease ? " (unexpected decrease)" : ""}`
                     }
-                    info="This is the tax number used in the verdict stress math. If blank, the model uses current saved taxes and flags post-sale taxes as unverified."
+                    info="This is the tax number used in the verdict stress math. If blank, the model uses current saved taxes and flags post-sale taxes as unverified. A modeled figure below current taxes is unusual after a sale and will inflate every stress metric."
                   />
                 </div>
               </div>
@@ -1255,6 +1265,11 @@ export function DealVerdict({
                   placeholder={String(currentTaxes || "")}
                   className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
                 />
+                <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
+                  Current taxes: {formatCurrency(currentTaxes)}. This field is
+                  the full annual dollar amount, not the change. Leave it
+                  blank to keep using current taxes.
+                </span>
               </label>
               <label className="block">
                 <span className="text-xs font-medium text-slate-700">
@@ -1308,12 +1323,30 @@ export function DealVerdict({
                   value={formatCurrency(modeledTaxesAnnual)}
                   note={
                     postPurchaseTaxesAnnual === null
-                      ? "Using saved current taxes"
-                      : `${formatCurrency(taxDelta)} delta vs saved taxes`
+                      ? `Using saved current taxes (${formatCurrency(currentTaxes)})`
+                      : `${formatCurrency(currentTaxes)} current, ${taxDelta > 0 ? "+" : ""}${formatCurrency(taxDelta)} delta`
                   }
                   info="Use this to model post-sale tax exposure separately from the saved current tax bill. The verdict NOI uses this adjustment so taxes do not disappear from stress math."
                 />
               </div>
+
+              {hasUnexpectedTaxDecrease && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800 sm:col-span-2 lg:col-span-5">
+                  <p className="font-semibold">
+                    Post-Sale Taxes is set below current taxes.
+                  </p>
+                  <p className="mt-1">
+                    Post-Sale Taxes / Year is {formatCurrency(modeledTaxesAnnual)},{" "}
+                    {formatCurrency(Math.abs(taxDelta))} lower than the current{" "}
+                    {formatCurrency(currentTaxes)} tax bill. Cook County sales
+                    are usually reassessed upward, so this is treated as a hard
+                    stop rather than an assumption. If you meant &quot;no
+                    change,&quot; clear this field so it falls back to current
+                    taxes; otherwise confirm the lower figure (e.g. an
+                    exemption or successful appeal) in the notes below.
+                  </p>
+                </div>
+              )}
               <div className="rounded-md bg-white p-3 sm:col-span-2 lg:col-span-3">
                 <Metric
                   label="Cash Cushion"

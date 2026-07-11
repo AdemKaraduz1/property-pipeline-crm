@@ -151,7 +151,6 @@ export function PropertySummaryActions({
       returnLines: getSectionLines("Return Summary"),
       noiBridgeLines: getSectionLines("NOI Bridge"),
       investmentLines: getSectionLines("Investment Position"),
-      propertyDetailsLines: getSectionLines("Property Details"),
       diligenceLines: getSectionLines("Key Diligence Before Offer"),
       unitLines: getSectionLines("Units"),
       note,
@@ -379,47 +378,6 @@ export function PropertySummaryActions({
     return { commands, bottomY: cursorY };
   }
 
-  function makeDetailGrid(
-    items: { label: string; value: string }[],
-    x: number,
-    y: number,
-    columns: number,
-    columnWidth: number,
-    rowHeight: number,
-  ) {
-    const commands: string[] = [];
-    const maxValueCharacters = 18;
-
-    items.forEach((item, index) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-      const cellX = x + column * columnWidth;
-      const cellY = y - row * rowHeight;
-      const rawValue = item.value || "-";
-      const displayValue =
-        rawValue.length > maxValueCharacters
-          ? `${rawValue.slice(0, maxValueCharacters - 3)}...`
-          : rawValue;
-
-      commands.push(
-        makeText(item.label.toUpperCase(), cellX, cellY, {
-          font: "F2",
-          size: 7,
-          color: "0.45 0.52 0.63",
-        }),
-      );
-      commands.push(
-        makeText(displayValue, cellX, cellY - 14, {
-          font: "F2",
-          size: 9.5,
-          color: "0.08 0.11 0.18",
-        }),
-      );
-    });
-
-    return commands.join("\n");
-  }
-
   async function buildPdfBlob() {
     const encoder = new TextEncoder();
     const pageWidth = 612;
@@ -477,47 +435,10 @@ export function PropertySummaryActions({
       sections.investmentLines,
       "Maximum price",
     );
-    const primaryRisk = getLineValue(
-      sections.investmentLines,
-      "Primary risk",
-    );
     const vacancy = getLineValue(sections.noiBridgeLines, "Vacancy");
     const operatingExpenses = getLineValue(
       sections.noiBridgeLines,
       "Operating expenses",
-    );
-    const neighborhood = getLineValue(
-      sections.propertyDetailsLines,
-      "Neighborhood",
-    );
-    const yearBuilt = getLineValue(sections.propertyDetailsLines, "Year built");
-    const totalSqft = getLineValue(sections.propertyDetailsLines, "Total sqft");
-    const pricePerUnit = getLineValue(
-      sections.propertyDetailsLines,
-      "Price per unit",
-    );
-    const downPayment = getLineValue(
-      sections.propertyDetailsLines,
-      "Down payment",
-    );
-    const loanAmount = getLineValue(
-      sections.propertyDetailsLines,
-      "Loan amount",
-    );
-    const taxesAnnual = getLineValue(
-      sections.propertyDetailsLines,
-      "Taxes annual",
-    );
-    const insuranceAnnual = getLineValue(
-      sections.propertyDetailsLines,
-      "Insurance annual",
-    );
-    const lotSize = getLineValue(sections.propertyDetailsLines, "Lot size");
-    const units = getLineValue(sections.propertyDetailsLines, "Units");
-    const parking = getLineValue(sections.propertyDetailsLines, "Parking");
-    const currentCapRate = getLineValue(
-      sections.currentLines,
-      "Current cap rate",
     );
 
     pageCommands.push(makeRect(0, 0, pageWidth, pageHeight, { fill: "1 1 1" }));
@@ -617,7 +538,7 @@ export function PropertySummaryActions({
     pageCommands.push(makeLine(44, 566, 376, 566, "0.88 0.91 0.95"));
 
     pageCommands.push(
-      makeRect(44, 448, 250, 98, {
+      makeRect(44, 440, 250, 106, {
         fill: "0.98 0.99 1",
         stroke: "0.90 0.93 0.96",
       }),
@@ -632,13 +553,13 @@ export function PropertySummaryActions({
           `Maximum price: ${maximumPrice}`,
         ],
         58,
-        504,
-        { width: 216, labelWidth: 104, rowHeight: 14, valueSize: 8 },
+        506,
+        { width: 216, labelWidth: 104, rowHeight: 15, valueSize: 8 },
       ).commands,
     );
 
     pageCommands.push(
-      makeRect(318, 448, 250, 98, {
+      makeRect(318, 440, 250, 106, {
         fill: "0.98 0.99 1",
         stroke: "0.90 0.93 0.96",
       }),
@@ -654,8 +575,8 @@ export function PropertySummaryActions({
           `Financing: ${financingAssumption}`,
         ],
         332,
-        504,
-        { width: 216, labelWidth: 112, rowHeight: 13, valueSize: 7.8 },
+        506,
+        { width: 216, labelWidth: 112, rowHeight: 15, valueSize: 7.8 },
       ).commands,
     );
 
@@ -702,44 +623,6 @@ export function PropertySummaryActions({
       });
       cursorY -= wrappedLines.length > 1 ? 24 : 17;
     });
-
-    pageCommands.push(
-      makeRect(44, 66, 524, 204, {
-        fill: "0.98 0.99 1",
-        stroke: "0.90 0.93 0.96",
-      }),
-    );
-    pageCommands.push(makeSectionHeading("Property Details", 58, 246, 492));
-    pageCommands.push(
-      makeText(`Primary risk: ${primaryRisk}`, 58, 224, {
-        font: "F2",
-        size: 8.2,
-        color: "0.42 0.49 0.60",
-      }),
-    );
-    pageCommands.push(
-      makeDetailGrid(
-        [
-          { label: "Neighborhood", value: neighborhood },
-          { label: "Year Built", value: yearBuilt },
-          { label: "Total Sqft", value: totalSqft },
-          { label: "Lot Size", value: lotSize },
-          { label: "Units", value: units },
-          { label: "Price / Unit", value: pricePerUnit },
-          { label: "Down Payment", value: downPayment },
-          { label: "Loan Amount", value: loanAmount },
-          { label: "Taxes (Annual)", value: taxesAnnual },
-          { label: "Insurance (Annual)", value: insuranceAnnual },
-          { label: "Parking", value: parking },
-          { label: "Current Cap Rate", value: currentCapRate },
-        ],
-        58,
-        202,
-        4,
-        123,
-        44,
-      ),
-    );
 
     if (sections.note) {
       wrapSummaryLine(sections.note, 102).slice(0, 2).forEach((line, index) => {
