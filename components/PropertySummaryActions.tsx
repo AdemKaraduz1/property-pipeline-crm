@@ -90,6 +90,14 @@ export function PropertySummaryActions({
     ];
   }
 
+  function getLineValue(lines: string[], label: string) {
+    const match = lines.find((line) =>
+      line.toLowerCase().startsWith(`${label.toLowerCase()}:`),
+    );
+
+    return match ? splitLabelValue(match)[1] : "-";
+  }
+
   function parseSummarySections() {
     const lines = summary.split("\n").map((line) => line.trim());
     const title = lines[0] || "Property Pipeline CRM Deal Summary";
@@ -212,12 +220,23 @@ export function PropertySummaryActions({
     text: string,
     x: number,
     y: number,
-    options: { font?: "F1" | "F2"; size?: number } = {},
+    options: { font?: "F1" | "F2"; size?: number; color?: string } = {},
   ) {
     const font = options.font || "F1";
     const size = options.size || 10;
+    const color = options.color || "0.08 0.11 0.18";
 
-    return `BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(text)}) Tj ET`;
+    return `q ${color} rg BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(text)}) Tj ET Q`;
+  }
+
+  function makeLine(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    color = "0.84 0.88 0.93",
+  ) {
+    return `q ${color} RG ${x1} ${y1} m ${x2} ${y2} l S Q`;
   }
 
   function makeRect(
@@ -230,11 +249,11 @@ export function PropertySummaryActions({
     const commands: string[] = [];
 
     if (options.fill) {
-      commands.push(`${options.fill} rg ${x} ${y} ${width} ${height} re f`);
+      commands.push(`q ${options.fill} rg ${x} ${y} ${width} ${height} re f Q`);
     }
 
     if (options.stroke) {
-      commands.push(`${options.stroke} RG ${x} ${y} ${width} ${height} re S`);
+      commands.push(`q ${options.stroke} RG ${x} ${y} ${width} ${height} re S Q`);
     }
 
     return commands.join("\n");
@@ -243,25 +262,39 @@ export function PropertySummaryActions({
   function makeTable(title: string, lines: string[], x: number, y: number) {
     const width = 250;
     const commands: string[] = [
-      makeRect(x, y - 18, width, 20, { fill: "0.94 0.96 0.98" }),
-      makeRect(x, y - 18, width, 20, { stroke: "0.82 0.86 0.91" }),
-      makeText(title, x + 10, y - 12, { font: "F2", size: 11 }),
+      makeRect(x, y - 18, width, 22, { fill: "0.08 0.11 0.18" }),
+      makeRect(x, y - 18, width, 22, { stroke: "0.08 0.11 0.18" }),
+      makeText(title, x + 10, y - 12, {
+        font: "F2",
+        size: 11,
+        color: "1 1 1",
+      }),
     ];
-    let cursorY = y - 38;
+    let cursorY = y - 40;
 
-    lines.forEach((line) => {
+    lines.forEach((line, rowIndex) => {
       const [label, value] = splitLabelValue(line);
       const valueLines = wrapSummaryLine(value, 28).slice(0, 3);
       const rowHeight = Math.max(28, valueLines.length * 12 + 12);
 
-      commands.push(makeRect(x, cursorY - rowHeight + 8, width, rowHeight, {
-        stroke: "0.88 0.91 0.95",
-      }));
-      commands.push(makeText(label, x + 10, cursorY, { font: "F2", size: 8 }));
+      commands.push(
+        makeRect(x, cursorY - rowHeight + 8, width, rowHeight, {
+          fill: rowIndex % 2 === 0 ? "0.98 0.99 1" : "1 1 1",
+          stroke: "0.84 0.88 0.93",
+        }),
+      );
+      commands.push(
+        makeText(label, x + 10, cursorY, {
+          font: "F2",
+          size: 8,
+          color: "0.31 0.38 0.49",
+        }),
+      );
       valueLines.forEach((valueLine, valueIndex) => {
         commands.push(
           makeText(valueLine, x + 110, cursorY - valueIndex * 12, {
             size: 9,
+            color: "0.08 0.11 0.18",
           }),
         );
       });
@@ -269,6 +302,40 @@ export function PropertySummaryActions({
     });
 
     return { commands, bottomY: cursorY };
+  }
+
+  function makeMetricCard(
+    label: string,
+    value: string,
+    x: number,
+    y: number,
+    width: number,
+    options: { accent?: string; dark?: boolean } = {},
+  ) {
+    const dark = options.dark === true;
+    const fill = dark ? "0.08 0.11 0.18" : "0.98 0.99 1";
+    const stroke = dark ? "0.08 0.11 0.18" : "0.84 0.88 0.93";
+    const labelColor = dark ? "0.68 0.78 0.92" : "0.45 0.52 0.63";
+    const valueColor = dark ? "1 1 1" : "0.08 0.11 0.18";
+    const commands = [
+      makeRect(x, y, width, 58, { fill, stroke }),
+      makeText(label.toUpperCase(), x + 12, y + 38, {
+        font: "F2",
+        size: 7,
+        color: labelColor,
+      }),
+      makeText(value, x + 12, y + 17, {
+        font: "F2",
+        size: value.length > 14 ? 11 : 14,
+        color: valueColor,
+      }),
+    ];
+
+    if (options.accent) {
+      commands.push(makeRect(x, y, 4, 58, { fill: options.accent }));
+    }
+
+    return commands.join("\n");
   }
 
   async function buildPdfBlob() {
@@ -280,37 +347,69 @@ export function PropertySummaryActions({
     const sections = parseSummarySections();
     const pdfPhoto = await getPdfPhoto();
     const pageCommands: string[] = [];
+    const reportDate = new Date().toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const askingPrice = getLineValue(sections.currentLines, "Asking price");
+    const projectedPurchasePrice = getLineValue(
+      sections.projectedLines,
+      "Projected purchase price",
+    );
+    const projectedNoi = getLineValue(sections.projectedLines, "Projected NOI");
+    const projectedCapRate = getLineValue(
+      sections.projectedLines,
+      "Projected cap rate",
+    );
+    const annualDebtService = getLineValue(
+      sections.projectedLines,
+      "Annual debt service",
+    );
+    const totalRehab = getLineValue(sections.projectedLines, "Total rehab");
 
-    pageCommands.push(makeRect(0, 724, pageWidth, 68, { fill: "0.96 0.98 1" }));
-    pageCommands.push(makeText("Property Pipeline CRM", marginX, 762, {
+    pageCommands.push(makeRect(0, 0, pageWidth, pageHeight, { fill: "1 1 1" }));
+    pageCommands.push(makeRect(0, 692, pageWidth, 100, { fill: "0.06 0.09 0.16" }));
+    pageCommands.push(makeRect(0, 688, pageWidth, 4, { fill: "0.15 0.38 0.92" }));
+    pageCommands.push(makeText("PROPERTY PIPELINE CRM", marginX, 764, {
       font: "F2",
       size: 10,
+      color: "0.68 0.78 0.92",
     }));
-    pageCommands.push(makeText("Deal Summary", marginX, 742, {
+    pageCommands.push(makeText("Investment Deal Summary", marginX, 738, {
       font: "F2",
-      size: 22,
+      size: 24,
+      color: "1 1 1",
     }));
-    pageCommands.push(makeText(sections.address, marginX, 710, {
+    pageCommands.push(makeText(`Prepared ${reportDate}`, 472, 764, {
+      size: 8,
+      color: "0.68 0.78 0.92",
+    }));
+    pageCommands.push(makeText(sections.address, marginX, 714, {
       font: "F2",
-      size: 14,
+      size: 13,
+      color: "0.88 0.93 1",
     }));
 
-    let detailsY = 690;
-    sections.propertyLines.slice(0, 5).forEach((line) => {
-      pageCommands.push(makeText(line, marginX, detailsY, { size: 9 }));
-      detailsY -= 13;
+    let detailsY = 666;
+    sections.propertyLines.slice(0, 4).forEach((line) => {
+      pageCommands.push(makeText(line, marginX, detailsY, {
+        size: 8,
+        color: "0.45 0.52 0.63",
+      }));
+      detailsY -= 12;
     });
 
-    const photoBox = { x: 400, y: 610, width: 168, height: 104 };
+    const photoBox = { x: 390, y: 596, width: 178, height: 112 };
     pageCommands.push(
       makeRect(photoBox.x, photoBox.y, photoBox.width, photoBox.height, {
-        fill: "0.93 0.95 0.97",
-        stroke: "0.80 0.84 0.89",
+        fill: "0.94 0.96 0.98",
+        stroke: "0.74 0.79 0.86",
       }),
     );
 
     if (pdfPhoto) {
-      const scale = Math.min(
+      const scale = Math.max(
         photoBox.width / pdfPhoto.width,
         photoBox.height / pdfPhoto.height,
       );
@@ -320,53 +419,104 @@ export function PropertySummaryActions({
       const imageY = photoBox.y + (photoBox.height - imageHeight) / 2;
 
       pageCommands.push(
-        `q ${imageWidth.toFixed(2)} 0 0 ${imageHeight.toFixed(2)} ${imageX.toFixed(2)} ${imageY.toFixed(2)} cm /Im1 Do Q`,
+        `q ${photoBox.x} ${photoBox.y} ${photoBox.width} ${photoBox.height} re W n ${imageWidth.toFixed(2)} 0 0 ${imageHeight.toFixed(2)} ${imageX.toFixed(2)} ${imageY.toFixed(2)} cm /Im1 Do Q`,
       );
     } else {
-      pageCommands.push(makeText("Property photo", photoBox.x + 46, photoBox.y + 58, {
-        font: "F2",
-        size: 10,
-      }));
-      pageCommands.push(makeText("Add one in walkthrough", photoBox.x + 32, photoBox.y + 40, {
-        size: 8,
-      }));
+      pageCommands.push(
+        makeText("Property photo", photoBox.x + 48, photoBox.y + 68, {
+          font: "F2",
+          size: 10,
+          color: "0.31 0.38 0.49",
+        }),
+      );
+      pageCommands.push(
+        makeText("Listing or walkthrough image", photoBox.x + 30, photoBox.y + 50, {
+          size: 8,
+          color: "0.45 0.52 0.63",
+        }),
+      );
     }
 
-    const currentTable = makeTable("Current View", sections.currentLines, 44, 570);
+    pageCommands.push(
+      makeMetricCard("Asking Price", askingPrice, 44, 604, 104, {
+        accent: "0.15 0.38 0.92",
+      }),
+    );
+    pageCommands.push(
+      makeMetricCard("Projected Price", projectedPurchasePrice, 158, 604, 114, {
+        accent: "0.15 0.38 0.92",
+      }),
+    );
+    pageCommands.push(
+      makeMetricCard("Projected NOI", projectedNoi, 282, 604, 94, {
+        dark: true,
+      }),
+    );
+    pageCommands.push(
+      makeMetricCard("Projected Cap", projectedCapRate, 44, 532, 104, {
+        accent: "0.05 0.59 0.38",
+      }),
+    );
+    pageCommands.push(
+      makeMetricCard("Debt Service", annualDebtService, 158, 532, 114),
+    );
+    pageCommands.push(
+      makeMetricCard("Total Rehab", totalRehab, 282, 532, 94),
+    );
+
+    const currentTable = makeTable("Current View", sections.currentLines, 44, 452);
     const projectedTable = makeTable(
       "Projected View",
       sections.projectedLines,
       318,
-      570,
+      452,
     );
     pageCommands.push(...currentTable.commands, ...projectedTable.commands);
 
-    let cursorY = Math.min(currentTable.bottomY, projectedTable.bottomY) - 18;
+    let cursorY = Math.min(currentTable.bottomY, projectedTable.bottomY) - 24;
 
-    pageCommands.push(makeText("Units", marginX, cursorY, {
+    pageCommands.push(makeText("Unit Rent Roll", marginX, cursorY, {
       font: "F2",
       size: 12,
+      color: "0.08 0.11 0.18",
     }));
-    cursorY -= 18;
+    pageCommands.push(makeLine(marginX, cursorY - 8, 568, cursorY - 8));
+    cursorY -= 22;
 
-    sections.unitLines.forEach((line) => {
-      wrapSummaryLine(line, 96).forEach((wrappedLine) => {
+    sections.unitLines.slice(0, 7).forEach((line, index) => {
+      wrapSummaryLine(line.replace(/^- /, ""), 94).forEach((wrappedLine, lineIndex) => {
         if (cursorY < bottomY) return;
-        pageCommands.push(makeText(wrappedLine, marginX, cursorY, { size: 9 }));
-        cursorY -= 13;
+        if (lineIndex === 0) {
+          pageCommands.push(
+            makeRect(marginX, cursorY - 6, 524, 17, {
+              fill: index % 2 === 0 ? "0.98 0.99 1" : "1 1 1",
+            }),
+          );
+        }
+        pageCommands.push(
+          makeText(wrappedLine, marginX + 8, cursorY, {
+            size: 8,
+            color: "0.20 0.25 0.34",
+          }),
+        );
+        cursorY -= 12;
       });
     });
 
     if (sections.note && cursorY > bottomY + 34) {
       cursorY -= 10;
       wrapSummaryLine(sections.note, 96).forEach((line) => {
-        pageCommands.push(makeText(line, marginX, cursorY, { size: 8 }));
+        pageCommands.push(makeText(line, marginX, cursorY, {
+          size: 8,
+          color: "0.45 0.52 0.63",
+        }));
         cursorY -= 11;
       });
     }
 
     pageCommands.push(makeText("Planning estimate - verify before making offers.", marginX, 28, {
       size: 7,
+      color: "0.45 0.52 0.63",
     }));
 
     const content = pageCommands.join("\n");
