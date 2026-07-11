@@ -101,31 +101,57 @@ export function PropertySummaryActions({
   function parseSummarySections() {
     const lines = summary.split("\n").map((line) => line.trim());
     const title = lines[0] || "Property Pipeline CRM Deal Summary";
+    const sectionHeadings = [
+      "Current View",
+      "Projected View",
+      "Return Summary",
+      "NOI Bridge",
+      "Investment Position",
+      "Key Diligence Before Offer",
+      "Units",
+    ];
     const currentIndex = lines.indexOf("Current View");
-    const projectedIndex = lines.indexOf("Projected View");
-    const unitsIndex = lines.indexOf("Units");
+    const firstSectionIndex =
+      currentIndex === -1
+        ? lines.findIndex((line) => sectionHeadings.includes(line))
+        : currentIndex;
     const noteIndex = lines.findIndex((line) => line.startsWith("Planning note:"));
     const propertyLines = lines
-      .slice(1, currentIndex === -1 ? undefined : currentIndex)
+      .slice(1, firstSectionIndex === -1 ? undefined : firstSectionIndex)
       .filter(Boolean);
-    const currentLines = lines
-      .slice(currentIndex + 1, projectedIndex)
-      .filter(Boolean);
-    const projectedLines = lines
-      .slice(projectedIndex + 1, unitsIndex)
-      .filter(Boolean);
-    const unitLines = lines
-      .slice(unitsIndex + 1, noteIndex === -1 ? undefined : noteIndex)
-      .filter(Boolean);
+
+    function getSectionLines(heading: string) {
+      const startIndex = lines.indexOf(heading);
+
+      if (startIndex === -1) return [];
+
+      const nextHeadingIndex = lines.findIndex(
+        (line, index) =>
+          index > startIndex && sectionHeadings.includes(line),
+      );
+      const endIndex =
+        nextHeadingIndex === -1
+          ? noteIndex === -1
+            ? undefined
+            : noteIndex
+          : nextHeadingIndex;
+
+      return lines.slice(startIndex + 1, endIndex).filter(Boolean);
+    }
+
     const note = noteIndex === -1 ? "" : lines[noteIndex];
 
     return {
       title,
       address: propertyLines[0] || "Untitled Property",
       propertyLines: propertyLines.slice(1),
-      currentLines,
-      projectedLines,
-      unitLines,
+      currentLines: getSectionLines("Current View"),
+      projectedLines: getSectionLines("Projected View"),
+      returnLines: getSectionLines("Return Summary"),
+      noiBridgeLines: getSectionLines("NOI Bridge"),
+      investmentLines: getSectionLines("Investment Position"),
+      diligenceLines: getSectionLines("Key Diligence Before Offer"),
+      unitLines: getSectionLines("Units"),
       note,
     };
   }
@@ -259,47 +285,6 @@ export function PropertySummaryActions({
     return commands.join("\n");
   }
 
-  function makeTable(title: string, lines: string[], x: number, y: number) {
-    const width = 250;
-    const commands: string[] = [
-      makeText(title, x, y, {
-        font: "F2",
-        size: 12,
-        color: "0.08 0.11 0.18",
-      }),
-      makeRect(x, y - 10, 38, 2, { fill: "0.15 0.38 0.92" }),
-      makeLine(x, y - 16, x + width, y - 16, "0.88 0.91 0.95"),
-    ];
-    let cursorY = y - 36;
-
-    lines.forEach((line) => {
-      const [label, value] = splitLabelValue(line);
-      const valueLines = wrapSummaryLine(value, 28).slice(0, 3);
-      const rowHeight = Math.max(24, valueLines.length * 11 + 10);
-
-      commands.push(
-        makeText(label, x + 10, cursorY, {
-          font: "F2",
-          size: 8,
-          color: "0.42 0.49 0.60",
-        }),
-      );
-      valueLines.forEach((valueLine, valueIndex) => {
-        commands.push(
-          makeText(valueLine, x + 126, cursorY - valueIndex * 11, {
-            font: "F2",
-            size: 9.5,
-            color: "0.08 0.11 0.18",
-          }),
-        );
-      });
-      commands.push(makeLine(x, cursorY - rowHeight + 7, x + width, cursorY - rowHeight + 7, "0.93 0.95 0.97"));
-      cursorY -= rowHeight;
-    });
-
-    return { commands, bottomY: cursorY };
-  }
-
   function makeMetricCard(
     label: string,
     value: string,
@@ -333,12 +318,110 @@ export function PropertySummaryActions({
     return commands.join("\n");
   }
 
+  function makeSectionHeading(title: string, x: number, y: number, width = 240) {
+    return [
+      makeText(title, x, y, {
+        font: "F2",
+        size: 10.5,
+        color: "0.08 0.11 0.18",
+      }),
+      makeRect(x, y - 7, 32, 1.5, { fill: "0.15 0.38 0.92" }),
+      makeLine(x, y - 12, x + width, y - 12, "0.90 0.93 0.96"),
+    ].join("\n");
+  }
+
+  function makeKeyValueRows(
+    lines: string[],
+    x: number,
+    y: number,
+    options: {
+      labelWidth?: number;
+      width?: number;
+      rowHeight?: number;
+      labelSize?: number;
+      valueSize?: number;
+    } = {},
+  ) {
+    const commands: string[] = [];
+    const labelWidth = options.labelWidth ?? 104;
+    const width = options.width ?? 230;
+    const rowHeight = options.rowHeight ?? 15;
+    const labelSize = options.labelSize ?? 7.5;
+    const valueSize = options.valueSize ?? 8.5;
+    let cursorY = y;
+
+    lines.forEach((line) => {
+      const [label, value] = splitLabelValue(line);
+      const valueLines = wrapSummaryLine(value, 34).slice(0, 2);
+
+      commands.push(
+        makeText(label.toUpperCase(), x, cursorY, {
+          font: "F2",
+          size: labelSize,
+          color: "0.45 0.52 0.63",
+        }),
+      );
+      valueLines.forEach((valueLine, valueIndex) => {
+        commands.push(
+          makeText(valueLine, x + labelWidth, cursorY - valueIndex * 9, {
+            font: "F2",
+            size: valueSize,
+            color: "0.08 0.11 0.18",
+          }),
+        );
+      });
+      commands.push(makeLine(x, cursorY - rowHeight + 5, x + width, cursorY - rowHeight + 5, "0.94 0.96 0.98"));
+      cursorY -= Math.max(rowHeight, valueLines.length * 9 + 6);
+    });
+
+    return { commands, bottomY: cursorY };
+  }
+
+  function makeBulletList(
+    lines: string[],
+    x: number,
+    y: number,
+    maxCharacters: number,
+    maxRows: number,
+  ) {
+    const commands: string[] = [];
+    let cursorY = y;
+    let rows = 0;
+
+    for (const line of lines) {
+      if (rows >= maxRows) break;
+
+      const text = line.replace(/^- /, "");
+      const wrappedLines = wrapSummaryLine(text, maxCharacters).slice(0, 2);
+
+      wrappedLines.forEach((wrappedLine, lineIndex) => {
+        if (rows >= maxRows) return;
+
+        if (lineIndex === 0) {
+          commands.push(makeText("-", x, cursorY, {
+            font: "F2",
+            size: 8,
+            color: "0.15 0.38 0.92",
+          }));
+        }
+        commands.push(makeText(wrappedLine, x + 10, cursorY, {
+          size: 7.7,
+          color: "0.20 0.25 0.34",
+        }));
+        cursorY -= 10;
+        rows += 1;
+      });
+      cursorY -= 2;
+    }
+
+    return { commands, bottomY: cursorY };
+  }
+
   async function buildPdfBlob() {
     const encoder = new TextEncoder();
     const pageWidth = 612;
     const pageHeight = 792;
     const marginX = 44;
-    const bottomY = 54;
     const sections = parseSummarySections();
     const pdfPhoto = await getPdfPhoto();
     const pageCommands: string[] = [];
@@ -348,9 +431,13 @@ export function PropertySummaryActions({
       year: "numeric",
     });
     const askingPrice = getLineValue(sections.currentLines, "Asking price");
-    const projectedPurchasePrice = getLineValue(
+    const targetPurchasePrice =
+      getLineValue(sections.projectedLines, "Target purchase price") !== "-"
+        ? getLineValue(sections.projectedLines, "Target purchase price")
+        : getLineValue(sections.projectedLines, "Projected purchase price");
+    const projectedAnnualRent = getLineValue(
       sections.projectedLines,
-      "Projected purchase price",
+      "Projected annual rent",
     );
     const projectedNoi = getLineValue(sections.projectedLines, "Projected NOI");
     const projectedCapRate = getLineValue(
@@ -362,6 +449,40 @@ export function PropertySummaryActions({
       "Annual debt service",
     );
     const totalRehab = getLineValue(sections.projectedLines, "Total rehab");
+    const monthlyCashFlow = getLineValue(
+      sections.returnLines,
+      "Monthly cash flow",
+    );
+    const cashOnCash = getLineValue(
+      sections.returnLines,
+      "Cash-on-cash return",
+    );
+    const dscr = getLineValue(sections.returnLines, "DSCR");
+    const cashRequired = getLineValue(
+      sections.returnLines,
+      "Total estimated cash required",
+    );
+    const financingAssumption = getLineValue(
+      sections.returnLines,
+      "Financing assumption",
+    );
+    const targetOfferRange = getLineValue(
+      sections.investmentLines,
+      "Target offer range",
+    );
+    const maximumPrice = getLineValue(
+      sections.investmentLines,
+      "Maximum price",
+    );
+    const primaryRisk = getLineValue(
+      sections.investmentLines,
+      "Primary risk",
+    );
+    const vacancy = getLineValue(sections.noiBridgeLines, "Vacancy");
+    const operatingExpenses = getLineValue(
+      sections.noiBridgeLines,
+      "Operating expenses",
+    );
 
     pageCommands.push(makeRect(0, 0, pageWidth, pageHeight, { fill: "1 1 1" }));
     pageCommands.push(makeRect(0, 692, pageWidth, 100, { fill: "0.06 0.09 0.16" }));
@@ -438,7 +559,7 @@ export function PropertySummaryActions({
       }),
     );
     pageCommands.push(
-      makeMetricCard("Projected Price", projectedPurchasePrice, 158, 604, 114, {
+      makeMetricCard("Target Purchase Price", targetPurchasePrice, 158, 604, 114, {
         accent: "0.15 0.38 0.92",
       }),
     );
@@ -459,53 +580,117 @@ export function PropertySummaryActions({
     ));
     pageCommands.push(makeLine(44, 566, 376, 566, "0.88 0.91 0.95"));
 
-    const currentTable = makeTable("Current View", sections.currentLines, 44, 526);
-    const projectedTable = makeTable(
-      "Projected View",
-      sections.projectedLines,
-      318,
-      526,
+    pageCommands.push(
+      makeRect(44, 448, 250, 98, {
+        fill: "0.98 0.99 1",
+        stroke: "0.90 0.93 0.96",
+      }),
     );
-    pageCommands.push(...currentTable.commands, ...projectedTable.commands);
+    pageCommands.push(makeSectionHeading("Investment Position", 58, 526, 220));
+    pageCommands.push(
+      ...makeKeyValueRows(
+        [
+          `Asking price: ${askingPrice}`,
+          `Target purchase price: ${targetPurchasePrice}`,
+          `Target offer range: ${targetOfferRange}`,
+          `Maximum price: ${maximumPrice}`,
+        ],
+        58,
+        504,
+        { width: 216, labelWidth: 104, rowHeight: 14, valueSize: 8 },
+      ).commands,
+    );
 
-    let cursorY = Math.min(currentTable.bottomY, projectedTable.bottomY) - 24;
+    pageCommands.push(
+      makeRect(318, 448, 250, 98, {
+        fill: "0.98 0.99 1",
+        stroke: "0.90 0.93 0.96",
+      }),
+    );
+    pageCommands.push(makeSectionHeading("Return Summary", 332, 526, 220));
+    pageCommands.push(
+      ...makeKeyValueRows(
+        [
+          `Monthly cash flow: ${monthlyCashFlow}`,
+          `Cash-on-cash return: ${cashOnCash}`,
+          `DSCR: ${dscr}`,
+          `Cash required: ${cashRequired}`,
+          `Financing: ${financingAssumption}`,
+        ],
+        332,
+        504,
+        { width: 216, labelWidth: 86, rowHeight: 13, valueSize: 7.8 },
+      ).commands,
+    );
 
-    pageCommands.push(makeText("Unit Rent Roll", marginX, cursorY, {
+    pageCommands.push(
+      makeRect(44, 396, 524, 36, {
+        fill: "0.96 0.98 1",
+        stroke: "0.86 0.91 0.98",
+      }),
+    );
+    pageCommands.push(makeText("NOI CALCULATION", 58, 418, {
       font: "F2",
-      size: 12,
-      color: "0.08 0.11 0.18",
+      size: 8,
+      color: "0.25 0.34 0.47",
     }));
-    pageCommands.push(makeLine(marginX, cursorY - 8, 568, cursorY - 8));
-    cursorY -= 22;
+    pageCommands.push(makeText(
+      `Gross rent ${projectedAnnualRent}  |  Vacancy ${vacancy}  |  Operating expenses ${operatingExpenses}  |  NOI ${projectedNoi}`,
+      58,
+      403,
+      {
+        font: "F2",
+        size: 8.3,
+        color: "0.08 0.11 0.18",
+      },
+    ));
 
-    sections.unitLines.slice(0, 7).forEach((line, index) => {
-      wrapSummaryLine(line.replace(/^- /, ""), 94).forEach((wrappedLine, lineIndex) => {
-        if (cursorY < bottomY) return;
-        if (lineIndex === 0) {
-          pageCommands.push(
-            makeRect(marginX, cursorY - 6, 524, 17, {
-              fill: index % 2 === 0 ? "0.98 0.99 1" : "1 1 1",
-            }),
-          );
-        }
+    pageCommands.push(makeSectionHeading("Unit Rent Roll", 44, 366, 524));
+    let cursorY = 342;
+
+    sections.unitLines.slice(0, 5).forEach((line, index) => {
+      const wrappedLines = wrapSummaryLine(line.replace(/^- /, ""), 92).slice(0, 2);
+
+      pageCommands.push(
+        makeRect(marginX, cursorY - 6, 524, wrappedLines.length > 1 ? 28 : 17, {
+          fill: index % 2 === 0 ? "0.98 0.99 1" : "1 1 1",
+        }),
+      );
+      wrappedLines.forEach((wrappedLine, lineIndex) => {
         pageCommands.push(
-          makeText(wrappedLine, marginX + 8, cursorY, {
-            size: 8,
+          makeText(wrappedLine, marginX + 8, cursorY - lineIndex * 10, {
+            size: 7.8,
             color: "0.20 0.25 0.34",
           }),
         );
-        cursorY -= 12;
       });
+      cursorY -= wrappedLines.length > 1 ? 24 : 17;
     });
 
-    if (sections.note && cursorY > bottomY + 34) {
-      cursorY -= 10;
-      wrapSummaryLine(sections.note, 96).forEach((line) => {
-        pageCommands.push(makeText(line, marginX, cursorY, {
-          size: 8,
+    pageCommands.push(
+      makeRect(44, 66, 524, 204, {
+        fill: "1 0.99 0.94",
+        stroke: "0.95 0.78 0.43",
+      }),
+    );
+    pageCommands.push(makeSectionHeading("Key Diligence Before Offer", 58, 246, 492));
+    pageCommands.push(
+      makeText(`Primary risk: ${primaryRisk}`, 58, 224, {
+        font: "F2",
+        size: 8.2,
+        color: "0.50 0.25 0.05",
+      }),
+    );
+    pageCommands.push(
+      ...makeBulletList(sections.diligenceLines, 58, 206, 84, 12).commands,
+    );
+
+    if (sections.note) {
+      wrapSummaryLine(sections.note, 102).slice(0, 2).forEach((line, index) => {
+        pageCommands.push(makeText(line, marginX, 48 - index * 10, {
+          size: 7,
           color: "0.45 0.52 0.63",
         }));
-        cursorY -= 11;
       });
     }
 

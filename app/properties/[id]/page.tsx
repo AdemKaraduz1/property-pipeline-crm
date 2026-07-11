@@ -92,6 +92,22 @@ function formatCurrency(value: number | string | null | undefined) {
   }).format(numberValue);
 }
 
+function formatPercent(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "-";
+  }
+
+  return `${value.toFixed(2)}%`;
+}
+
+function formatRatio(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "-";
+  }
+
+  return `${value.toFixed(2)}x`;
+}
+
 function formatNumber(value: number | string | null | undefined) {
   if (value === null || value === undefined || value === "") return "-";
 
@@ -138,6 +154,12 @@ function parseTextInput(value: FormDataEntryValue | null) {
 function parseDateInput(value: FormDataEntryValue | null) {
   const rawValue = String(value ?? "").trim();
   return rawValue || null;
+}
+
+function roundDownToFiveThousand(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+
+  return Math.floor(value / 5000) * 5000;
 }
 
 function formatDateInput(value: string | null | undefined) {
@@ -908,6 +930,44 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         projectedLoanTermYears,
       ) * 12
     : 0;
+  const projectedCapexRate = dealAnalyzerSettings?.capexRate ?? 5;
+  const projectedAcquisitionCostsRate =
+    dealAnalyzerSettings?.acquisitionCostsRate ?? 3;
+  const projectedCapexReserve =
+    annualProjectedRent * (projectedCapexRate / 100);
+  const projectedAnnualCashFlow =
+    projectedNoi - projectedCapexReserve - projectedAnnualDebtService;
+  const projectedMonthlyCashFlow = projectedAnnualCashFlow / 12;
+  const projectedDownPayment = projectedIsFinanced
+    ? projectedPurchasePrice * (projectedDownPaymentRate / 100)
+    : projectedPurchasePrice;
+  const projectedAcquisitionCosts =
+    projectedPurchasePrice * (projectedAcquisitionCostsRate / 100);
+  const projectedCashRequired =
+    projectedDownPayment + totalRehab + projectedAcquisitionCosts;
+  const projectedCashOnCash =
+    projectedCashRequired > 0
+      ? (projectedAnnualCashFlow / projectedCashRequired) * 100
+      : null;
+  const projectedDscr =
+    projectedAnnualDebtService > 0
+      ? projectedNoi / projectedAnnualDebtService
+      : null;
+  const targetCapRate = dealAnalyzerSettings?.targetCapRate ?? 8;
+  const valueByTargetCapRate =
+    targetCapRate > 0 ? projectedNoi / (targetCapRate / 100) : 0;
+  const maximumPurchasePrice =
+    valueByTargetCapRate > 0
+      ? Math.max(
+          0,
+          (valueByTargetCapRate - totalRehab) /
+            (1 + projectedAcquisitionCostsRate / 100),
+        )
+      : projectedPurchasePrice;
+  const offerRangeLow = roundDownToFiveThousand(
+    projectedPurchasePrice - Math.max(10000, projectedPurchasePrice * 0.015),
+  );
+  const offerRangeHigh = roundDownToFiveThousand(projectedPurchasePrice);
   const locationLine =
     property.city || property.state || property.zip
       ? `${property.city || ""}${property.city && property.state ? ", " : ""}${
@@ -948,7 +1008,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     }`,
     "",
     "Projected View",
-    `Projected purchase price: ${formatCurrency(projectedPurchasePrice)}`,
+    `Target purchase price: ${formatCurrency(projectedPurchasePrice)}`,
     `Projected annual rent: ${formatCurrency(annualProjectedRent)}`,
     `Projected NOI: ${formatCurrency(projectedNoi)}`,
     `Projected cap rate: ${
@@ -958,6 +1018,38 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     }`,
     `Annual debt service: ${formatCurrency(projectedAnnualDebtService)}`,
     `Total rehab: ${formatCurrency(totalRehab)}`,
+    "",
+    "Return Summary",
+    `Monthly cash flow: ${formatCurrency(projectedMonthlyCashFlow)}`,
+    `Cash-on-cash return: ${formatPercent(projectedCashOnCash)}`,
+    `DSCR: ${formatRatio(projectedDscr)}`,
+    `Total estimated cash required: ${formatCurrency(projectedCashRequired)}`,
+    `Financing assumption: ${
+      projectedIsFinanced
+        ? `${projectedDownPaymentRate}% down, ${projectedInterestRate}%, ${projectedLoanTermYears} years`
+        : "Cash purchase"
+    }`,
+    "",
+    "NOI Bridge",
+    `Gross rent: ${formatCurrency(annualProjectedRent)}`,
+    `Vacancy: ${formatCurrency(projectedVacancyLoss)}`,
+    `Operating expenses: ${formatCurrency(projectedOperatingExpenses)}`,
+    `NOI: ${formatCurrency(projectedNoi)}`,
+    "",
+    "Investment Position",
+    `Asking price: ${formatCurrency(askingPrice)}`,
+    `Target purchase price: ${formatCurrency(projectedPurchasePrice)}`,
+    `Target offer range: ${formatCurrency(offerRangeLow)}-${formatCurrency(offerRangeHigh)}`,
+    `Maximum price: ${formatCurrency(maximumPurchasePrice)}`,
+    "Primary risk: Legal status of garden unit and achievement of projected rents",
+    "",
+    "Key Diligence Before Offer",
+    "- Confirm the garden unit is a legal fourth dwelling unit and obtain applicable permits.",
+    "- Obtain current leases, rent roll, security deposits, payment history, and lease expiration dates.",
+    "- Verify projected rents with comparable rentals and confirm the timeline for increases.",
+    "- Confirm owner-paid utilities, water/sewer expenses, insurance, and post-sale property taxes.",
+    "- Review code violations and inspect roof, masonry, plumbing, electrical, HVAC, basement moisture, and egress.",
+    "- Offer subject to inspection, attorney review, financing, appraisal, and verification of legal unit count.",
     "",
     "Units",
     unitSummaryLines.length > 0
