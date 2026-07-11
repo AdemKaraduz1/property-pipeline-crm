@@ -11,6 +11,7 @@ import {
   type PropertyRentRollUpdate,
 } from "@/lib/deal-analyzer";
 import { asRecord } from "@/lib/rehab";
+import { DscrStressChart, NoiCashFlowBridge } from "@/components/DealVerdictCharts";
 
 type SaveUnderwritingAction = (formData: FormData) => Promise<{
   success: boolean;
@@ -32,6 +33,7 @@ type DealVerdictProps = {
   projectedLoanAmount: number;
   projectedLoanTermYears: number;
   projectedPurchasePrice: number;
+  annualCapexReserve: number;
   taxesAnnual: number | null;
   totalRehab: number;
   underwriting: unknown;
@@ -343,6 +345,7 @@ export function DealVerdict({
   projectedLoanAmount: initialProjectedLoanAmount,
   projectedLoanTermYears: initialProjectedLoanTermYears,
   projectedPurchasePrice: initialProjectedPurchasePrice,
+  annualCapexReserve: initialAnnualCapexReserve,
   taxesAnnual,
   totalRehab,
   underwriting,
@@ -375,6 +378,8 @@ export function DealVerdict({
   const projectedNoi = activeProjection?.noiAnnual ?? initialProjectedNoi;
   const annualDebtService =
     activeProjection?.annualDebtService ?? initialAnnualDebtService;
+  const annualCapexReserve =
+    activeProjection?.annualCapexReserve ?? initialAnnualCapexReserve;
   const projectedInterestRate =
     activeProjection?.interestRate ?? initialProjectedInterestRate;
   const projectedLoanAmount =
@@ -514,15 +519,28 @@ export function DealVerdict({
       : 0;
   const baseDscr =
     annualDebtService > 0 ? stabilizedNoiTaxAdjusted / annualDebtService : null;
-  const stabilizedCashFlow = stabilizedNoiTaxAdjusted - annualDebtService;
+  const stabilizedCashFlow =
+    stabilizedNoiTaxAdjusted - annualCapexReserve - annualDebtService;
   const stressedDscr =
     annualDebtServicePlusOne > 0
       ? stabilizedNoiTaxAdjusted / annualDebtServicePlusOne
       : null;
-  const downsideCashFlow = downsideNoi - annualDebtServicePlusTwo;
+  const downsideCashFlow =
+    downsideNoi - annualCapexReserve - annualDebtServicePlusTwo;
   const legalUnitDscr =
     annualDebtService > 0 ? legalUnitNoi / annualDebtService : null;
-  const legalUnitCashFlow = legalUnitNoi - annualDebtService;
+  const legalUnitCashFlow =
+    legalUnitNoi - annualCapexReserve - annualDebtService;
+  const stressedDscrPlusTwo =
+    annualDebtServicePlusTwo > 0
+      ? stabilizedNoiTaxAdjusted / annualDebtServicePlusTwo
+      : null;
+  const downsideDscr =
+    annualDebtServicePlusTwo > 0 ? downsideNoi / annualDebtServicePlusTwo : null;
+  const bridgeVacancyLoss = annualProjectedRent * (vacancyRate / 100);
+  const bridgeNoi =
+    annualProjectedRent - bridgeVacancyLoss - projectedOperatingExpenses;
+  const bridgeCashFlow = bridgeNoi - annualCapexReserve - annualDebtService;
   const rehabStressTotal = totalRehab * (1 + rehabOverrunRate / 100);
   const loanPoints = projectedLoanAmount * (loanPointsRate / 100);
   const monthlyDebtService = annualDebtService / 12;
@@ -846,6 +864,79 @@ export function DealVerdict({
                 )}
               </div>
 
+              <div className="mb-3 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    DSCR Stress Test
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                    Green clears the lender minimum comfortably, amber is
+                    tight, red misses it.
+                  </p>
+                  <DscrStressChart
+                    scenarios={[
+                      { label: "Base", dscr: baseDscr },
+                      { label: "+1% Rate", dscr: stressedDscr },
+                      { label: "+2% Rate", dscr: stressedDscrPlusTwo },
+                      {
+                        label: "Downside",
+                        sublabel: "rent + vacancy + rate",
+                        dscr: downsideDscr,
+                      },
+                    ]}
+                    lenderMinDscr={lenderMinDscr}
+                  />
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Gross Rent to Cash Flow
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                    Projected assumptions, not stress-tested; blue bars are
+                    running totals, gray bars are deductions.
+                  </p>
+                  <NoiCashFlowBridge
+                    items={[
+                      {
+                        label: "Gross Rent",
+                        type: "total",
+                        value: annualProjectedRent,
+                      },
+                      {
+                        label: "Vacancy",
+                        type: "delta",
+                        value: -bridgeVacancyLoss,
+                      },
+                      {
+                        label: "Op. Expenses",
+                        type: "delta",
+                        value: -projectedOperatingExpenses,
+                      },
+                      { label: "NOI", type: "total", value: bridgeNoi },
+                      {
+                        label: "CapEx",
+                        type: "delta",
+                        value: -annualCapexReserve,
+                      },
+                      ...(annualDebtService > 0
+                        ? [
+                            {
+                              label: "Debt Service",
+                              type: "delta" as const,
+                              value: -annualDebtService,
+                            },
+                          ]
+                        : []),
+                      {
+                        label: "Cash Flow",
+                        type: "total",
+                        value: bridgeCashFlow,
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+
               <div className="mb-3 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <Metric
@@ -914,10 +1005,10 @@ export function DealVerdict({
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-slate-50 p-3">
                   <Metric
-                    label="Downside Cash Flow (Before CapEx)"
+                    label="Downside Cash Flow"
                     value={formatCurrency(downsideCashFlow)}
-                    note="+2% rate, rent haircut, vacancy stress; excludes CapEx reserve"
-                    info="This is annual cash flow after a harsher scenario: interest rate rises by 2 points, rent is reduced by your downside haircut, and vacancy is increased. It does not subtract the CapEx reserve, so the real downside cash flow is lower than this. Negative here is a major warning sign."
+                    note={`+2% rate, rent haircut, vacancy stress, ${formatCurrency(annualCapexReserve)} CapEx reserve`}
+                    info="This is annual cash flow after a harsher scenario: interest rate rises by 2 points, rent is reduced by your downside haircut, vacancy is increased, and the CapEx reserve is still subtracted (repairs don't get cheaper just because rent collections drop). Negative here is a major warning sign."
                   />
                 </div>
                 <div className="rounded-lg bg-slate-50 p-3">
@@ -1080,8 +1171,8 @@ export function DealVerdict({
                   <Metric
                     label="Legal-Unit Cash Flow"
                     value={formatCurrency(legalUnitCashFlow)}
-                    note="Before CapEx reserve"
-                    info="This shows annual cash flow after debt service if unsupported unit rent is removed. Negative here means legal-unit verification is a major underwriting condition."
+                    note="After CapEx reserve and debt service"
+                    info="This shows annual cash flow after the CapEx reserve and debt service if unsupported unit rent is removed. Negative here means legal-unit verification is a major underwriting condition."
                   />
                 </div>
               </div>

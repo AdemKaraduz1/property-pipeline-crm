@@ -16,6 +16,8 @@ export type DealAnalyzerProjection = {
   capRate: number;
   annualDebtService: number;
   cashFlowAfterDebt: number;
+  annualCapexReserve: number;
+  cashFlowAfterCapex: number;
   isFinanced: boolean;
   interestRate: number;
   loanAmount: number;

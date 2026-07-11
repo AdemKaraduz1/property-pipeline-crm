@@ -63,6 +63,38 @@ function formatRatio(value: number) {
   return Number.isFinite(value) ? `${value.toFixed(2)}x` : "—";
 }
 
+function getCashOnCashStatus(
+  cashOnCashReturn: number,
+  cashRequired: number,
+): MetricStatus | undefined {
+  if (cashRequired <= 0 || !Number.isFinite(cashOnCashReturn)) return undefined;
+  if (cashOnCashReturn >= 0.08) return "good";
+  if (cashOnCashReturn >= 0.05) return "caution";
+  return "bad";
+}
+
+function getDscrStatus(
+  dscr: number,
+  isFinanced: boolean,
+): MetricStatus | undefined {
+  if (!isFinanced || !Number.isFinite(dscr)) return undefined;
+  if (dscr >= 1.25) return "good";
+  if (dscr >= 1.0) return "caution";
+  return "bad";
+}
+
+function getCapRateLeverageStatus(
+  capRate: number,
+  interestRatePercent: number,
+  isFinanced: boolean,
+): MetricStatus | undefined {
+  if (!isFinanced || !Number.isFinite(capRate)) return undefined;
+  const spread = capRate - interestRatePercent / 100;
+  if (spread >= 0.005) return "good";
+  if (spread >= -0.005) return "caution";
+  return "bad";
+}
+
 function getFirstYearInterest(
   principal: number,
   annualRatePercent: number,
@@ -86,34 +118,67 @@ function getFirstYearInterest(
   return interestTotal;
 }
 
+type MetricStatus = "good" | "caution" | "bad";
+
+const metricStatusCardClass: Record<MetricStatus, string> = {
+  good: "border-green-300 bg-green-50",
+  caution: "border-amber-300 bg-amber-50",
+  bad: "border-red-300 bg-red-50",
+};
+
+const metricStatusBadgeClass: Record<MetricStatus, string> = {
+  good: "bg-green-100 text-green-800",
+  caution: "bg-amber-100 text-amber-800",
+  bad: "bg-red-100 text-red-800",
+};
+
+const metricStatusLabel: Record<MetricStatus, string> = {
+  good: "On target",
+  caution: "Borderline",
+  bad: "Below target",
+};
+
 function Metric({
   label,
   value,
   note,
   emphasis = false,
+  status,
 }: {
   label: string;
   value: string;
   note?: string;
   emphasis?: boolean;
+  status?: MetricStatus;
 }) {
   return (
     <div
       className={
         emphasis
           ? "min-w-0 rounded-md border border-slate-800 bg-slate-900 p-2.5 text-white sm:rounded-lg sm:p-4"
-          : "min-w-0 rounded-md border border-slate-200 bg-slate-50 p-2.5 sm:rounded-lg sm:p-4"
+          : status
+            ? `min-w-0 rounded-md border p-2.5 sm:rounded-lg sm:p-4 ${metricStatusCardClass[status]}`
+            : "min-w-0 rounded-md border border-slate-200 bg-slate-50 p-2.5 sm:rounded-lg sm:p-4"
       }
     >
-      <p
-        className={
-          emphasis
-            ? "break-words text-[11px] leading-tight text-slate-300 sm:text-sm"
-            : "break-words text-[11px] leading-tight text-slate-500 sm:text-sm"
-        }
-      >
-        {label}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={
+            emphasis
+              ? "break-words text-[11px] leading-tight text-slate-300 sm:text-sm"
+              : "break-words text-[11px] leading-tight text-slate-500 sm:text-sm"
+          }
+        >
+          {label}
+        </p>
+        {status && (
+          <span
+            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide sm:text-[10px] ${metricStatusBadgeClass[status]}`}
+          >
+            {metricStatusLabel[status]}
+          </span>
+        )}
+      </div>
       <p
         className={
           emphasis
@@ -606,6 +671,8 @@ export function DealAnalyzer({
       capRate: results.capRate,
       annualDebtService: results.annualDebtService,
       cashFlowAfterDebt: results.noiAnnual - results.annualDebtService,
+      annualCapexReserve: results.capexExpense,
+      cashFlowAfterCapex: results.annualCashFlow,
       isFinanced,
       interestRate,
       loanAmount: results.loanAmount,
@@ -857,9 +924,15 @@ export function DealAnalyzer({
           </section>
 
           <section className={mobileAnalysisPanelClass}>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600 sm:mb-4 sm:text-sm">
-              Returns & Risk
-            </h3>
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600 sm:text-sm">
+                Returns & Risk
+              </h3>
+              <p className="text-[10px] leading-tight text-slate-400 sm:text-xs">
+                Targets: 8%+ cash-on-cash, 1.25x+ DSCR, cap rate above your
+                interest rate. Typical investor guardrails, not guarantees.
+              </p>
+            </div>
             <div className={analysisMetricGridClass}>
               <Metric
                 label="Monthly Cash Flow"
@@ -872,16 +945,35 @@ export function DealAnalyzer({
                 value={formatPercent(results.cashOnCashReturn)}
                 note={`${formatCurrency(results.cashRequired)} total cash required`}
                 emphasis
+                status={getCashOnCashStatus(
+                  results.cashOnCashReturn,
+                  results.cashRequired,
+                )}
               />
               <Metric
                 label="NOI"
                 value={formatCurrency(results.noiAnnual)}
-                note={`${formatPercent(results.capRate)} cap rate at purchase price`}
+                note="Effective gross income minus operating expenses"
+              />
+              <Metric
+                label="Cap Rate"
+                value={formatPercent(results.capRate)}
+                note={
+                  isFinanced
+                    ? `vs ${interestRate.toFixed(2)}% interest rate`
+                    : "at purchase price"
+                }
+                status={getCapRateLeverageStatus(
+                  results.capRate,
+                  interestRate,
+                  isFinanced,
+                )}
               />
               <Metric
                 label="DSCR"
                 value={isFinanced ? formatRatio(results.dscr) : "N/A"}
                 note="NOI ÷ annual debt service"
+                status={getDscrStatus(results.dscr, isFinanced)}
               />
             </div>
           </section>

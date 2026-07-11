@@ -1349,6 +1349,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         projectedNoi={projectedNoi}
         purchasePrice={projectedPurchasePrice}
         annualDebtService={projectedAnnualDebtService}
+        annualCapexReserve={projectedCapexReserve}
         isFinanced={projectedIsFinanced}
       />
 
@@ -1651,6 +1652,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         projectedLoanAmount={projectedLoanAmount}
         projectedLoanTermYears={projectedLoanTermYears}
         projectedPurchasePrice={projectedPurchasePrice}
+        annualCapexReserve={projectedCapexReserve}
         taxesAnnual={taxesAnnual}
         totalRehab={totalRehab}
         underwriting={underwritingDiligence}

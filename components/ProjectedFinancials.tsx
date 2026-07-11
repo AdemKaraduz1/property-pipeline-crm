@@ -13,6 +13,7 @@ type ProjectedFinancialsProps = {
   projectedNoi: number;
   purchasePrice: number;
   annualDebtService: number;
+  annualCapexReserve: number;
   isFinanced: boolean;
 };
 
@@ -31,6 +32,7 @@ export function ProjectedFinancials({
   projectedNoi,
   purchasePrice,
   annualDebtService,
+  annualCapexReserve,
   isFinanced,
 }: ProjectedFinancialsProps) {
   const initialProjection: DealAnalyzerProjection = {
@@ -42,6 +44,8 @@ export function ProjectedFinancials({
     capRate: purchasePrice > 0 ? projectedNoi / purchasePrice : 0,
     annualDebtService,
     cashFlowAfterDebt: projectedNoi - annualDebtService,
+    annualCapexReserve,
+    cashFlowAfterCapex: projectedNoi - annualCapexReserve - annualDebtService,
     isFinanced,
     interestRate: 0,
     loanAmount: 0,
@@ -162,8 +166,24 @@ export function ProjectedFinancials({
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {projection.isFinanced
-              ? `NOI minus ${formatCurrency(projection.annualDebtService)} annual mortgage payments; see Return Summary for cash flow after CapEx reserve`
+              ? `NOI minus ${formatCurrency(projection.annualDebtService)} annual mortgage payments`
               : "Cash purchase—no mortgage debt service"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-sm text-slate-500">
+            Cash Flow After CapEx Reserve
+          </p>
+          <p
+            className={`text-xl font-bold ${projection.cashFlowAfterCapex < 0 ? "text-red-700" : "text-slate-950"}`}
+            data-testid="projected-cash-flow-after-capex"
+          >
+            {formatCurrency(projection.cashFlowAfterCapex)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            The real spendable number: minus{" "}
+            {formatCurrency(projection.annualCapexReserve)} CapEx reserve
           </p>
         </div>
       </div>
