@@ -784,6 +784,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       exit_cap_rate: parseMoneyInput(formData.get("exit_cap_rate")) || 0,
       sale_cost_rate: parseMoneyInput(formData.get("sale_cost_rate")) || 0,
       refi_ltv: parseMoneyInput(formData.get("refi_ltv")) || 0,
+      refi_interest_rate:
+        parseMoneyInput(formData.get("refi_interest_rate")) || 0,
+      refi_loan_term_years:
+        parseMoneyInput(formData.get("refi_loan_term_years")) || 0,
       arv_estimate: parseMoneyInput(formData.get("arv_estimate")),
     };
 

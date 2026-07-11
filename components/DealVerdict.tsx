@@ -443,6 +443,11 @@ export function DealVerdict({
   const exitCapRate = getNumber(inputs.exit_cap_rate, 8);
   const saleCostRate = getNumber(inputs.sale_cost_rate, 7);
   const refiLtv = getNumber(inputs.refi_ltv, 75);
+  const refiInterestRate = getNumber(inputs.refi_interest_rate, projectedInterestRate);
+  const refiLoanTermYears = getNumber(
+    inputs.refi_loan_term_years,
+    projectedLoanTermYears,
+  );
   const arvEstimate = getOptionalNumber(inputs.arv_estimate);
 
   const utilityAllowanceAnnual = Math.max(0, utilityAllowanceMonthly) * 12;
@@ -551,6 +556,18 @@ export function DealVerdict({
     0,
     refiValue * (refiLtv / 100) - projectedLoanAmount,
   );
+  const refiLoanAmount = Math.max(0, refiValue * (refiLtv / 100));
+  const refiAnnualDebtService =
+    refiLoanAmount > 0
+      ? getMonthlyMortgagePayment(
+          refiLoanAmount,
+          refiInterestRate,
+          refiLoanTermYears,
+        ) * 12
+      : 0;
+  const refiAnnualCashFlow =
+    stabilizedNoiTaxAdjusted - annualCapexReserve - refiAnnualDebtService;
+  const refiMonthlyCashFlow = refiAnnualCashFlow / 12;
   const loanToValue =
     projectedPurchasePrice > 0 && projectedLoanAmount > 0
       ? projectedLoanAmount / projectedPurchasePrice
@@ -1804,6 +1821,32 @@ export function DealVerdict({
               </label>
               <label className="block">
                 <span className="text-xs font-medium text-slate-700">
+                  Refi Rate %
+                </span>
+                <input
+                  name="refi_interest_rate"
+                  type="number"
+                  min="0"
+                  step="0.125"
+                  defaultValue={refiInterestRate}
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">
+                  Refi Term (Years)
+                </span>
+                <input
+                  name="refi_loan_term_years"
+                  type="number"
+                  min="1"
+                  step="1"
+                  defaultValue={refiLoanTermYears}
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">
                   ARV / Comp Value
                 </span>
                 <input
@@ -1840,6 +1883,16 @@ export function DealVerdict({
                   }
                 />
               </div>
+              {exitStrategy === "refi" && (
+                <div className="rounded-md bg-white p-3 lg:col-span-3">
+                  <Metric
+                    label="Monthly Cash Flow After Refi"
+                    value={formatCurrency(refiMonthlyCashFlow)}
+                    note={`${formatCurrency(refiAnnualDebtService)} annual debt service at ${formatPercent(refiInterestRate)}, ${refiLoanTermYears}yr`}
+                    info="NOI minus the CapEx reserve minus debt service on the new refinanced loan (Refi LTV x Refi/ARV value, at Refi Rate and Refi Term above), instead of your original acquisition loan."
+                  />
+                </div>
+              )}
             </div>
           </Drawer>
               </div>
