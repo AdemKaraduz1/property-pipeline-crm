@@ -966,17 +966,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     projectedAnnualDebtService > 0
       ? projectedNoi / projectedAnnualDebtService
       : null;
-  const targetCapRate = dealAnalyzerSettings?.targetCapRate ?? 8;
-  const valueByTargetCapRate =
-    targetCapRate > 0 ? projectedNoi / (targetCapRate / 100) : 0;
-  const capRateMaximumPurchasePrice =
-    valueByTargetCapRate > 0
-      ? Math.max(
-          0,
-          (valueByTargetCapRate - totalRehab) /
-            (1 + projectedAcquisitionCostsRate / 100),
-        )
-      : projectedPurchasePrice;
   const utilityAllowanceAnnual =
     Math.max(
       0,
@@ -1030,8 +1019,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       ? downsideCashFlowPrincipal / loanToValue
       : null,
   );
-  const maximumPurchasePrice =
-    downsideBreakevenPurchasePrice ?? capRateMaximumPurchasePrice;
+  const maximumPurchasePrice = downsideBreakevenPurchasePrice;
   const offerRangeLow = roundDownToFiveThousand(
     projectedPurchasePrice - Math.max(10000, projectedPurchasePrice * 0.015),
   );
@@ -1120,6 +1108,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     `Asking price: ${formatCurrency(askingPrice)}`,
     `Analyzed purchase price: ${formatCurrency(projectedPurchasePrice)}`,
     `Offer range: ${formatCurrency(offerRangeLow)}-${formatCurrency(offerRangeHigh)}`,
+    `Downside breakeven price: ${formatCurrency(downsideBreakevenPurchasePrice)}`,
     `Maximum purchase price: ${formatCurrency(maximumPurchasePrice)}`,
     `Primary risk: ${primaryRiskText}`,
     "",

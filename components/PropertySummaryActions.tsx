@@ -442,10 +442,16 @@ export function PropertySummaryActions({
       getLineValue(sections.investmentLines, "Offer range") !== "-"
         ? getLineValue(sections.investmentLines, "Offer range")
         : getLineValue(sections.investmentLines, "Target offer range");
+    const downsideBreakevenPrice = getLineValue(
+      sections.investmentLines,
+      "Downside breakeven price",
+    );
     const maximumPrice =
-      getLineValue(sections.investmentLines, "Maximum purchase price") !== "-"
-        ? getLineValue(sections.investmentLines, "Maximum purchase price")
-        : getLineValue(sections.investmentLines, "Maximum price");
+      downsideBreakevenPrice !== "-"
+        ? downsideBreakevenPrice
+        : getLineValue(sections.investmentLines, "Maximum purchase price") !== "-"
+          ? getLineValue(sections.investmentLines, "Maximum purchase price")
+          : getLineValue(sections.investmentLines, "Maximum price");
     const vacancy = getLineValue(sections.noiBridgeLines, "Vacancy");
     const operatingExpenses = getLineValue(
       sections.noiBridgeLines,
