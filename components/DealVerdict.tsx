@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { AutoSaveForm } from "@/components/AutoSaveForm";
 import {
@@ -49,6 +49,8 @@ const REHAB_RISK_FLAGS = [
   ["porch_code", "Porch / code"],
   ["permits", "Permits"],
 ] as const;
+
+const INFO_TIP_OPEN_EVENT = "property-pipeline:deal-verdict-info-open";
 
 function formatCurrency(value: number | null | undefined) {
   if (value === null || value === undefined || !Number.isFinite(value)) {
@@ -123,6 +125,88 @@ function roundDownToThousand(value: number | null) {
   return Math.floor(value / 1000) * 1000;
 }
 
+function InfoTip({
+  label,
+  info,
+  className = "absolute right-0 top-0",
+}: {
+  label: string;
+  info: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLSpanElement | null>(null);
+  const id = useId();
+
+  useEffect(() => {
+    function handleOpen(event: Event) {
+      const detail = (event as CustomEvent<{ id: string }>).detail;
+
+      if (detail?.id !== id) {
+        setOpen(false);
+      }
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !wrapperRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener(INFO_TIP_OPEN_EVENT, handleOpen);
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      window.removeEventListener(INFO_TIP_OPEN_EVENT, handleOpen);
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [id]);
+
+  function toggleInfo(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setOpen((currentOpen) => {
+      const nextOpen = !currentOpen;
+
+      if (nextOpen) {
+        window.dispatchEvent(
+          new CustomEvent(INFO_TIP_OPEN_EVENT, {
+            detail: { id },
+          }),
+        );
+      }
+
+      return nextOpen;
+    });
+  }
+
+  return (
+    <span ref={wrapperRef} className={`${className} z-30`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`${label} details`}
+        onClick={toggleInfo}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-slate-300 hover:text-slate-700 focus:border-slate-400 focus:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200"
+      >
+        <Info className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute right-0 top-7 z-40 w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white p-3 text-left text-[11px] font-normal leading-relaxed text-slate-600 shadow-lg"
+        >
+          {info}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -136,21 +220,7 @@ function Metric({
 }) {
   return (
     <div className="relative min-w-0 pr-8">
-      {info && (
-        <span className="group absolute right-0 top-0">
-          <span
-            tabIndex={0}
-            title={info}
-            aria-label={`${label} details`}
-            className="inline-flex h-6 w-6 cursor-help items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:border-slate-300 hover:text-slate-700 focus:border-slate-400 focus:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200"
-          >
-            <Info className="h-3.5 w-3.5" aria-hidden="true" />
-          </span>
-          <span className="pointer-events-none invisible absolute right-0 top-7 z-20 w-72 rounded-lg border border-slate-200 bg-white p-3 text-left text-xs font-normal leading-relaxed text-slate-600 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-            {info}
-          </span>
-        </span>
-      )}
+      {info && <InfoTip label={label} info={info} />}
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
         {label}
       </p>
@@ -180,13 +250,11 @@ function Drawer({
           <span className="flex items-center gap-2">
             <span className="block">{title}</span>
             {info && (
-              <span
-                title={info}
-                aria-label={`${title} details`}
-                className="inline-flex h-6 w-6 cursor-help items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:border-slate-300 hover:text-slate-700"
-              >
-                <Info className="h-3.5 w-3.5" aria-hidden="true" />
-              </span>
+              <InfoTip
+                label={title}
+                info={info}
+                className="relative inline-flex shrink-0"
+              />
             )}
           </span>
           <span className="mt-0.5 block text-xs font-normal leading-relaxed text-slate-500">
