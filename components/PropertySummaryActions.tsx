@@ -109,6 +109,7 @@ export function PropertySummaryActions({
       "Investment Position",
       "Property Details",
       "Common Area Rehab",
+      "Additional Income",
       "Key Diligence Before Offer",
       "Units",
     ];
@@ -153,6 +154,7 @@ export function PropertySummaryActions({
       noiBridgeLines: getSectionLines("NOI Bridge"),
       investmentLines: getSectionLines("Investment Position"),
       commonAreaRehabLines: getSectionLines("Common Area Rehab"),
+      additionalIncomeLines: getSectionLines("Additional Income"),
       diligenceLines: getSectionLines("Key Diligence Before Offer"),
       unitLines: getSectionLines("Units"),
       note,
@@ -449,9 +451,26 @@ export function PropertySummaryActions({
           ? getLineValue(sections.investmentLines, "Maximum purchase price")
           : getLineValue(sections.investmentLines, "Maximum price");
     const vacancy = getLineValue(sections.noiBridgeLines, "Vacancy");
+    const additionalIncomeBridge = getLineValue(
+      sections.noiBridgeLines,
+      "Additional income",
+    );
     const operatingExpenses = getLineValue(
       sections.noiBridgeLines,
       "Operating expenses",
+    );
+    const additionalIncomeTotal = getLineValue(
+      sections.additionalIncomeLines,
+      "Additional income total",
+    );
+    const additionalIncomeNotes = getLineValue(
+      sections.additionalIncomeLines,
+      "Income notes",
+    );
+    const additionalIncomeItemLines = sections.additionalIncomeLines.filter(
+      (line) =>
+        !line.toLowerCase().startsWith("additional income total:") &&
+        !line.toLowerCase().startsWith("income notes:"),
     );
     const commonRehabContingency = getLineValue(
       sections.commonAreaRehabLines,
@@ -621,8 +640,13 @@ export function PropertySummaryActions({
       size: 8,
       color: "0.25 0.34 0.47",
     }));
+    const hasAdditionalIncome =
+      additionalIncomeBridge !== "-" && additionalIncomeBridge !== "$0";
+
     pageCommands.push(makeText(
-      `Gross rent ${projectedAnnualRent}  |  Vacancy ${vacancy}  |  Operating expenses ${operatingExpenses}  |  NOI ${projectedNoi}`,
+      `Gross rent ${projectedAnnualRent}  |  Vacancy ${vacancy}${
+        hasAdditionalIncome ? `  |  Other income ${additionalIncomeBridge}` : ""
+      }  |  Operating expenses ${operatingExpenses}  |  NOI ${projectedNoi}`,
       58,
       403,
       {
@@ -709,6 +733,72 @@ export function PropertySummaryActions({
           .forEach((line, index) => {
             pageCommands.push(
               makeText(line, marginX, rehabSummaryY - 14 - index * 10, {
+                size: 7.5,
+                color: "0.42 0.49 0.60",
+              }),
+            );
+          });
+      }
+
+      cursorY = rehabSummaryY - (commonRehabNotes !== "-" ? 40 : 16);
+    }
+
+    if (additionalIncomeItemLines.length > 0) {
+      const incomeHeadingY = cursorY - 10;
+
+      pageCommands.push(
+        makeSectionHeading("Additional Income", marginX, incomeHeadingY, 524),
+      );
+
+      const incomeColumns = 2;
+      const incomeColumnWidth = 262;
+      const incomeRowHeight = 14;
+      const incomeContentY = incomeHeadingY - 22;
+
+      additionalIncomeItemLines.slice(0, 8).forEach((line, index) => {
+        const [label, value] = splitLabelValue(line);
+        const column = index % incomeColumns;
+        const row = Math.floor(index / incomeColumns);
+        const x = marginX + column * incomeColumnWidth;
+        const y = incomeContentY - row * incomeRowHeight;
+
+        pageCommands.push(
+          makeText(label, x, y, {
+            font: "F2",
+            size: 8,
+            color: "0.35 0.42 0.53",
+          }),
+        );
+        pageCommands.push(
+          makeText(value, x + 170, y, {
+            font: "F2",
+            size: 8,
+            color: "0.08 0.11 0.18",
+          }),
+        );
+      });
+
+      const incomeRowsUsed = Math.ceil(
+        Math.min(additionalIncomeItemLines.length, 8) / incomeColumns,
+      );
+      const incomeSummaryY =
+        incomeContentY - incomeRowsUsed * incomeRowHeight - 8;
+
+      pageCommands.push(
+        makeText(
+          `Additional Income Total: ${additionalIncomeTotal}`,
+          marginX,
+          incomeSummaryY,
+          { font: "F2", size: 8.5, color: "0.08 0.11 0.18" },
+        ),
+      );
+
+      if (additionalIncomeNotes !== "-") {
+        wrapSummaryLine(additionalIncomeNotes, 100)
+          .slice(0, 2)
+          .forEach((line, index) => {
+            pageCommands.push(
+              makeText(line, marginX, incomeSummaryY - 14 - index * 10, {
                 size: 7.5,
                 color: "0.42 0.49 0.60",
               }),

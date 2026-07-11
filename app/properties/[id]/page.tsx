@@ -20,6 +20,7 @@ import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 import { PropertySummaryActions } from "@/components/PropertySummaryActions";
 import { PropertyRentRollBridge } from "@/components/PropertyRentRollBridge";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
+import { ADDITIONAL_INCOME_ITEMS, getAdditionalIncomeTotal } from "@/lib/income";
 import {
   getLoanPrincipalFromAnnualDebtService,
   getMonthlyMortgagePayment,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/deal-analyzer";
 import { calculateChicagoFmr } from "@/lib/fmr";
 import { getNeighborhoodFromExtractedFields } from "@/lib/neighborhoods";
+import { MONTH_TO_MONTH_LABEL, isMonthToMonth } from "@/lib/lease";
 
 type PageProps = {
   params: Promise<{
@@ -621,6 +623,70 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     return { success: true };
   }
 
+  async function updateAdditionalIncome(formData: FormData) {
+    "use server";
+
+    const updateSupabase = await createClient();
+    const {
+      data: { user: updateUser },
+    } = await updateSupabase.auth.getUser();
+
+    if (!updateUser) {
+      return {
+        success: false,
+        message: "You must be signed in to save additional income.",
+      };
+    }
+
+    const { data: currentProperty } = await updateSupabase
+      .from("properties")
+      .select("all_extracted_fields")
+      .eq("id", id)
+      .eq("user_id", updateUser.id)
+      .single();
+
+    if (!currentProperty) {
+      return {
+        success: false,
+        message: "Could not load additional income.",
+      };
+    }
+
+    const currentMetadata = asRecord(currentProperty.all_extracted_fields);
+    const items = Object.fromEntries(
+      ADDITIONAL_INCOME_ITEMS.map((item) => [
+        item.id,
+        parseMoneyInput(formData.get(`additional_income_${item.id}`)) || 0,
+      ]),
+    );
+
+    const { error: updateError } = await updateSupabase
+      .from("properties")
+      .update({
+        all_extracted_fields: {
+          ...currentMetadata,
+          additional_income: {
+            items,
+            notes: parseTextInput(formData.get("additional_income_notes")),
+          },
+        },
+      })
+      .eq("id", id)
+      .eq("user_id", updateUser.id);
+
+    if (updateError) {
+      console.error("Could not save additional income:", updateError);
+      return {
+        success: false,
+        message: "Could not save additional income.",
+      };
+    }
+
+    revalidatePath(`/properties/${id}`);
+    revalidatePath("/pipeline");
+    return { success: true };
+  }
+
   async function updateUnderwritingDiligence(formData: FormData) {
     "use server";
 
@@ -836,6 +902,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   );
   const totalRehab = unitRehabTotal + commonRehabTotal;
 
+  const additionalIncome = asRecord(propertyMetadata.additional_income);
+  const additionalIncomeItems = asRecord(additionalIncome.items);
+  const additionalIncomeNotes =
+    typeof additionalIncome.notes === "string" ? additionalIncome.notes : "";
+  const additionalIncomeAnnual = getAdditionalIncomeTotal(
+    additionalIncomeItems,
+  );
+
   const annualUtilities = unitList.reduce(
     (sum, unit) => sum + getAnnualUtilityCost(unit),
     0,
@@ -908,7 +982,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const currentNoi =
     annualCurrentRent -
     currentVacancyLoss -
-    currentItemizedOperatingExpenses;
+    currentItemizedOperatingExpenses +
+    additionalIncomeAnnual;
 
   const currentCapRate =
     Number(askingPrice) > 0 ? currentNoi / Number(askingPrice) : null;
@@ -919,7 +994,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const projectedNoi =
     annualProjectedRent -
     projectedVacancyLoss -
-    projectedOperatingExpenses;
+    projectedOperatingExpenses +
+    additionalIncomeAnnual;
   const projectedPurchasePrice =
     dealAnalyzerSettings?.purchasePrice ?? Number(askingPrice || 0);
   const projectedIsFinanced =
@@ -1101,6 +1177,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     "NOI Bridge",
     `Gross rent: ${formatCurrency(annualProjectedRent)}`,
     `Vacancy: ${formatCurrency(projectedVacancyLoss)}`,
+    `Additional income: ${formatCurrency(additionalIncomeAnnual)}`,
     `Operating expenses: ${formatCurrency(projectedOperatingExpenses)}`,
     `NOI: ${formatCurrency(projectedNoi)}`,
     "",
@@ -1137,6 +1214,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     `Contingency: ${commonRehabContingency}%`,
     `Common area rehab total: ${formatCurrency(commonRehabTotal)}`,
     commonRehabNotes ? `Rehab notes: ${commonRehabNotes}` : null,
+    "",
+    "Additional Income",
+    ...ADDITIONAL_INCOME_ITEMS.filter(
+      (item) => toFiniteNumber(additionalIncomeItems[item.id]) > 0,
+    ).map(
+      (item) =>
+        `${item.label}: ${formatCurrency(toFiniteNumber(additionalIncomeItems[item.id]))}`,
+    ),
+    `Additional income total: ${formatCurrency(additionalIncomeAnnual)}`,
+    additionalIncomeNotes ? `Income notes: ${additionalIncomeNotes}` : null,
     "",
     "Key Diligence Before Offer",
     "- Confirm the garden unit is a legal fourth dwelling unit and obtain applicable permits.",
@@ -1354,6 +1441,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           {[
             ["#overview", "Overview"],
             ["#building", "Building"],
+            ["#income", "Income"],
             ["#operating-expenses", "Expenses"],
             ["#analysis", "Analysis"],
             ["#diligence", "Verdict"],
@@ -1557,6 +1645,96 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </details>
       )}
 
+      <details id="income" className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
+          <div className="min-w-0 flex-1">
+            <h3 className={sectionTitleClass}>Additional Income</h3>
+            <p className={sectionDescriptionClass}>
+              Non-rent income like laundry, parking, or storage. Added to NOI
+              in the Deal Analyzer, Deal Verdict, and PDF summary.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
+                Additional Income
+              </p>
+              <p className="text-lg font-bold text-slate-950 sm:text-xl">
+                {formatCurrency(additionalIncomeAnnual)}
+              </p>
+            </div>
+            <span className={disclosureIndicatorClass}>+</span>
+          </div>
+        </summary>
+
+        <div className={disclosureBodyClass}>
+          <AutoSaveForm
+            action={updateAdditionalIncome}
+            draftKey={`property-pipeline:autosave:${id}:additional-income`}
+            statusClassName="mt-2 text-right text-xs text-slate-500"
+          >
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {ADDITIONAL_INCOME_ITEMS.map((item) => {
+                const storedAmount = toFiniteNumber(
+                  additionalIncomeItems[item.id],
+                );
+
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-md border border-slate-200 bg-slate-50 p-2 md:rounded-lg md:p-3"
+                  >
+                    <label
+                      htmlFor={`additional_income_${item.id}`}
+                      className="block text-xs font-semibold leading-tight text-slate-800 md:text-sm"
+                    >
+                      {item.label}
+                    </label>
+                    <p className="mb-1.5 h-6 overflow-hidden text-[10px] leading-3 text-slate-500 md:mb-2 md:min-h-8 md:text-xs md:leading-4">
+                      {item.description}
+                    </p>
+                    <input
+                      id={`additional_income_${item.id}`}
+                      name={`additional_income_${item.id}`}
+                      type="number"
+                      min="0"
+                      step="1"
+                      defaultValue={storedAmount > 0 ? storedAmount : ""}
+                      placeholder="$0/yr"
+                      className={`${inlineInputClass} h-8`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-3">
+              <label
+                htmlFor="additional_income_notes"
+                className="mb-1 block text-xs font-medium text-slate-700 md:text-sm"
+              >
+                Additional Income Notes
+              </label>
+              <textarea
+                id="additional_income_notes"
+                name="additional_income_notes"
+                defaultValue={additionalIncomeNotes}
+                rows={2}
+                placeholder="Source of these numbers, how many machines/spots, seasonal notes..."
+                className={`${inlineInputClass} h-16 resize-none`}
+              />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-slate-500 sm:text-sm">
+                Annual total: {formatCurrency(additionalIncomeAnnual)}
+              </p>
+            </div>
+          </AutoSaveForm>
+        </div>
+      </details>
+
       <details id="operating-expenses" open className={sectionCardClass}>
         <summary className={disclosureSummaryClass}>
           <div>
@@ -1709,6 +1887,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           projectedMonthlyRent={projectedMonthlyRent}
           totalRehab={totalRehab}
           ownerPaidUtilitiesAnnual={annualUtilities}
+          additionalIncomeAnnual={additionalIncomeAnnual}
           initialSettings={dealAnalyzerSettings}
         />
       </div>
@@ -1729,6 +1908,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         projectedLoanTermYears={projectedLoanTermYears}
         projectedPurchasePrice={projectedPurchasePrice}
         annualCapexReserve={projectedCapexReserve}
+        additionalIncomeAnnual={additionalIncomeAnnual}
         taxesAnnual={taxesAnnual}
         totalRehab={totalRehab}
         underwriting={underwritingDiligence}

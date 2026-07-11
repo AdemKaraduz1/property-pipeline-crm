@@ -25,6 +25,7 @@ type DealAnalyzerProps = {
   projectedMonthlyRent: number;
   totalRehab: number;
   ownerPaidUtilitiesAnnual: number;
+  additionalIncomeAnnual: number;
   initialSettings: DealAnalyzerSettings | null;
 };
 
@@ -233,6 +234,7 @@ export function DealAnalyzer({
   projectedMonthlyRent,
   totalRehab,
   ownerPaidUtilitiesAnnual,
+  additionalIncomeAnnual,
   initialSettings,
 }: DealAnalyzerProps) {
   const [purchaseMethod, setPurchaseMethod] =
@@ -577,7 +579,8 @@ export function DealAnalyzer({
       customOperatingExpensesAnnual === null
         ? itemizedOperatingExpenses
         : Math.max(0, customOperatingExpensesAnnual);
-    const noiAnnual = effectiveGrossIncome - operatingExpenses;
+    const noiAnnual =
+      effectiveGrossIncome + additionalIncomeAnnual - operatingExpenses;
     const netCashFlowBeforeDebt = noiAnnual - capexExpense;
 
     const isFinanced = purchaseMethod === "financed";
@@ -621,6 +624,7 @@ export function DealAnalyzer({
       vacancyLoss,
       operatingExpenses,
       capexExpense,
+      additionalIncomeAnnual,
       noiAnnual,
       downPayment,
       loanAmount,
@@ -650,6 +654,7 @@ export function DealAnalyzer({
     insuranceAnnual,
     utilitiesAnnual,
     otherExpensesAnnual,
+    additionalIncomeAnnual,
     purchaseMethod,
     downPaymentRate,
     acquisitionCostsRate,
@@ -1044,6 +1049,11 @@ export function DealAnalyzer({
                 label="Effective Gross Income"
                 value={formatCurrency(results.effectiveGrossIncome)}
                 note={`${formatCurrency(results.vacancyLoss)} vacancy allowance`}
+              />
+              <Metric
+                label="Additional Income"
+                value={formatCurrency(results.additionalIncomeAnnual)}
+                note="Laundry, parking, and other non-rent income"
               />
               <Metric
                 label="Value by Target Cap Rate"

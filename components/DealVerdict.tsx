@@ -35,6 +35,7 @@ type DealVerdictProps = {
   projectedLoanTermYears: number;
   projectedPurchasePrice: number;
   annualCapexReserve: number;
+  additionalIncomeAnnual: number;
   taxesAnnual: number | null;
   totalRehab: number;
   underwriting: unknown;
@@ -326,6 +327,7 @@ export function DealVerdict({
   projectedLoanTermYears: initialProjectedLoanTermYears,
   projectedPurchasePrice: initialProjectedPurchasePrice,
   annualCapexReserve: initialAnnualCapexReserve,
+  additionalIncomeAnnual,
   taxesAnnual,
   totalRehab,
   underwriting,
@@ -372,7 +374,8 @@ export function DealVerdict({
         annualCurrentRent * (vacancyRate / 100) -
         (annualFixedOperatingExpenses +
           annualCurrentRent * (repairsMaintenanceRate / 100) +
-          annualCurrentRent * (propertyManagementRate / 100))
+          annualCurrentRent * (propertyManagementRate / 100)) +
+        additionalIncomeAnnual
       : initialCurrentNoi;
 
   useEffect(() => {
@@ -474,7 +477,8 @@ export function DealVerdict({
   const legalUnitNoi =
     legalUnitProjectedRent * (1 - vacancyRate / 100) -
     projectedOperatingExpenses -
-    taxDelta;
+    taxDelta +
+    additionalIncomeAnnual;
   const downsideAnnualRent =
     adjustedProjectedRent * (1 - downsideRentHaircutRate / 100);
   const downsideVacancyLoss = downsideAnnualRent * (downsideVacancyRate / 100);
@@ -482,7 +486,8 @@ export function DealVerdict({
     downsideAnnualRent -
     downsideVacancyLoss -
     projectedOperatingExpenses -
-    taxDelta;
+    taxDelta +
+    additionalIncomeAnnual;
   const annualDebtServicePlusOne =
     projectedLoanAmount > 0
       ? getMonthlyMortgagePayment(
@@ -521,7 +526,10 @@ export function DealVerdict({
     annualDebtServicePlusTwo > 0 ? downsideNoi / annualDebtServicePlusTwo : null;
   const bridgeVacancyLoss = annualProjectedRent * (vacancyRate / 100);
   const bridgeNoi =
-    annualProjectedRent - bridgeVacancyLoss - projectedOperatingExpenses;
+    annualProjectedRent -
+    bridgeVacancyLoss -
+    projectedOperatingExpenses +
+    additionalIncomeAnnual;
   const bridgeCashFlow = bridgeNoi - annualCapexReserve - annualDebtService;
   const rehabStressTotal = totalRehab * (1 + rehabOverrunRate / 100);
   const loanPoints = projectedLoanAmount * (loanPointsRate / 100);
@@ -928,6 +936,15 @@ export function DealVerdict({
                         type: "delta",
                         value: -bridgeVacancyLoss,
                       },
+                      ...(additionalIncomeAnnual > 0
+                        ? [
+                            {
+                              label: "Other Income",
+                              type: "delta" as const,
+                              value: additionalIncomeAnnual,
+                            },
+                          ]
+                        : []),
                       {
                         label: "Op. Expenses",
                         type: "delta",
