@@ -12,6 +12,7 @@ import {
   type StabilizationUnitSettings,
 } from "@/lib/stabilization";
 import { StabilizationCurveChart } from "@/components/DealVerdictCharts";
+import { isMonthToMonth } from "@/lib/lease";
 
 type StabilizationUnitProp = {
   id: string;
@@ -48,6 +49,17 @@ function getStorageKey(propertyId: string) {
   return `property-pipeline:stabilization-plan:${propertyId}`;
 }
 
+function getDefaultTurnoverDate(
+  leaseExpiration: string | null,
+  planStartDate: string,
+) {
+  if (leaseExpiration && !isMonthToMonth(leaseExpiration)) {
+    return leaseExpiration;
+  }
+
+  return planStartDate;
+}
+
 export function StabilizationPlan({
   propertyId,
   units,
@@ -79,8 +91,10 @@ export function StabilizationPlan({
       initial[unit.id] = {
         turnoverDate:
           saved?.turnoverDate ??
-          unit.leaseExpiration ??
-          parsedSavedPlan.planStartDate,
+          getDefaultTurnoverDate(
+            unit.leaseExpiration,
+            parsedSavedPlan.planStartDate,
+          ),
         vacancyWeeks: saved?.vacancyWeeks ?? parsedSavedPlan.defaultVacancyWeeks,
         relocationCost: saved?.relocationCost ?? 0,
       };
@@ -292,7 +306,10 @@ export function StabilizationPlan({
     () =>
       units.map((unit) => {
         const unitSetting = unitSettings[unit.id] ?? {
-          turnoverDate: unit.leaseExpiration ?? planStartDate,
+          turnoverDate: getDefaultTurnoverDate(
+            unit.leaseExpiration,
+            planStartDate,
+          ),
           vacancyWeeks: defaultVacancyWeeks,
           relocationCost: 0,
         };

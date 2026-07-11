@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { calculateChicagoFmr } from "@/lib/fmr";
+import { MONTH_TO_MONTH_LABEL } from "@/lib/lease";
 
 type PropertyUnitFormProps = {
   propertyId: string;
@@ -39,6 +40,7 @@ export function PropertyUnitForm({
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isMonthToMonthLease, setIsMonthToMonthLease] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,7 +75,9 @@ export function PropertyUnitForm({
       full_baths: bathrooms,
       half_baths: null,
       rent: currentRent,
-      lease_expiration: toText(formData.get("lease_expiration")),
+      lease_expiration: formData.get("lease_mtm")
+        ? MONTH_TO_MONTH_LABEL
+        : toText(formData.get("lease_expiration")),
       appliances_features: toText(formData.get("appliances_features")),
       tenant_pays: toText(formData.get("tenant_pays")),
 
@@ -99,6 +103,7 @@ export function PropertyUnitForm({
     }
 
     form.reset();
+    setIsMonthToMonthLease(false);
     router.refresh();
     setIsSaving(false);
   }
@@ -192,7 +197,20 @@ export function PropertyUnitForm({
             id="lease_expiration"
             name="lease_expiration"
             placeholder="12/26"
+            disabled={isMonthToMonthLease}
           />
+          <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-600">
+            <input
+              name="lease_mtm"
+              type="checkbox"
+              checked={isMonthToMonthLease}
+              onChange={(event) =>
+                setIsMonthToMonthLease(event.target.checked)
+              }
+              className="h-3.5 w-3.5 rounded border-slate-300"
+            />
+            Month-to-month
+          </label>
         </div>
 
         <div>
