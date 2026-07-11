@@ -597,14 +597,16 @@ export function DealVerdict({
           stabilizedNoiTaxAdjusted / (exitCapRate / 100) - rehabStressTotal,
         )
       : null;
-  const suggestedGoodDealPrice = roundDownToThousand(
-    Math.min(
-      ...[debtSupportedPrice, incomeSupportedPrice].filter(
-        (price): price is number =>
-          price !== null && Number.isFinite(price) && price > 0,
-      ),
-    ),
-  );
+  const suggestedGoodDealPrice = hasUnexpectedTaxDecrease
+    ? null
+    : roundDownToThousand(
+        Math.min(
+          ...[debtSupportedPrice, incomeSupportedPrice].filter(
+            (price): price is number =>
+              price !== null && Number.isFinite(price) && price > 0,
+          ),
+        ),
+      );
 
   const activeRiskFlags = REHAB_RISK_FLAGS.filter(([id]) =>
     getBoolean(inputs[`risk_${id}`]),
@@ -793,7 +795,7 @@ export function DealVerdict({
     suggestedGoodDealPrice !== null && projectedPurchasePrice > 0
       ? Math.max(0, projectedPurchasePrice - suggestedGoodDealPrice)
       : null;
-  const nonPriceItems = issues.slice(0, 2);
+  const nonPriceItems = [...hardStops, ...issues].slice(0, 3);
 
   return (
     <details
@@ -950,27 +952,33 @@ export function DealVerdict({
                   <Metric
                     label="Suggested Good-Deal Price"
                     value={
-                      currentPriceWorks
-                        ? "Current price works"
-                        : formatCurrency(suggestedGoodDealPrice)
+                      hasUnexpectedTaxDecrease
+                        ? "Fix taxes first"
+                        : currentPriceWorks
+                          ? "Current price works"
+                          : formatCurrency(suggestedGoodDealPrice)
                     }
                     note={
-                      suggestedGoodDealPrice === null
-                        ? "Add more rent, debt, and expense data"
-                        : suggestedPriceGap && suggestedPriceGap > 0
-                          ? `${formatCurrency(suggestedPriceGap)} below analyzed price`
-                          : "Based on stress DSCR, downside cash flow, and target yield"
+                      hasUnexpectedTaxDecrease
+                        ? "Post-sale taxes are overstating NOI below"
+                        : suggestedGoodDealPrice === null
+                          ? "Add more rent, debt, and expense data"
+                          : suggestedPriceGap && suggestedPriceGap > 0
+                            ? `${formatCurrency(suggestedPriceGap)} below analyzed price`
+                            : "Based on stress DSCR, downside cash flow, and target yield"
                     }
-                    info="This is the highest price the model thinks still works as a good deal based on debt coverage, downside cash flow, target yield, and stressed rehab. If it says current price works, the analyzed price is already at or below that threshold."
+                    info="This is the highest price the model thinks still works as a good deal based on debt coverage, downside cash flow, target yield, and stressed rehab. It is hidden when post-sale taxes are modeled below current taxes, since every price candidate is derived from that same overstated NOI and would be misleading until that's fixed."
                   />
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <Metric
                     label="Target Basis"
                     value={
-                      debtSupportedPrice !== null
-                        ? "Debt + income"
-                        : "Income yield"
+                      hasUnexpectedTaxDecrease
+                        ? "Blocked by tax data"
+                        : debtSupportedPrice !== null
+                          ? "Debt + income"
+                          : "Income yield"
                     }
                     note={`${formatPercent(exitCapRate)} target yield after stressed rehab`}
                     info="This tells you which constraint is driving the suggested good-deal price. Debt + income means both lender coverage and income yield are part of the limit. Income yield means the target return is the main limit."
@@ -979,7 +987,13 @@ export function DealVerdict({
               </div>
 
               {dealCall !== "Good deal" && nonPriceItems.length > 0 && (
-                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                <div
+                  className={`mb-3 rounded-lg border p-3 text-xs leading-relaxed ${
+                    hardStops.length > 0
+                      ? "border-red-200 bg-red-50 text-red-800"
+                      : "border-amber-200 bg-amber-50 text-amber-900"
+                  }`}
+                >
                   <p className="font-semibold">
                     Price alone may not fully fix this deal.
                   </p>
