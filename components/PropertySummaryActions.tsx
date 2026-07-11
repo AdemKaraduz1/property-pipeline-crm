@@ -436,20 +436,14 @@ export function PropertySummaryActions({
       sections.returnLines,
       "Financing assumption",
     );
-    const targetOfferRange =
-      getLineValue(sections.investmentLines, "Offer range") !== "-"
-        ? getLineValue(sections.investmentLines, "Offer range")
-        : getLineValue(sections.investmentLines, "Target offer range");
-    const downsideBreakevenPrice = getLineValue(
+    const startingOfferPrice = getLineValue(
       sections.investmentLines,
-      "Downside breakeven price",
+      "Starting offer price",
     );
-    const maximumPrice =
-      downsideBreakevenPrice !== "-"
-        ? downsideBreakevenPrice
-        : getLineValue(sections.investmentLines, "Maximum purchase price") !== "-"
-          ? getLineValue(sections.investmentLines, "Maximum purchase price")
-          : getLineValue(sections.investmentLines, "Maximum price");
+    const maximumPrice = getLineValue(
+      sections.investmentLines,
+      "Maximum purchase price",
+    );
     const vacancy = getLineValue(sections.noiBridgeLines, "Vacancy");
     const additionalIncomeBridge = getLineValue(
       sections.noiBridgeLines,
@@ -598,7 +592,7 @@ export function PropertySummaryActions({
       ...makeKeyValueRows(
         [
           `Asking price: ${askingPrice}`,
-          `Offer range: ${targetOfferRange}`,
+          `Starting offer: ${startingOfferPrice}`,
           `Maximum price: ${maximumPrice}`,
         ],
         58,
@@ -678,54 +672,61 @@ export function PropertySummaryActions({
       cursorY -= wrappedLines.length > 1 ? 24 : 17;
     });
 
-    if (commonRehabItemLines.length > 0) {
+    const hasCommonRehabContent =
+      commonRehabItemLines.length > 0 || commonRehabNotes !== "-";
+
+    if (hasCommonRehabContent) {
       const rehabHeadingY = cursorY - 14;
 
       pageCommands.push(
         makeSectionHeading("Common Area Rehab", marginX, rehabHeadingY, 524),
       );
 
-      const rehabColumns = 2;
-      const rehabColumnWidth = 262;
-      const rehabRowHeight = 14;
-      const rehabContentY = rehabHeadingY - 22;
+      let rehabSummaryY = rehabHeadingY - 22;
 
-      commonRehabItemLines.slice(0, 10).forEach((line, index) => {
-        const [label, value] = splitLabelValue(line);
-        const column = index % rehabColumns;
-        const row = Math.floor(index / rehabColumns);
-        const x = marginX + column * rehabColumnWidth;
-        const y = rehabContentY - row * rehabRowHeight;
+      if (commonRehabItemLines.length > 0) {
+        const rehabColumns = 2;
+        const rehabColumnWidth = 262;
+        const rehabRowHeight = 14;
+        const rehabContentY = rehabHeadingY - 22;
+
+        commonRehabItemLines.slice(0, 10).forEach((line, index) => {
+          const [label, value] = splitLabelValue(line);
+          const column = index % rehabColumns;
+          const row = Math.floor(index / rehabColumns);
+          const x = marginX + column * rehabColumnWidth;
+          const y = rehabContentY - row * rehabRowHeight;
+
+          pageCommands.push(
+            makeText(label, x, y, {
+              font: "F2",
+              size: 8,
+              color: "0.35 0.42 0.53",
+            }),
+          );
+          pageCommands.push(
+            makeText(value, x + 170, y, {
+              font: "F2",
+              size: 8,
+              color: "0.08 0.11 0.18",
+            }),
+          );
+        });
+
+        const rehabRowsUsed = Math.ceil(
+          Math.min(commonRehabItemLines.length, 10) / rehabColumns,
+        );
+        rehabSummaryY = rehabContentY - rehabRowsUsed * rehabRowHeight - 8;
 
         pageCommands.push(
-          makeText(label, x, y, {
-            font: "F2",
-            size: 8,
-            color: "0.35 0.42 0.53",
-          }),
+          makeText(
+            `Contingency: ${commonRehabContingency}   |   Common Area Rehab Total: ${commonRehabTotal}`,
+            marginX,
+            rehabSummaryY,
+            { font: "F2", size: 8.5, color: "0.08 0.11 0.18" },
+          ),
         );
-        pageCommands.push(
-          makeText(value, x + 170, y, {
-            font: "F2",
-            size: 8,
-            color: "0.08 0.11 0.18",
-          }),
-        );
-      });
-
-      const rehabRowsUsed = Math.ceil(
-        Math.min(commonRehabItemLines.length, 10) / rehabColumns,
-      );
-      const rehabSummaryY = rehabContentY - rehabRowsUsed * rehabRowHeight - 8;
-
-      pageCommands.push(
-        makeText(
-          `Contingency: ${commonRehabContingency}   |   Common Area Rehab Total: ${commonRehabTotal}`,
-          marginX,
-          rehabSummaryY,
-          { font: "F2", size: 8.5, color: "0.08 0.11 0.18" },
-        ),
-      );
+      }
 
       if (commonRehabNotes !== "-") {
         wrapSummaryLine(commonRehabNotes, 100)

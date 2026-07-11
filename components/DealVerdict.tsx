@@ -531,6 +531,8 @@ export function DealVerdict({
   const bridgeCashFlow = bridgeNoi - annualCapexReserve - annualDebtService;
   const rehabStressTotal = totalRehab * (1 + rehabOverrunRate / 100);
   const loanPoints = projectedLoanAmount * (loanPointsRate / 100);
+  const monthlyDebtService = annualDebtService / 12;
+  const reserveRequirement = monthlyDebtService * reserveMonths;
   const stressedCashFlow =
     stabilizedNoiTaxAdjusted - annualCapexReserve - annualDebtServicePlusOne;
   const stressedCashFlowPlusTwo =
@@ -538,7 +540,8 @@ export function DealVerdict({
   const cashInvested =
     Math.max(0, projectedPurchasePrice - projectedLoanAmount) +
     Math.max(0, totalRehab) +
-    Math.max(0, loanPoints);
+    Math.max(0, loanPoints) +
+    Math.max(0, reserveRequirement);
   const baseCashOnCash =
     cashInvested > 0 ? stabilizedCashFlow / cashInvested : null;
   const stressedCashOnCash =
@@ -557,8 +560,6 @@ export function DealVerdict({
         100
       : 0;
   const underwrittenOccupancyRate = Math.max(0, 100 - vacancyRate);
-  const monthlyDebtService = annualDebtService / 12;
-  const reserveRequirement = monthlyDebtService * reserveMonths;
   const exitValue =
     exitCapRate > 0 ? stabilizedNoiTaxAdjusted / (exitCapRate / 100) : 0;
   const saleCosts = exitValue * (saleCostRate / 100);

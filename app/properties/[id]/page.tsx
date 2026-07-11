@@ -162,12 +162,6 @@ function parseDateInput(value: FormDataEntryValue | null) {
   return rawValue || null;
 }
 
-function roundDownToFiveThousand(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-
-  return Math.floor(value / 5000) * 5000;
-}
-
 function roundDownToThousand(value: number | null) {
   if (value === null || !Number.isFinite(value) || value <= 0) return null;
 
@@ -1071,7 +1065,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     downsideAnnualRent -
     downsideAnnualRent * (downsideVacancyRate / 100) -
     projectedOperatingExpenses -
-    taxDelta;
+    taxDelta +
+    additionalIncomeAnnual;
   const loanToValue =
     projectedPurchasePrice > 0 && projectedLoanAmount > 0
       ? projectedLoanAmount / projectedPurchasePrice
@@ -1094,10 +1089,21 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       : null,
   );
   const maximumPurchasePrice = downsideBreakevenPurchasePrice;
-  const offerRangeLow = roundDownToFiveThousand(
-    projectedPurchasePrice - Math.max(10000, projectedPurchasePrice * 0.015),
+  const targetCapRate = dealAnalyzerSettings?.targetCapRate ?? 8;
+  const valueByTargetCapRate =
+    targetCapRate > 0 ? projectedNoi / (targetCapRate / 100) : 0;
+  const capRateMaxPurchasePrice = Math.max(
+    0,
+    (valueByTargetCapRate - Math.max(0, totalRehab)) /
+      (1 + projectedAcquisitionCostsRate / 100),
   );
-  const offerRangeHigh = roundDownToFiveThousand(projectedPurchasePrice);
+  const startingOfferPriceRaw =
+    capRateMaxPurchasePrice > 0 ? capRateMaxPurchasePrice * 0.9 : null;
+  const startingOfferPrice = roundDownToThousand(
+    startingOfferPriceRaw !== null && Number(askingPrice) > 0
+      ? Math.min(startingOfferPriceRaw, Number(askingPrice))
+      : startingOfferPriceRaw,
+  );
   const locationLine =
     property.city || property.state || property.zip
       ? `${property.city || ""}${property.city && property.state ? ", " : ""}${
@@ -1182,8 +1188,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     "Investment Position",
     `Asking price: ${formatCurrency(askingPrice)}`,
     `Analyzed purchase price: ${formatCurrency(projectedPurchasePrice)}`,
-    `Offer range: ${formatCurrency(offerRangeLow)}-${formatCurrency(offerRangeHigh)}`,
-    `Downside breakeven price: ${formatCurrency(downsideBreakevenPurchasePrice)}`,
+    `Starting offer price: ${formatCurrency(startingOfferPrice)}`,
     `Maximum purchase price: ${formatCurrency(maximumPurchasePrice)}`,
     `Primary risk: ${primaryRiskText}`,
     "",
