@@ -37,6 +37,18 @@ type DealVerdictProps = {
   underwriting: unknown;
   vacancyRate: number;
   propertyId: string;
+  annualOwnerPaidUtilities: number;
+  inferredRecordedUnitCount: number | null;
+  propertyType: string | null;
+  units: VerdictUnit[];
+};
+
+type VerdictUnit = {
+  id: string;
+  label: string;
+  currentRent: number;
+  projectedRent: number;
+  leaseExpiration: string | null;
 };
 
 const REHAB_RISK_FLAGS = [
@@ -49,6 +61,26 @@ const REHAB_RISK_FLAGS = [
   ["porch_code", "Porch / code"],
   ["permits", "Permits"],
 ] as const;
+
+const EXPENSE_CONFIRMATION_ITEMS = [
+  ["water_sewer", "Water / sewer"],
+  ["garbage", "Garbage fee"],
+  ["common_electric", "Common-area electric"],
+  ["snow", "Snow removal"],
+  ["pest", "Pest control"],
+  ["leasing_turnover", "Leasing / turnover"],
+  ["legal_accounting", "Legal / accounting"],
+  ["permits_inspections", "Permits / inspections"],
+  ["replacement_reserves", "Replacement reserves"],
+  ["management_stress", "Management stress"],
+] as const;
+
+const CRITICAL_EXPENSE_IDS = new Set([
+  "water_sewer",
+  "garbage",
+  "replacement_reserves",
+  "management_stress",
+]);
 
 const INFO_TIP_OPEN_EVENT = "property-pipeline:deal-verdict-info-open";
 
@@ -316,6 +348,10 @@ export function DealVerdict({
   underwriting,
   vacancyRate: initialVacancyRate,
   propertyId,
+  annualOwnerPaidUtilities,
+  inferredRecordedUnitCount,
+  propertyType,
+  units,
 }: DealVerdictProps) {
   const [liveProjection, setLiveProjection] =
     useState<DealAnalyzerProjection | null>(null);
@@ -392,11 +428,12 @@ export function DealVerdict({
   const rentCompUrl = getString(inputs.rent_comp_url);
   const rentNotes = getString(inputs.rent_notes);
   const utilityAllowanceMonthly = getNumber(inputs.utility_allowance_monthly, 0);
+  const savedRecordedUnitCount = getOptionalNumber(inputs.recorded_unit_count);
   const postPurchaseTaxesAnnual = getOptionalNumber(
     inputs.post_purchase_taxes_annual,
   );
   const taxNotes = getString(inputs.tax_notes);
-  const lenderMinDscr = getNumber(inputs.lender_min_dscr, 1.2);
+  const lenderMinDscr = getNumber(inputs.lender_min_dscr, 1.25);
   const loanPointsRate = getNumber(inputs.loan_points_rate, 1);
   const reserveMonths = getNumber(inputs.reserve_months, 6);
   const downsideRentHaircutRate = getNumber(inputs.downside_rent_haircut_rate, 10);
@@ -421,9 +458,34 @@ export function DealVerdict({
     annualProjectedRent - utilityAllowanceAnnual,
   );
   const currentTaxes = Number(taxesAnnual || 0);
+  const modeledTaxesAnnual = postPurchaseTaxesAnnual ?? currentTaxes;
   const taxDelta =
-    postPurchaseTaxesAnnual === null ? 0 : postPurchaseTaxesAnnual - currentTaxes;
+    modeledTaxesAnnual - currentTaxes;
   const stabilizedNoiTaxAdjusted = projectedNoi - taxDelta - utilityAllowanceAnnual;
+  const recordedUnitCount =
+    savedRecordedUnitCount !== null
+      ? Math.max(0, Math.floor(savedRecordedUnitCount))
+      : inferredRecordedUnitCount;
+  const modeledUnitCount = units.length;
+  const unitCountMismatch =
+    recordedUnitCount !== null &&
+    modeledUnitCount > recordedUnitCount &&
+    legalUnitsVerified !== "yes";
+  const unsupportedUnits = unitCountMismatch
+    ? units.slice(recordedUnitCount)
+    : [];
+  const unsupportedAnnualRent = unsupportedUnits.reduce(
+    (sum, unit) => sum + Math.max(0, unit.projectedRent) * 12,
+    0,
+  );
+  const legalUnitProjectedRent = Math.max(
+    0,
+    adjustedProjectedRent - unsupportedAnnualRent,
+  );
+  const legalUnitNoi =
+    legalUnitProjectedRent * (1 - vacancyRate / 100) -
+    projectedOperatingExpenses -
+    taxDelta;
   const downsideAnnualRent =
     adjustedProjectedRent * (1 - downsideRentHaircutRate / 100);
   const downsideVacancyLoss = downsideAnnualRent * (downsideVacancyRate / 100);
@@ -456,6 +518,9 @@ export function DealVerdict({
       ? stabilizedNoiTaxAdjusted / annualDebtServicePlusOne
       : null;
   const downsideCashFlow = downsideNoi - annualDebtServicePlusTwo;
+  const legalUnitDscr =
+    annualDebtService > 0 ? legalUnitNoi / annualDebtService : null;
+  const legalUnitCashFlow = legalUnitNoi - annualDebtService;
   const rehabStressTotal = totalRehab * (1 + rehabOverrunRate / 100);
   const loanPoints = projectedLoanAmount * (loanPointsRate / 100);
   const monthlyDebtService = annualDebtService / 12;
@@ -524,6 +589,34 @@ export function DealVerdict({
   const activeRiskFlags = REHAB_RISK_FLAGS.filter(([id]) =>
     getBoolean(inputs[`risk_${id}`]),
   );
+  const expenseConfirmations = EXPENSE_CONFIRMATION_ITEMS.map(([id, label]) => ({
+    id,
+    label,
+    confirmed: getBoolean(inputs[`expense_${id}_confirmed`]),
+  }));
+  const missingExpenseConfirmations = expenseConfirmations.filter(
+    (item) => !item.confirmed,
+  );
+  const missingCriticalExpenseConfirmations =
+    missingExpenseConfirmations.filter((item) =>
+      CRITICAL_EXPENSE_IDS.has(item.id),
+    );
+  const projectedRentLiftRate =
+    annualCurrentRent > 0
+      ? ((annualProjectedRent - annualCurrentRent) / annualCurrentRent) * 100
+      : 0;
+  const unitsWithLargeRentIncreases = units.filter(
+    (unit) =>
+      unit.currentRent > 0 &&
+      unit.projectedRent > unit.currentRent &&
+      ((unit.projectedRent - unit.currentRent) / unit.currentRent) * 100 >= 25,
+  );
+  const unitsMissingLeaseTiming = units.filter(
+    (unit) =>
+      unit.currentRent > 0 &&
+      unit.projectedRent > unit.currentRent * 1.1 &&
+      !unit.leaseExpiration,
+  );
   const issues: string[] = [];
   const hardStops: string[] = [];
 
@@ -534,12 +627,32 @@ export function DealVerdict({
     issues.push("Projected rent needs stronger proof.");
   }
 
+  if (projectedRentLiftRate >= 20) {
+    issues.push("Projected rent growth is heavily driving the deal.");
+  }
+
+  if (unitsMissingLeaseTiming.length > 0) {
+    issues.push("Lease timing is missing for rent increases.");
+  }
+
   if (postPurchaseTaxesAnnual === null) {
     issues.push("Post-sale tax exposure is not modeled.");
   }
 
+  if (unitCountMismatch) {
+    hardStops.push("Modeled unit count exceeds recorded/listed unit count.");
+  }
+
   if (stressedDscr !== null && stressedDscr < lenderMinDscr) {
     hardStops.push("DSCR misses the stressed lender target.");
+  }
+
+  if (
+    unitCountMismatch &&
+    legalUnitDscr !== null &&
+    legalUnitDscr < lenderMinDscr
+  ) {
+    hardStops.push("Deal fails if unsupported unit rent is removed.");
   }
 
   if (downsideCashFlow < 0) {
@@ -558,10 +671,18 @@ export function DealVerdict({
     issues.push("Multiple rehab risk flags are active.");
   }
 
+  if (annualOwnerPaidUtilities === 0 && modeledUnitCount > 0) {
+    issues.push("Owner-paid utilities are not modeled or confirmed.");
+  }
+
+  if (missingCriticalExpenseConfirmations.length > 0) {
+    issues.push("Key operating expenses still need confirmation.");
+  }
+
   let dealScore = 100;
 
   dealScore -= hardStops.length * 28;
-  dealScore -= issues.length * 9;
+  dealScore -= issues.length * 8;
 
   if (baseDscr !== null && baseDscr < lenderMinDscr) {
     dealScore -= 12;
@@ -573,6 +694,18 @@ export function DealVerdict({
 
   if (rentConfidence === "unverified") {
     dealScore -= 8;
+  }
+
+  if (projectedRentLiftRate >= 20) {
+    dealScore -= 8;
+  }
+
+  if (unitsMissingLeaseTiming.length > 0) {
+    dealScore -= Math.min(12, unitsMissingLeaseTiming.length * 4);
+  }
+
+  if (missingExpenseConfirmations.length > 0) {
+    dealScore -= Math.min(14, missingExpenseConfirmations.length * 2);
   }
 
   if (activeRiskFlags.length > 0) {
@@ -591,7 +724,7 @@ export function DealVerdict({
     positiveSignals.push("Base DSCR meets the lender target.");
   }
 
-  if (stressedDscr !== null && stressedDscr >= lenderMinDscr) {
+  if (stressedDscr !== null && stressedDscr >= Math.max(lenderMinDscr, 1.25)) {
     positiveSignals.push("DSCR still works after a 1% rate stress.");
   }
 
@@ -606,7 +739,7 @@ export function DealVerdict({
   const dealCall =
     hardStops.length >= 2 || dealScore < 45
       ? "Bad deal"
-      : hardStops.length === 0 && dealScore >= 75
+      : hardStops.length === 0 && issues.length <= 1 && dealScore >= 80
         ? "Good deal"
         : "Needs review";
   const dealCallSummary =
@@ -691,9 +824,9 @@ export function DealVerdict({
 
                 <p className="mt-2 text-[11px] leading-relaxed opacity-85">
                   Score starts at 100 and subtracts for modeled blockers,
-                  weak rent proof, DSCR misses, negative stress cash flow, and
-                  rehab/legal/code risk. It is a screening score, not a
-                  guarantee.
+                  weak rent proof, DSCR misses, negative stress cash flow,
+                  unit-count risk, missing expense checks, and rehab/legal/code
+                  risk. It is a screening score, not a guarantee.
                 </p>
 
                 {topDecisionReasons.length > 0 && (
@@ -757,6 +890,19 @@ export function DealVerdict({
                 </div>
               )}
 
+              {unitCountMismatch && (
+                <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800">
+                  <p className="font-semibold">Legal unit risk is active.</p>
+                  <p className="mt-1">
+                    {modeledUnitCount} modeled units vs.{" "}
+                    {recordedUnitCount} recorded/listed units
+                    {propertyType ? ` from ${propertyType}` : ""}. Until the
+                    extra unit is verified, the verdict stress-tests that rent
+                    at $0.
+                  </p>
+                </div>
+              )}
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-slate-50 p-3">
                   <Metric
@@ -798,6 +944,53 @@ export function DealVerdict({
                     value={formatCurrency(rehabStressTotal)}
                     note={`${formatPercent(rehabOverrunRate)} overrun on ${formatCurrency(totalRehab)}`}
                     info="This adds your rehab overrun percentage to the current rehab estimate. It helps show what the deal looks like if repairs come in higher than expected."
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="Rent Increase"
+                    value={formatPercent(projectedRentLiftRate)}
+                    note={`${formatCurrency(annualCurrentRent)} to ${formatCurrency(annualProjectedRent)}`}
+                    info="This shows how much projected rent is above current rent. Big increases are not bad by themselves, but the deal score now expects proof and lease timing before calling the deal clean."
+                  />
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="Recorded Units"
+                    value={
+                      recordedUnitCount === null
+                        ? "Not set"
+                        : `${recordedUnitCount}`
+                    }
+                    note={`${modeledUnitCount} modeled in CRM`}
+                    info="This compares the unit count you modeled against the listed or public-record count. If modeled units are higher, the score warns until legal unit count is verified."
+                  />
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="Expense Checks"
+                    value={`${expenseConfirmations.length - missingExpenseConfirmations.length}/${expenseConfirmations.length}`}
+                    note={
+                      missingCriticalExpenseConfirmations.length > 0
+                        ? "Critical items missing"
+                        : "Confirmed checklist"
+                    }
+                    info="This tracks whether commonly missed operating expenses have been confirmed. Water/sewer, garbage, reserves, and management stress are treated as key checks."
+                  />
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <Metric
+                    label="Post-Sale Taxes"
+                    value={formatCurrency(modeledTaxesAnnual)}
+                    note={
+                      taxDelta === 0
+                        ? "No tax stress delta"
+                        : `${formatCurrency(taxDelta)} change vs current`
+                    }
+                    info="This is the tax number used in the verdict stress math. If blank, the model uses current saved taxes and flags post-sale taxes as unverified."
                   />
                 </div>
               </div>
@@ -854,6 +1047,42 @@ export function DealVerdict({
                 />
               </div>
             </div>
+
+            {unitCountMismatch && (
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <div className="rounded-md border border-red-100 bg-red-50 p-3">
+                  <Metric
+                    label="Legal-Unit NOI"
+                    value={formatCurrency(legalUnitNoi)}
+                    note={`${formatCurrency(unsupportedAnnualRent)} unsupported rent removed`}
+                    info="This removes projected rent from modeled units above the recorded/listed unit count, while leaving expenses in place. It approximates the deal if an extra basement/garden unit cannot be counted."
+                  />
+                </div>
+                <div className="rounded-md border border-red-100 bg-red-50 p-3">
+                  <Metric
+                    label="Legal-Unit DSCR"
+                    value={formatRatio(legalUnitDscr)}
+                    note={`${formatRatio(baseDscr)} with all modeled units`}
+                    info="This divides legal-unit-stressed NOI by annual debt service. It is useful when the deal depends on a unit that still needs legal verification."
+                  />
+                </div>
+                <div className="rounded-md border border-red-100 bg-red-50 p-3">
+                  <Metric
+                    label="Legal-Unit Cash Flow"
+                    value={formatCurrency(legalUnitCashFlow)}
+                    note="Before CapEx reserve"
+                    info="This shows annual cash flow after debt service if unsupported unit rent is removed. Negative here means legal-unit verification is a major underwriting condition."
+                  />
+                </div>
+              </div>
+            )}
+
+            {postPurchaseTaxesAnnual !== null && taxDelta !== 0 && (
+              <p className="mt-3 rounded-md border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-600">
+                Stabilized NOI includes a {formatCurrency(taxDelta)} post-sale
+                tax adjustment against current saved taxes.
+              </p>
+            )}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <label className="block">
@@ -970,6 +1199,42 @@ export function DealVerdict({
                 />
               </label>
             </div>
+
+            {(unitsWithLargeRentIncreases.length > 0 ||
+              unitsMissingLeaseTiming.length > 0) && (
+              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+                <p className="font-semibold">Rent increase watchlist</p>
+                {unitsWithLargeRentIncreases.length > 0 && (
+                  <p className="mt-1">
+                    Large increases:{" "}
+                    {unitsWithLargeRentIncreases
+                      .map((unit) => {
+                        const lift =
+                          ((unit.projectedRent - unit.currentRent) /
+                            unit.currentRent) *
+                          100;
+
+                        return `${unit.label} ${formatCurrency(unit.currentRent)} -> ${formatCurrency(unit.projectedRent)} (${formatPercent(lift)})`;
+                      })
+                      .join("; ")}
+                  </p>
+                )}
+                {unitsMissingLeaseTiming.length > 0 && (
+                  <p className="mt-1">
+                    Add lease expiration or turnover timing for:{" "}
+                    {unitsMissingLeaseTiming
+                      .map((unit) => unit.label)
+                      .join(", ")}
+                    .
+                  </p>
+                )}
+                <p className="mt-1">
+                  FMR or voucher ceilings are not guaranteed contract rents;
+                  keep comps, utility allowance, and rent-reasonableness proof
+                  attached.
+                </p>
+              </div>
+            )}
           </Drawer>
 
           <Drawer
@@ -1037,6 +1302,26 @@ export function DealVerdict({
                   note={`${formatCurrency(loanPoints)} points, ${formatCurrency(reserveRequirement)} reserves`}
                 />
               </div>
+              <div className="rounded-md bg-white p-3 sm:col-span-2 lg:col-span-2">
+                <Metric
+                  label="Tax Stress"
+                  value={formatCurrency(modeledTaxesAnnual)}
+                  note={
+                    postPurchaseTaxesAnnual === null
+                      ? "Using saved current taxes"
+                      : `${formatCurrency(taxDelta)} delta vs saved taxes`
+                  }
+                  info="Use this to model post-sale tax exposure separately from the saved current tax bill. The verdict NOI uses this adjustment so taxes do not disappear from stress math."
+                />
+              </div>
+              <div className="rounded-md bg-white p-3 sm:col-span-2 lg:col-span-3">
+                <Metric
+                  label="Cash Cushion"
+                  value={formatCurrency(loanPoints + reserveRequirement)}
+                  note="Loan points plus reserve requirement; acquisition costs may still need separate lender/escrow detail"
+                  info="This helps catch costs that are easy to miss at closing, like lender points and required reserves. Keep acquisition cost percent conservative if escrows, legal, title, appraisal, or inspection costs are not fully modeled."
+                />
+              </div>
               <label className="block sm:col-span-2 lg:col-span-5">
                 <span className="text-xs font-medium text-slate-700">
                   Tax / Financing Notes
@@ -1075,6 +1360,28 @@ export function DealVerdict({
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="text-xs font-medium text-slate-700">
+                  Recorded / Listed Unit Count
+                </span>
+                <input
+                  name="recorded_unit_count"
+                  type="number"
+                  min="0"
+                  step="1"
+                  defaultValue={recordedUnitCount ?? ""}
+                  placeholder={
+                    inferredRecordedUnitCount === null
+                      ? "Unknown"
+                      : String(inferredRecordedUnitCount)
+                  }
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                />
+                <span className="mt-1 block text-xs leading-relaxed text-slate-500">
+                  CRM models {modeledUnitCount} units
+                  {propertyType ? `; property type says ${propertyType}` : ""}.
+                </span>
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">
                   Legal Unit Count
                 </span>
                 <select
@@ -1101,6 +1408,19 @@ export function DealVerdict({
                   <option value="issue_found">Issue found</option>
                 </select>
               </label>
+              {unitCountMismatch && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800 sm:col-span-2">
+                  <p className="font-semibold">
+                    Ask for legal-unit documentation before relying on extra
+                    rent.
+                  </p>
+                  <p className="mt-1">
+                    Verify zoning / certificate of occupancy, permits for
+                    basement work, legal bedroom and egress, separate utilities,
+                    and lender/appraiser/insurance treatment.
+                  </p>
+                </div>
+              )}
               <label className="block sm:col-span-2">
                 <span className="text-xs font-medium text-slate-700">
                   Rehab / Legal Notes
@@ -1113,6 +1433,67 @@ export function DealVerdict({
                   className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                 />
               </label>
+            </div>
+          </Drawer>
+
+          <Drawer
+            title="Expense Completeness"
+            summary="Confirm the operating costs that are easy to miss before trusting the score."
+            info="The score now penalizes unconfirmed key expense categories because missing water/sewer, garbage, reserves, or management stress can make a deal look stronger than it is."
+          >
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {expenseConfirmations.map((item) => (
+                <label
+                  key={item.id}
+                  className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                >
+                  <input
+                    name={`expense_${item.id}_confirmed`}
+                    type="checkbox"
+                    defaultChecked={item.confirmed}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                  />
+                  <span>
+                    <span className="block font-medium">{item.label}</span>
+                    {CRITICAL_EXPENSE_IDS.has(item.id) && (
+                      <span className="block text-xs text-slate-500">
+                        Key score check
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-md bg-white p-3">
+                <Metric
+                  label="Owner-Paid Utilities"
+                  value={formatCurrency(annualOwnerPaidUtilities)}
+                  note="From unit owner-paid selections"
+                  info="This comes from the water, gas, and electric boxes in each unit. If water/sewer is owner responsibility, make sure it is modeled or confirmed elsewhere."
+                />
+              </div>
+              <div className="rounded-md bg-white p-3">
+                <Metric
+                  label="Confirmed Items"
+                  value={`${expenseConfirmations.length - missingExpenseConfirmations.length}/${expenseConfirmations.length}`}
+                  note={
+                    missingCriticalExpenseConfirmations.length > 0
+                      ? `${missingCriticalExpenseConfirmations.length} key missing`
+                      : "Key checks complete"
+                  }
+                  info="Checked items mean you have reviewed that expense category. This does not add dollars by itself; it keeps the verdict honest about missing inputs."
+                />
+              </div>
+              <div className="rounded-md bg-white p-3">
+                <Metric
+                  label="Modeled Opex"
+                  value={formatCurrency(projectedOperatingExpenses)}
+                  note={`${formatCurrency(annualProjectedRent)} projected rent`}
+                  info="This is the operating expense number currently coming from the analyzer. If checklist items are missing, add them in operating expenses or keep them marked unconfirmed."
+                />
+              </div>
             </div>
           </Drawer>
 

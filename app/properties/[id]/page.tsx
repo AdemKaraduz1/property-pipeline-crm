@@ -153,6 +153,38 @@ function getDefaultInsuranceAnnual(unitCount: number) {
   return null;
 }
 
+function getUnitCountFromText(value: unknown) {
+  if (!value) return null;
+
+  const text = String(value).toLowerCase();
+  const digitMatch = text.match(/\b([1-9])\s*(?:flat|unit|family|families|plex)\b/);
+
+  if (digitMatch) return Number(digitMatch[1]);
+
+  const wordCounts: Record<string, number> = {
+    one: 1,
+    single: 1,
+    two: 2,
+    duplex: 2,
+    three: 3,
+    triplex: 3,
+    four: 4,
+    quad: 4,
+  };
+
+  for (const [word, count] of Object.entries(wordCounts)) {
+    if (
+      new RegExp(`\\b${word}\\s*(?:flat|unit|family|families|plex)?\\b`).test(
+        text,
+      )
+    ) {
+      return count;
+    }
+  }
+
+  return null;
+}
+
 function getGoogleMapsUrl(property: {
   address?: unknown;
   city?: unknown;
@@ -600,7 +632,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       post_purchase_taxes_annual: parseMoneyInput(
         formData.get("post_purchase_taxes_annual"),
       ),
-      lender_min_dscr: parseMoneyInput(formData.get("lender_min_dscr")) || 1.2,
+      lender_min_dscr: parseMoneyInput(formData.get("lender_min_dscr")) || 1.25,
       loan_points_rate:
         parseMoneyInput(formData.get("loan_points_rate")) || 0,
       reserve_months: parseMoneyInput(formData.get("reserve_months")) || 0,
@@ -613,6 +645,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       rehab_overrun_rate:
         parseMoneyInput(formData.get("rehab_overrun_rate")) || 0,
 
+      recorded_unit_count: parseMoneyInput(formData.get("recorded_unit_count")),
+
       risk_roof_age: formData.has("risk_roof_age"),
       risk_masonry: formData.has("risk_masonry"),
       risk_sewer_line: formData.has("risk_sewer_line"),
@@ -621,6 +655,30 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       risk_lead_asbestos: formData.has("risk_lead_asbestos"),
       risk_porch_code: formData.has("risk_porch_code"),
       risk_permits: formData.has("risk_permits"),
+      expense_water_sewer_confirmed: formData.has(
+        "expense_water_sewer_confirmed",
+      ),
+      expense_garbage_confirmed: formData.has("expense_garbage_confirmed"),
+      expense_common_electric_confirmed: formData.has(
+        "expense_common_electric_confirmed",
+      ),
+      expense_snow_confirmed: formData.has("expense_snow_confirmed"),
+      expense_pest_confirmed: formData.has("expense_pest_confirmed"),
+      expense_leasing_turnover_confirmed: formData.has(
+        "expense_leasing_turnover_confirmed",
+      ),
+      expense_legal_accounting_confirmed: formData.has(
+        "expense_legal_accounting_confirmed",
+      ),
+      expense_permits_inspections_confirmed: formData.has(
+        "expense_permits_inspections_confirmed",
+      ),
+      expense_replacement_reserves_confirmed: formData.has(
+        "expense_replacement_reserves_confirmed",
+      ),
+      expense_management_stress_confirmed: formData.has(
+        "expense_management_stress_confirmed",
+      ),
       legal_units_verified:
         parseTextInput(formData.get("legal_units_verified")) || "unknown",
       code_violation_check:
@@ -915,6 +973,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     currentRent: Number(getCurrentRent(unit) || 0),
     projectedRent: Number(getProjectedRent(unit) || 0),
   }));
+  const verdictUnits = unitList.map((unit) => ({
+    id: unit.id,
+    label: getUnitLabel(unit),
+    currentRent: Number(getCurrentRent(unit) || 0),
+    projectedRent: Number(getProjectedRent(unit) || 0),
+    leaseExpiration: unit.lease_expiration || null,
+  }));
+  const inferredRecordedUnitCount = getUnitCountFromText(property.property_type);
 
   const hasBuildingDetails =
     hasValue(property.year_built) ||
@@ -1470,6 +1536,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         underwriting={underwritingDiligence}
         vacancyRate={operatingVacancyRate}
         propertyId={id}
+        annualOwnerPaidUtilities={annualUtilities}
+        inferredRecordedUnitCount={inferredRecordedUnitCount}
+        propertyType={property.property_type || null}
+        units={verdictUnits}
       />
 
       {property.broker_remarks && (
