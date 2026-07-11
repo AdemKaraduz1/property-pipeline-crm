@@ -560,36 +560,52 @@ export function DealVerdict({
     projectedPurchasePrice > 0 && projectedLoanAmount > 0
       ? projectedLoanAmount / projectedPurchasePrice
       : null;
-  const debtSupportedPrices = [
+  const getDebtSupportedPrice = (
+    annualDebtServiceCapacity: number | null,
+    annualRatePercent: number,
+  ) => {
+    if (loanToValue === null || loanToValue <= 0) return null;
+    if (
+      annualDebtServiceCapacity === null ||
+      !Number.isFinite(annualDebtServiceCapacity) ||
+      annualDebtServiceCapacity <= 0
+    ) {
+      return null;
+    }
+
+    const principal = getLoanPrincipalFromAnnualDebtService(
+      annualDebtServiceCapacity,
+      annualRatePercent,
+      projectedLoanTermYears,
+    );
+
+    return principal !== null && Number.isFinite(principal) && principal > 0
+      ? principal / loanToValue
+      : null;
+  };
+  const baseDscrSupportedPrice =
     baseDscr !== null && lenderMinDscr > 0
-      ? getLoanPrincipalFromAnnualDebtService(
+      ? getDebtSupportedPrice(
           stabilizedNoiTaxAdjusted / lenderMinDscr,
           projectedInterestRate + rateStressStepOne,
-          projectedLoanTermYears,
         )
-      : null,
-    getLoanPrincipalFromAnnualDebtService(
-      downsideNoi,
-      projectedInterestRate + rateStressStepTwo,
-      projectedLoanTermYears,
-    ),
-    getLoanPrincipalFromAnnualDebtService(
-      stabilizedNoiTaxAdjusted,
-      projectedInterestRate,
-      projectedLoanTermYears,
-    ),
-  ]
-    .filter(
-      (principal): principal is number =>
-        principal !== null && Number.isFinite(principal) && principal > 0,
-    )
-    .map((principal) =>
-      loanToValue !== null && loanToValue > 0 ? principal / loanToValue : null,
-    )
-    .filter(
-      (price): price is number =>
-        price !== null && Number.isFinite(price) && price > 0,
-    );
+      : null;
+  const downsideCashFlowSupportedPrice = getDebtSupportedPrice(
+    downsideNoi - annualCapexReserve,
+    projectedInterestRate + rateStressStepTwo,
+  );
+  const fullNoiDebtSupportedPrice = getDebtSupportedPrice(
+    stabilizedNoiTaxAdjusted,
+    projectedInterestRate,
+  );
+  const debtSupportedPrices = [
+    baseDscrSupportedPrice,
+    downsideCashFlowSupportedPrice,
+    fullNoiDebtSupportedPrice,
+  ].filter(
+    (price): price is number =>
+      price !== null && Number.isFinite(price) && price > 0,
+  );
   const debtSupportedPrice =
     debtSupportedPrices.length > 0 ? Math.min(...debtSupportedPrices) : null;
   const incomeSupportedPrice =
@@ -962,7 +978,7 @@ export function DealVerdict({
                 </div>
               </div>
 
-              <div className="mb-3 grid gap-3 sm:grid-cols-3">
+              <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <Metric
                     label="Analyzed Price"
@@ -988,9 +1004,34 @@ export function DealVerdict({
                           ? "Add more rent, debt, and expense data"
                           : suggestedPriceGap && suggestedPriceGap > 0
                             ? `${formatCurrency(suggestedPriceGap)} below analyzed price`
-                            : "Based on stress DSCR, downside cash flow, and target yield"
+                            : "Based on DSCR, downside breakeven, and target yield"
                     }
-                    info="This is the highest price the model thinks still works as a good deal based on debt coverage, downside cash flow, target yield, and stressed rehab. It is hidden when post-sale taxes are modeled below current taxes, since every price candidate is derived from that same overstated NOI and would be misleading until that's fixed."
+                    info="This is the highest price the model thinks still works as a good deal based on lender coverage, downside cash-flow breakeven after CapEx reserve, target yield, and stressed rehab. It is hidden when post-sale taxes are modeled below current taxes, since every price candidate is derived from that same overstated NOI and would be misleading until that's fixed."
+                  />
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <Metric
+                    label="Downside Breakeven Price"
+                    value={
+                      hasUnexpectedTaxDecrease
+                        ? "Fix taxes first"
+                        : formatCurrency(
+                            roundDownToThousand(downsideCashFlowSupportedPrice),
+                          )
+                    }
+                    note={
+                      hasUnexpectedTaxDecrease
+                        ? "Post-sale taxes are overstating NOI below"
+                        : downsideCashFlowSupportedPrice === null
+                          ? "Need debt and downside NOI data"
+                          : projectedPurchasePrice > downsideCashFlowSupportedPrice
+                            ? `${formatCurrency(
+                                projectedPurchasePrice -
+                                  downsideCashFlowSupportedPrice,
+                              )} below analyzed price`
+                            : "Current price clears downside cash flow"
+                    }
+                    info="This is the highest purchase price, at the current loan-to-value and downside rate stress, where downside NOI still covers debt service plus the CapEx reserve. It does not test your target yield by itself."
                   />
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -1000,11 +1041,11 @@ export function DealVerdict({
                       hasUnexpectedTaxDecrease
                         ? "Blocked by tax data"
                         : debtSupportedPrice !== null
-                          ? "Debt + income"
+                          ? "Debt + cash flow + income"
                           : "Income yield"
                     }
                     note={`${formatPercent(exitCapRate)} target yield after stressed rehab`}
-                    info="This tells you which constraint is driving the suggested good-deal price. Debt + income means both lender coverage and income yield are part of the limit. Income yield means the target return is the main limit."
+                    info="This tells you which constraint is driving the suggested good-deal price. Debt + cash flow + income means lender coverage, downside cash-flow breakeven, and income yield are all part of the limit. Income yield means the target return is the main limit."
                   />
                 </div>
               </div>
