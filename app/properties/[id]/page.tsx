@@ -1443,12 +1443,12 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           {[
             ["#overview", "Overview"],
             ["#building", "Building"],
-            ["#income", "Income"],
             ["#operating-expenses", "Expenses"],
             ["#analysis", "Analysis"],
             ["#diligence", "Verdict"],
             ["#stabilization", "Stabilization"],
             ["#units", `Units (${unitCount})`],
+            ["#income", "Income"],
             ["#rehab", "Rehab"],
             ["#programs", "Programs"],
           ].map(([href, label]) => (
@@ -1646,96 +1646,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           </div>
         </details>
       )}
-
-      <details id="income" className={sectionCardClass}>
-        <summary className={disclosureSummaryClass}>
-          <div className="min-w-0 flex-1">
-            <h3 className={sectionTitleClass}>Additional Income</h3>
-            <p className={sectionDescriptionClass}>
-              Non-rent income like laundry, parking, or storage. Added to NOI
-              in the Deal Analyzer, Deal Verdict, and PDF summary.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
-                Additional Income
-              </p>
-              <p className="text-lg font-bold text-slate-950 sm:text-xl">
-                {formatCurrency(additionalIncomeAnnual)}
-              </p>
-            </div>
-            <span className={disclosureIndicatorClass}>+</span>
-          </div>
-        </summary>
-
-        <div className={disclosureBodyClass}>
-          <AutoSaveForm
-            action={updateAdditionalIncome}
-            draftKey={`property-pipeline:autosave:${id}:additional-income`}
-            statusClassName="mt-2 text-right text-xs text-slate-500"
-          >
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-2 xl:grid-cols-4">
-              {ADDITIONAL_INCOME_ITEMS.map((item) => {
-                const storedAmount = toFiniteNumber(
-                  additionalIncomeItems[item.id],
-                );
-
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-md border border-slate-200 bg-slate-50 p-2 md:rounded-lg md:p-3"
-                  >
-                    <label
-                      htmlFor={`additional_income_${item.id}`}
-                      className="block text-xs font-semibold leading-tight text-slate-800 md:text-sm"
-                    >
-                      {item.label}
-                    </label>
-                    <p className="mb-1.5 h-6 overflow-hidden text-[10px] leading-3 text-slate-500 md:mb-2 md:min-h-8 md:text-xs md:leading-4">
-                      {item.description}
-                    </p>
-                    <input
-                      id={`additional_income_${item.id}`}
-                      name={`additional_income_${item.id}`}
-                      type="number"
-                      min="0"
-                      step="1"
-                      defaultValue={storedAmount > 0 ? storedAmount : ""}
-                      placeholder="$0/yr"
-                      className={`${inlineInputClass} h-8`}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-3">
-              <label
-                htmlFor="additional_income_notes"
-                className="mb-1 block text-xs font-medium text-slate-700 md:text-sm"
-              >
-                Additional Income Notes
-              </label>
-              <textarea
-                id="additional_income_notes"
-                name="additional_income_notes"
-                defaultValue={additionalIncomeNotes}
-                rows={2}
-                placeholder="Source of these numbers, how many machines/spots, seasonal notes..."
-                className={`${inlineInputClass} h-16 resize-none`}
-              />
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-slate-500 sm:text-sm">
-                Annual total: {formatCurrency(additionalIncomeAnnual)}
-              </p>
-            </div>
-          </AutoSaveForm>
-        </div>
-      </details>
 
       <details id="operating-expenses" open className={sectionCardClass}>
         <summary className={disclosureSummaryClass}>
@@ -2563,6 +2473,96 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </div>
           </div>
         )}
+        </div>
+      </details>
+
+      <details id="income" className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
+          <div className="min-w-0 flex-1">
+            <h3 className={sectionTitleClass}>Additional Income</h3>
+            <p className={sectionDescriptionClass}>
+              Non-rent income like laundry or parking. Added to NOI in the
+              Deal Analyzer, Deal Verdict, and PDF summary.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
+                Additional Income
+              </p>
+              <p className="text-lg font-bold text-slate-950 sm:text-xl">
+                {formatCurrency(additionalIncomeAnnual)}
+              </p>
+            </div>
+            <span className={disclosureIndicatorClass}>+</span>
+          </div>
+        </summary>
+
+        <div className={disclosureBodyClass}>
+          <AutoSaveForm
+            action={updateAdditionalIncome}
+            draftKey={`property-pipeline:autosave:${id}:additional-income`}
+            statusClassName="mt-2 text-right text-xs text-slate-500"
+          >
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {ADDITIONAL_INCOME_ITEMS.map((item) => {
+                const storedAmount = toFiniteNumber(
+                  additionalIncomeItems[item.id],
+                );
+
+                return (
+                  <div
+                    key={item.id}
+                    className="rounded-md border border-slate-200 bg-slate-50 p-2 md:rounded-lg md:p-3"
+                  >
+                    <label
+                      htmlFor={`additional_income_${item.id}`}
+                      className="block text-xs font-semibold leading-tight text-slate-800 md:text-sm"
+                    >
+                      {item.label}
+                    </label>
+                    <p className="mb-1.5 h-6 overflow-hidden text-[10px] leading-3 text-slate-500 md:mb-2 md:min-h-8 md:text-xs md:leading-4">
+                      {item.description}
+                    </p>
+                    <input
+                      id={`additional_income_${item.id}`}
+                      name={`additional_income_${item.id}`}
+                      type="number"
+                      min="0"
+                      step="1"
+                      defaultValue={storedAmount > 0 ? storedAmount : ""}
+                      placeholder="$0/yr"
+                      className={`${inlineInputClass} h-8`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-3">
+              <label
+                htmlFor="additional_income_notes"
+                className="mb-1 block text-xs font-medium text-slate-700 md:text-sm"
+              >
+                Additional Income Notes
+              </label>
+              <textarea
+                id="additional_income_notes"
+                name="additional_income_notes"
+                defaultValue={additionalIncomeNotes}
+                rows={2}
+                placeholder="Source of these numbers, how many machines/spots, seasonal notes..."
+                className={`${inlineInputClass} h-16 resize-none`}
+              />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-slate-500 sm:text-sm">
+                Annual total: {formatCurrency(additionalIncomeAnnual)}
+              </p>
+            </div>
+          </AutoSaveForm>
         </div>
       </details>
 
