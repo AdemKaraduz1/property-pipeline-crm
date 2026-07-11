@@ -6,6 +6,7 @@ import { AutoSaveForm } from "@/components/AutoSaveForm";
 import {
   DEAL_ANALYZER_PROJECTION_EVENT,
   PROPERTY_RENT_ROLL_EVENT,
+  getLoanPrincipalFromAnnualDebtService,
   getMonthlyMortgagePayment,
   type DealAnalyzerProjection,
   type PropertyRentRollUpdate,
@@ -130,27 +131,6 @@ function getOptionalNumber(value: unknown) {
 
 function getBoolean(value: unknown) {
   return value === true;
-}
-
-function getLoanPrincipalFromAnnualDebtService(
-  annualDebtService: number,
-  annualRatePercent: number,
-  termYears: number,
-) {
-  if (annualDebtService <= 0 || termYears <= 0) return null;
-
-  const monthlyPayment = annualDebtService / 12;
-  const paymentCount = termYears * 12;
-  const monthlyRate = annualRatePercent / 100 / 12;
-
-  if (monthlyRate === 0) return monthlyPayment * paymentCount;
-
-  const growthFactor = Math.pow(1 + monthlyRate, paymentCount);
-
-  return (
-    (monthlyPayment * (growthFactor - 1)) /
-    (monthlyRate * growthFactor)
-  );
 }
 
 function roundDownToThousand(value: number | null) {

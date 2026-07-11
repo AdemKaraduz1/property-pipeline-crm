@@ -21,6 +21,7 @@ import { PropertySummaryActions } from "@/components/PropertySummaryActions";
 import { PropertyRentRollBridge } from "@/components/PropertyRentRollBridge";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
 import {
+  getLoanPrincipalFromAnnualDebtService,
   getMonthlyMortgagePayment,
   parseDealAnalyzerSettings,
 } from "@/lib/deal-analyzer";
@@ -162,6 +163,12 @@ function roundDownToFiveThousand(value: number) {
   if (!Number.isFinite(value) || value <= 0) return 0;
 
   return Math.floor(value / 5000) * 5000;
+}
+
+function roundDownToThousand(value: number | null) {
+  if (value === null || !Number.isFinite(value) || value <= 0) return null;
+
+  return Math.floor(value / 1000) * 1000;
 }
 
 function formatDateInput(value: string | null | undefined) {
@@ -657,6 +664,10 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         formData.get("post_purchase_taxes_annual"),
       ),
       lender_min_dscr: parseMoneyInput(formData.get("lender_min_dscr")) || 1.25,
+      rate_stress_step_one:
+        parseMoneyInput(formData.get("rate_stress_step_one")) || 0,
+      rate_stress_step_two:
+        parseMoneyInput(formData.get("rate_stress_step_two")) || 0,
       loan_points_rate:
         parseMoneyInput(formData.get("loan_points_rate")) || 0,
       reserve_months: parseMoneyInput(formData.get("reserve_months")) || 0,
@@ -958,7 +969,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   const targetCapRate = dealAnalyzerSettings?.targetCapRate ?? 8;
   const valueByTargetCapRate =
     targetCapRate > 0 ? projectedNoi / (targetCapRate / 100) : 0;
-  const maximumPurchasePrice =
+  const capRateMaximumPurchasePrice =
     valueByTargetCapRate > 0
       ? Math.max(
           0,
@@ -966,6 +977,61 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             (1 + projectedAcquisitionCostsRate / 100),
         )
       : projectedPurchasePrice;
+  const utilityAllowanceAnnual =
+    Math.max(
+      0,
+      toFiniteNumber(underwritingDiligence.utility_allowance_monthly, 0),
+    ) * 12;
+  const postPurchaseTaxesAnnual = hasValue(
+    underwritingDiligence.post_purchase_taxes_annual,
+  )
+    ? toFiniteNumber(underwritingDiligence.post_purchase_taxes_annual)
+    : null;
+  const taxDelta =
+    (postPurchaseTaxesAnnual ?? Number(taxesAnnual || 0)) -
+    Number(taxesAnnual || 0);
+  const adjustedProjectedRent = Math.max(
+    0,
+    annualProjectedRent - utilityAllowanceAnnual,
+  );
+  const downsideRentHaircutRate = toFiniteNumber(
+    underwritingDiligence.downside_rent_haircut_rate,
+    10,
+  );
+  const downsideVacancyRate = toFiniteNumber(
+    underwritingDiligence.downside_vacancy_rate,
+    Math.max(10, operatingVacancyRate + 3),
+  );
+  const downsideAnnualRent =
+    adjustedProjectedRent * (1 - downsideRentHaircutRate / 100);
+  const downsideNoi =
+    downsideAnnualRent -
+    downsideAnnualRent * (downsideVacancyRate / 100) -
+    projectedOperatingExpenses -
+    taxDelta;
+  const loanToValue =
+    projectedPurchasePrice > 0 && projectedLoanAmount > 0
+      ? projectedLoanAmount / projectedPurchasePrice
+      : null;
+  const rateStressStepTwo = toFiniteNumber(
+    underwritingDiligence.rate_stress_step_two,
+    0,
+  );
+  const downsideCashFlowPrincipal =
+    loanToValue !== null && loanToValue > 0
+      ? getLoanPrincipalFromAnnualDebtService(
+          downsideNoi - projectedCapexReserve,
+          projectedInterestRate + rateStressStepTwo,
+          projectedLoanTermYears,
+        )
+      : null;
+  const downsideBreakevenPurchasePrice = roundDownToThousand(
+    downsideCashFlowPrincipal !== null && loanToValue !== null && loanToValue > 0
+      ? downsideCashFlowPrincipal / loanToValue
+      : null,
+  );
+  const maximumPurchasePrice =
+    downsideBreakevenPurchasePrice ?? capRateMaximumPurchasePrice;
   const offerRangeLow = roundDownToFiveThousand(
     projectedPurchasePrice - Math.max(10000, projectedPurchasePrice * 0.015),
   );
@@ -1022,7 +1088,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     }`,
     "",
     "Projected View",
-    `Target purchase price: ${formatCurrency(projectedPurchasePrice)}`,
+    `Analyzed purchase price: ${formatCurrency(projectedPurchasePrice)}`,
     `Projected annual rent: ${formatCurrency(annualProjectedRent)}`,
     `Projected NOI: ${formatCurrency(projectedNoi)}`,
     `Projected cap rate: ${
@@ -1052,9 +1118,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     "",
     "Investment Position",
     `Asking price: ${formatCurrency(askingPrice)}`,
-    `Target purchase price: ${formatCurrency(projectedPurchasePrice)}`,
-    `Target offer range: ${formatCurrency(offerRangeLow)}-${formatCurrency(offerRangeHigh)}`,
-    `Maximum price: ${formatCurrency(maximumPurchasePrice)}`,
+    `Analyzed purchase price: ${formatCurrency(projectedPurchasePrice)}`,
+    `Offer range: ${formatCurrency(offerRangeLow)}-${formatCurrency(offerRangeHigh)}`,
+    `Maximum purchase price: ${formatCurrency(maximumPurchasePrice)}`,
     `Primary risk: ${primaryRiskText}`,
     "",
     "Property Details",

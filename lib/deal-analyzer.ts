@@ -70,6 +70,27 @@ export function getMonthlyMortgagePayment(
   );
 }
 
+export function getLoanPrincipalFromAnnualDebtService(
+  annualDebtService: number,
+  annualRatePercent: number,
+  termYears: number,
+) {
+  if (annualDebtService <= 0 || termYears <= 0) return null;
+
+  const monthlyPayment = annualDebtService / 12;
+  const paymentCount = termYears * 12;
+  const monthlyRate = annualRatePercent / 100 / 12;
+
+  if (monthlyRate === 0) return monthlyPayment * paymentCount;
+
+  const growthFactor = Math.pow(1 + monthlyRate, paymentCount);
+
+  return (
+    (monthlyPayment * (growthFactor - 1)) /
+    (monthlyRate * growthFactor)
+  );
+}
+
 const NUMBER_KEYS = [
   "purchasePrice",
   "downPaymentRate",

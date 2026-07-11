@@ -402,9 +402,11 @@ export function PropertySummaryActions({
     });
     const askingPrice = getLineValue(sections.currentLines, "Asking price");
     const targetPurchasePrice =
-      getLineValue(sections.projectedLines, "Target purchase price") !== "-"
-        ? getLineValue(sections.projectedLines, "Target purchase price")
-        : getLineValue(sections.projectedLines, "Projected purchase price");
+      getLineValue(sections.projectedLines, "Analyzed purchase price") !== "-"
+        ? getLineValue(sections.projectedLines, "Analyzed purchase price")
+        : getLineValue(sections.projectedLines, "Target purchase price") !== "-"
+          ? getLineValue(sections.projectedLines, "Target purchase price")
+          : getLineValue(sections.projectedLines, "Projected purchase price");
     const projectedAnnualRent = getLineValue(
       sections.projectedLines,
       "Projected annual rent",
@@ -436,14 +438,14 @@ export function PropertySummaryActions({
       sections.returnLines,
       "Financing assumption",
     );
-    const targetOfferRange = getLineValue(
-      sections.investmentLines,
-      "Target offer range",
-    );
-    const maximumPrice = getLineValue(
-      sections.investmentLines,
-      "Maximum price",
-    );
+    const targetOfferRange =
+      getLineValue(sections.investmentLines, "Offer range") !== "-"
+        ? getLineValue(sections.investmentLines, "Offer range")
+        : getLineValue(sections.investmentLines, "Target offer range");
+    const maximumPrice =
+      getLineValue(sections.investmentLines, "Maximum purchase price") !== "-"
+        ? getLineValue(sections.investmentLines, "Maximum purchase price")
+        : getLineValue(sections.investmentLines, "Maximum price");
     const vacancy = getLineValue(sections.noiBridgeLines, "Vacancy");
     const operatingExpenses = getLineValue(
       sections.noiBridgeLines,
@@ -525,9 +527,16 @@ export function PropertySummaryActions({
       }),
     );
     pageCommands.push(
-      makeMetricCard("Target Purchase Price", targetPurchasePrice, 158, 604, 114, {
-        accent: "0.15 0.38 0.92",
-      }),
+      makeMetricCard(
+        "Analyzed Purchase Price",
+        targetPurchasePrice,
+        158,
+        604,
+        114,
+        {
+          accent: "0.15 0.38 0.92",
+        },
+      ),
     );
     pageCommands.push(
       makeMetricCard("Projected NOI", projectedNoi, 282, 604, 94, {
@@ -557,9 +566,9 @@ export function PropertySummaryActions({
       ...makeKeyValueRows(
         [
           `Asking price: ${askingPrice}`,
-          `Target purchase price: ${targetPurchasePrice}`,
-          `Target offer range: ${targetOfferRange}`,
-          `Maximum price: ${maximumPrice}`,
+          `Analyzed purchase price: ${targetPurchasePrice}`,
+          `Offer range: ${targetOfferRange}`,
+          `Maximum purchase price: ${maximumPrice}`,
         ],
         58,
         506,
