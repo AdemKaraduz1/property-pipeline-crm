@@ -482,10 +482,6 @@ export function PropertySummaryActions({
       sections.returnLines,
       "Total estimated cash required",
     );
-    const financingAssumption = getLineValue(
-      sections.returnLines,
-      "Financing assumption",
-    );
     const startingOfferPrice = getLineValue(
       sections.investmentLines,
       "Starting offer price",
@@ -688,8 +684,9 @@ export function PropertySummaryActions({
 
     // ---- Investment Position / Return Summary ----
     const boxesTop = heroY - 34 - 16;
-    const investmentBoxHeight = latestOffer !== "-" ? 112 : 97;
-    const returnBoxHeight = 127;
+    const keyValueBoxHeight = (rowCount: number) => 52 + 15 * rowCount;
+    const investmentBoxHeight = keyValueBoxHeight(latestOffer !== "-" ? 4 : 3);
+    const returnBoxHeight = keyValueBoxHeight(4);
     const boxColumnWidth = (contentWidth - 24) / 2;
 
     pageCommands.push(
@@ -751,7 +748,6 @@ export function PropertySummaryActions({
           `Cash-on-cash return: ${cashOnCash}`,
           `DSCR: ${dscr}`,
           `Cash required: ${cashRequired}`,
-          `Financing: ${financingAssumption}`,
         ],
         returnBoxX + 14,
         boxesTop - 40,
@@ -881,6 +877,72 @@ export function PropertySummaryActions({
 
     let cursorY = unitRowY - 3;
 
+    if (additionalIncomeItemLines.length > 0) {
+      const incomeHeadingY = cursorY - 14;
+
+      pageCommands.push(
+        makeSectionHeading("Additional Income", marginX, incomeHeadingY, 524),
+      );
+
+      const incomeColumns = 2;
+      const incomeColumnWidth = 262;
+      const incomeRowHeight = 14;
+      const incomeContentY = incomeHeadingY - 22;
+
+      additionalIncomeItemLines.slice(0, 8).forEach((line, index) => {
+        const [label, value] = splitLabelValue(line);
+        const column = index % incomeColumns;
+        const row = Math.floor(index / incomeColumns);
+        const x = marginX + column * incomeColumnWidth;
+        const y = incomeContentY - row * incomeRowHeight;
+
+        pageCommands.push(
+          makeText(label, x, y, {
+            font: "F2",
+            size: 8,
+            color: "0.35 0.42 0.53",
+          }),
+        );
+        pageCommands.push(
+          makeText(value, x + 170, y, {
+            font: "F2",
+            size: 8,
+            color: "0.08 0.11 0.18",
+          }),
+        );
+      });
+
+      const incomeRowsUsed = Math.ceil(
+        Math.min(additionalIncomeItemLines.length, 8) / incomeColumns,
+      );
+      const incomeSummaryY =
+        incomeContentY - incomeRowsUsed * incomeRowHeight - 8;
+
+      pageCommands.push(
+        makeText(
+          `Additional Income Total: ${additionalIncomeTotal}`,
+          marginX,
+          incomeSummaryY,
+          { font: "F2", size: 8.5, color: "0.08 0.11 0.18" },
+        ),
+      );
+
+      if (additionalIncomeNotes !== "-") {
+        wrapSummaryLine(additionalIncomeNotes, 100)
+          .slice(0, 2)
+          .forEach((line, index) => {
+            pageCommands.push(
+              makeText(line, marginX, incomeSummaryY - 14 - index * 10, {
+                size: 7.5,
+                color: "0.42 0.49 0.60",
+              }),
+            );
+          });
+      }
+
+      cursorY = incomeSummaryY - (additionalIncomeNotes !== "-" ? 34 : 10);
+    }
+
     const hasCommonRehabContent =
       commonRehabEntries.length > 0 || commonRehabNotes !== "-";
 
@@ -969,72 +1031,6 @@ export function PropertySummaryActions({
       }
 
       cursorY = rehabY - 10;
-    }
-
-    if (additionalIncomeItemLines.length > 0) {
-      const incomeHeadingY = cursorY - 10;
-
-      pageCommands.push(
-        makeSectionHeading("Additional Income", marginX, incomeHeadingY, 524),
-      );
-
-      const incomeColumns = 2;
-      const incomeColumnWidth = 262;
-      const incomeRowHeight = 14;
-      const incomeContentY = incomeHeadingY - 22;
-
-      additionalIncomeItemLines.slice(0, 8).forEach((line, index) => {
-        const [label, value] = splitLabelValue(line);
-        const column = index % incomeColumns;
-        const row = Math.floor(index / incomeColumns);
-        const x = marginX + column * incomeColumnWidth;
-        const y = incomeContentY - row * incomeRowHeight;
-
-        pageCommands.push(
-          makeText(label, x, y, {
-            font: "F2",
-            size: 8,
-            color: "0.35 0.42 0.53",
-          }),
-        );
-        pageCommands.push(
-          makeText(value, x + 170, y, {
-            font: "F2",
-            size: 8,
-            color: "0.08 0.11 0.18",
-          }),
-        );
-      });
-
-      const incomeRowsUsed = Math.ceil(
-        Math.min(additionalIncomeItemLines.length, 8) / incomeColumns,
-      );
-      const incomeSummaryY =
-        incomeContentY - incomeRowsUsed * incomeRowHeight - 8;
-
-      pageCommands.push(
-        makeText(
-          `Additional Income Total: ${additionalIncomeTotal}`,
-          marginX,
-          incomeSummaryY,
-          { font: "F2", size: 8.5, color: "0.08 0.11 0.18" },
-        ),
-      );
-
-      if (additionalIncomeNotes !== "-") {
-        wrapSummaryLine(additionalIncomeNotes, 100)
-          .slice(0, 2)
-          .forEach((line, index) => {
-            pageCommands.push(
-              makeText(line, marginX, incomeSummaryY - 14 - index * 10, {
-                size: 7.5,
-                color: "0.42 0.49 0.60",
-              }),
-            );
-          });
-      }
-
-      cursorY = incomeSummaryY - (additionalIncomeNotes !== "-" ? 34 : 10);
     }
 
     const footerDividerY = Math.min(62, cursorY - 10);

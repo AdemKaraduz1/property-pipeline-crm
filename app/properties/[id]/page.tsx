@@ -909,16 +909,20 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       })()
     : null;
 
+  function flattenNoteText(value: unknown) {
+    return typeof value === "string"
+      ? value.trim().replace(/\s*\n+\s*/g, " ")
+      : "";
+  }
+
   function getWalkthroughItemNote(itemId: string) {
-    const notes = asRecord(walkthroughCommonItems[itemId]).notes;
-    return typeof notes === "string" ? notes.trim() : "";
+    return flattenNoteText(asRecord(walkthroughCommonItems[itemId]).notes);
   }
   const commonRehabContingency = toFiniteNumber(
     commonRehab.contingency_percent,
     10,
   );
-  const commonRehabNotes =
-    typeof commonRehab.notes === "string" ? commonRehab.notes : "";
+  const commonRehabNotes = flattenNoteText(commonRehab.notes);
   const commonRehabSubtotal = COMMON_REHAB_ITEMS.reduce(
     (sum, item) => sum + toFiniteNumber(commonRehabItems[item.id]),
     0,
@@ -933,8 +937,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
   const additionalIncome = asRecord(propertyMetadata.additional_income);
   const additionalIncomeItems = asRecord(additionalIncome.items);
-  const additionalIncomeNotes =
-    typeof additionalIncome.notes === "string" ? additionalIncome.notes : "";
+  const additionalIncomeNotes = flattenNoteText(additionalIncome.notes);
   const additionalIncomeAnnual = getAdditionalIncomeTotal(
     additionalIncomeItems,
   );
@@ -1241,6 +1244,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     `Insurance annual: ${formatCurrency(insuranceAnnual)}`,
     `Parking: ${property.parking ?? "-"}`,
     "",
+    "Additional Income",
+    ...ADDITIONAL_INCOME_ITEMS.filter(
+      (item) => toFiniteNumber(additionalIncomeItems[item.id]) > 0,
+    ).map(
+      (item) =>
+        `${item.label}: ${formatCurrency(toFiniteNumber(additionalIncomeItems[item.id]))}`,
+    ),
+    `Additional income total: ${formatCurrency(additionalIncomeAnnual)}`,
+    additionalIncomeNotes ? `Income notes: ${additionalIncomeNotes}` : null,
+    "",
     "Common Area Rehab",
     ...COMMON_REHAB_ITEMS.filter(
       (item) =>
@@ -1257,16 +1270,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     `Contingency: ${commonRehabContingency}%`,
     `Common area rehab total: ${formatCurrency(commonRehabTotal)}`,
     commonRehabNotes ? `Rehab notes: ${commonRehabNotes}` : null,
-    "",
-    "Additional Income",
-    ...ADDITIONAL_INCOME_ITEMS.filter(
-      (item) => toFiniteNumber(additionalIncomeItems[item.id]) > 0,
-    ).map(
-      (item) =>
-        `${item.label}: ${formatCurrency(toFiniteNumber(additionalIncomeItems[item.id]))}`,
-    ),
-    `Additional income total: ${formatCurrency(additionalIncomeAnnual)}`,
-    additionalIncomeNotes ? `Income notes: ${additionalIncomeNotes}` : null,
     "",
     "Key Diligence Before Offer",
     "- Confirm the garden unit is a legal fourth dwelling unit and obtain applicable permits.",
