@@ -1289,7 +1289,7 @@ export function DealVerdict({
                   min="0"
                   step="0.5"
                   defaultValue={downsideRentHaircutRate}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1302,7 +1302,7 @@ export function DealVerdict({
                   min="0"
                   step="0.5"
                   defaultValue={downsideVacancyRate}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1315,7 +1315,7 @@ export function DealVerdict({
                   min="0"
                   step="1"
                   defaultValue={rehabOverrunRate}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
             </div>
@@ -1333,7 +1333,7 @@ export function DealVerdict({
                 <select
                   name="rent_confidence"
                   defaultValue={rentConfidence}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 >
                   <option value="unverified">Unverified</option>
                   <option value="listing">Listing only</option>
@@ -1350,7 +1350,7 @@ export function DealVerdict({
                   name="rent_source"
                   defaultValue={rentSource}
                   placeholder="Lease, rent roll, Zillow comps, CHA/FMR..."
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1366,7 +1366,7 @@ export function DealVerdict({
                     utilityAllowanceMonthly > 0 ? utilityAllowanceMonthly : ""
                   }
                   placeholder="0"
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block sm:col-span-2">
@@ -1377,7 +1377,7 @@ export function DealVerdict({
                   name="rent_comp_url"
                   defaultValue={rentCompUrl}
                   placeholder="https://..."
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block sm:col-span-2">
@@ -1389,7 +1389,7 @@ export function DealVerdict({
                   defaultValue={rentNotes}
                   rows={2}
                   placeholder="Which units need rent proof, rent reasonableness concerns, voucher assumptions..."
-                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-base sm:text-sm"
                 />
               </label>
             </div>
@@ -1447,7 +1447,7 @@ export function DealVerdict({
                   step="1"
                   defaultValue={postPurchaseTaxesAnnual ?? ""}
                   placeholder={String(currentTaxes || "")}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
                 <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
                   Current taxes: {formatCurrency(currentTaxes)}. This field is
@@ -1465,7 +1465,7 @@ export function DealVerdict({
                   min="0"
                   step="0.05"
                   defaultValue={lenderMinDscr}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1478,7 +1478,7 @@ export function DealVerdict({
                   min="0"
                   step="0.25"
                   defaultValue={rateStressStepOne}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
                 <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
                   Points added to your rate for the lighter stress check.
@@ -1494,7 +1494,7 @@ export function DealVerdict({
                   min="0"
                   step="0.25"
                   defaultValue={rateStressStepTwo}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
                 <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
                   Points added for the downside scenario and the max-price
@@ -1512,7 +1512,7 @@ export function DealVerdict({
                   min="0"
                   step="0.25"
                   defaultValue={loanPointsRate}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1525,7 +1525,7 @@ export function DealVerdict({
                   min="0"
                   step="1"
                   defaultValue={reserveMonths}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <div className="rounded-md bg-white p-3">
@@ -1582,7 +1582,7 @@ export function DealVerdict({
                   defaultValue={taxNotes}
                   rows={2}
                   placeholder="Cook County reassessment note, lender quote, borrower reserves, rate-lock assumptions..."
-                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-base sm:text-sm"
                 />
               </label>
             </div>
@@ -1624,7 +1624,7 @@ export function DealVerdict({
                       ? "Unknown"
                       : String(inferredRecordedUnitCount)
                   }
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
                 <span className="mt-1 block text-xs leading-relaxed text-slate-500">
                   CRM models {modeledUnitCount} units
@@ -1638,7 +1638,7 @@ export function DealVerdict({
                 <select
                   name="legal_units_verified"
                   defaultValue={legalUnitsVerified}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 >
                   <option value="unknown">Unknown</option>
                   <option value="yes">Verified</option>
@@ -1652,7 +1652,7 @@ export function DealVerdict({
                 <select
                   name="code_violation_check"
                   defaultValue={codeViolationCheck}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 >
                   <option value="needs_check">Needs check</option>
                   <option value="clear">Clear</option>
@@ -1681,7 +1681,7 @@ export function DealVerdict({
                   defaultValue={rehabNotes}
                   rows={2}
                   placeholder="Inspection findings, contractor quote confidence, permit concerns, legal unit verification..."
-                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-base sm:text-sm"
                 />
               </label>
             </div>
@@ -1760,7 +1760,7 @@ export function DealVerdict({
                 <select
                   name="exit_strategy"
                   defaultValue={exitStrategy}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 >
                   <option value="hold">Hold</option>
                   <option value="refi">Refi</option>
@@ -1777,7 +1777,7 @@ export function DealVerdict({
                   min="0"
                   step="1"
                   defaultValue={holdPeriodYears}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1790,7 +1790,7 @@ export function DealVerdict({
                   min="0"
                   step="0.25"
                   defaultValue={exitCapRate}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1803,7 +1803,7 @@ export function DealVerdict({
                   min="0"
                   step="0.25"
                   defaultValue={saleCostRate}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1816,7 +1816,7 @@ export function DealVerdict({
                   min="0"
                   step="1"
                   defaultValue={refiLtv}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1829,7 +1829,7 @@ export function DealVerdict({
                   min="0"
                   step="0.125"
                   defaultValue={refiInterestRate}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1842,7 +1842,7 @@ export function DealVerdict({
                   min="1"
                   step="1"
                   defaultValue={refiLoanTermYears}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <label className="block">
@@ -1856,7 +1856,7 @@ export function DealVerdict({
                   step="1000"
                   defaultValue={arvEstimate ?? ""}
                   placeholder={String(Math.round(exitValue || projectedPurchasePrice))}
-                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
                 />
               </label>
               <div className="rounded-md bg-white p-3 lg:col-span-3">

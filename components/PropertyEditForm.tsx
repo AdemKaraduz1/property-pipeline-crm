@@ -253,7 +253,7 @@ export function PropertyEditForm({ property }: PropertyEditFormProps) {
                 id="condition"
                 name="condition"
                 defaultValue={property.condition || "unknown"}
-                className="mt-1 flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                className="mt-1 flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base sm:text-sm text-slate-900"
               >
                 <option value="unknown">Unknown</option>
                 <option value="turnkey">Turnkey</option>

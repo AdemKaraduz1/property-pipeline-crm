@@ -304,7 +304,7 @@ const dateInlineInputClass =
   "w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
 const mobileFieldClass =
-  "h-8 w-full min-w-0 appearance-none rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+  "h-8 w-full min-w-0 appearance-none rounded-md border border-slate-300 px-2 py-1 text-base sm:text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
 
 const sectionCardClass =
   "group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6";
@@ -328,7 +328,7 @@ const detailValueClass =
   "truncate text-sm font-medium text-slate-950 sm:text-base";
 
 const compactMoneyInputClass =
-  "h-8 w-full rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:h-10 sm:px-3 sm:py-2";
+  "h-8 w-full rounded-md border border-slate-300 px-2 py-1 text-base sm:text-sm text-slate-950 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:h-10 sm:px-3 sm:py-2";
 
 export default async function PropertyDetailPage({ params }: PageProps) {
   const supabase = await createClient();

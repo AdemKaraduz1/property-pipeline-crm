@@ -468,7 +468,7 @@ export function StabilizationPlan({
               type="date"
               value={planStartDate}
               onChange={(event) => setPlanStartDate(event.target.value)}
-              className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+              className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
             />
             <span className="mt-1 block text-xs text-slate-500">
               Usually your expected closing date
@@ -487,7 +487,7 @@ export function StabilizationPlan({
                 onChange={(event) =>
                   setDefaultVacancyWeeks(Number(event.target.value))
                 }
-                className="h-9 w-full rounded-md border border-slate-300 px-2 text-sm"
+                className="h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
               />
               <button
                 type="button"
