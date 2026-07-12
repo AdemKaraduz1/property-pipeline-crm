@@ -729,6 +729,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         parseMoneyInput(formData.get("rate_stress_step_two")) || 0,
       loan_points_rate:
         parseMoneyInput(formData.get("loan_points_rate")) || 0,
+      acquisition_costs_rate:
+        parseMoneyInput(formData.get("acquisition_costs_rate")) || 0,
       reserve_months: parseMoneyInput(formData.get("reserve_months")) || 0,
       tax_notes: parseTextInput(formData.get("tax_notes")),
 

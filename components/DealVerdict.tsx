@@ -428,6 +428,7 @@ export function DealVerdict({
   const rateStressStepOne = getNumber(inputs.rate_stress_step_one, 0);
   const rateStressStepTwo = getNumber(inputs.rate_stress_step_two, 0);
   const loanPointsRate = getNumber(inputs.loan_points_rate, 1);
+  const acquisitionCostsRate = getNumber(inputs.acquisition_costs_rate, 3);
   const reserveMonths = getNumber(inputs.reserve_months, 6);
   const downsideRentHaircutRate = getNumber(inputs.downside_rent_haircut_rate, 10);
   const downsideVacancyRate = getNumber(
@@ -551,6 +552,14 @@ export function DealVerdict({
     exitCapRate > 0 ? stabilizedNoiTaxAdjusted / (exitCapRate / 100) : 0;
   const saleCosts = exitValue * (saleCostRate / 100);
   const netSaleProceeds = Math.max(0, exitValue - saleCosts - projectedLoanAmount);
+  const acquisitionCosts = projectedPurchasePrice * (acquisitionCostsRate / 100);
+  const downPayment = Math.max(
+    0,
+    projectedPurchasePrice - projectedLoanAmount,
+  );
+  const totalCashInvested =
+    downPayment + Math.max(0, totalRehab) + acquisitionCosts;
+  const netProfitAtExit = netSaleProceeds - totalCashInvested;
   const refiValue = arvEstimate ?? exitValue;
   const refiProceeds = Math.max(
     0,
@@ -1517,6 +1526,23 @@ export function DealVerdict({
               </label>
               <label className="block">
                 <span className="text-xs font-medium text-slate-700">
+                  Acquisition Costs %
+                </span>
+                <input
+                  name="acquisition_costs_rate"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  defaultValue={acquisitionCostsRate}
+                  className="mt-1 h-9 w-full rounded-md border border-slate-300 px-2 text-base sm:text-sm"
+                />
+                <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
+                  Title, attorney, transfer tax, appraisal, and inspection
+                  costs, as a percent of purchase price.
+                </span>
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-700">
                   Reserve Months
                 </span>
                 <input
@@ -1890,6 +1916,16 @@ export function DealVerdict({
                     value={formatCurrency(refiMonthlyCashFlow)}
                     note={`${formatCurrency(refiAnnualDebtService)} annual debt service at ${formatPercent(refiInterestRate)}, ${refiLoanTermYears}yr`}
                     info="NOI minus the CapEx reserve minus debt service on the new refinanced loan (Refi LTV x Refi/ARV value, at Refi Rate and Refi Term above), instead of your original acquisition loan."
+                  />
+                </div>
+              )}
+              {exitStrategy === "sell" && (
+                <div className="rounded-md bg-white p-3 lg:col-span-3">
+                  <Metric
+                    label="Net Profit at Exit"
+                    value={formatCurrency(netProfitAtExit)}
+                    note={`${formatCurrency(netSaleProceeds)} net sale proceeds minus ${formatCurrency(totalCashInvested)} total cash invested`}
+                    info="Net Sale Proceeds minus everything you put in to get here: down payment, total rehab, and acquisition costs (Acquisition Costs % above). This is actual return, not just the check you'd receive at closing."
                   />
                 </div>
               )}
