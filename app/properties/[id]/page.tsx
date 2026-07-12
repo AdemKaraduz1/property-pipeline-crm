@@ -19,6 +19,7 @@ import { ArchivePropertyButton } from "@/components/ArchivePropertyButton";
 import { DeletePropertyButton } from "@/components/DeletePropertyButton";
 import { PropertySummaryActions } from "@/components/PropertySummaryActions";
 import { PropertyRentRollBridge } from "@/components/PropertyRentRollBridge";
+import { NegotiationLog } from "@/components/NegotiationLog";
 import { UnitLeaseExpirationField } from "@/components/UnitLeaseExpirationField";
 import { COMMON_REHAB_ITEMS, asRecord } from "@/lib/rehab";
 import { ADDITIONAL_INCOME_ITEMS, getAdditionalIncomeTotal } from "@/lib/income";
@@ -1831,6 +1832,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         inferredRecordedUnitCount={inferredRecordedUnitCount}
         propertyType={property.property_type || null}
         units={verdictUnits}
+      />
+
+      <NegotiationLog
+        propertyId={id}
+        initialLog={propertyMetadata.negotiation_log}
+        startingOfferPrice={startingOfferPrice}
+        maximumPurchasePrice={maximumPurchasePrice}
       />
 
       <StabilizationPlan
