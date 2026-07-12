@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Download, Share2 } from "lucide-react";
+import { Download, Eye, Share2 } from "lucide-react";
 
 type PropertySummaryActionsProps = {
   propertyId: string;
@@ -1115,15 +1115,6 @@ export function PropertySummaryActions({
     });
   }
 
-  async function copySummary() {
-    try {
-      await navigator.clipboard.writeText(summary);
-      setMessage("Text summary copied.");
-    } catch {
-      setMessage("Could not copy summary.");
-    }
-  }
-
   function savePdfBlob(blob: Blob) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -1138,6 +1129,21 @@ export function PropertySummaryActions({
   async function downloadPdf() {
     setMessage("Preparing PDF...");
     savePdfBlob(await buildPdfBlob());
+  }
+
+  async function previewPdf() {
+    const previewWindow = window.open("", "_blank");
+
+    setMessage("Preparing preview...");
+    const blob = await buildPdfBlob();
+
+    if (!previewWindow) {
+      savePdfBlob(blob);
+      return;
+    }
+
+    previewWindow.location.href = URL.createObjectURL(blob);
+    setMessage("");
   }
 
   async function sharePdf() {
@@ -1176,11 +1182,11 @@ export function PropertySummaryActions({
       <div className="grid grid-cols-3 gap-2">
         <button
           type="button"
-          onClick={copySummary}
+          onClick={previewPdf}
           className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
         >
-          <Copy className="h-4 w-4" aria-hidden="true" />
-          Copy Text
+          <Eye className="h-4 w-4" aria-hidden="true" />
+          Preview PDF
         </button>
         <button
           type="button"
