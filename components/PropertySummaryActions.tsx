@@ -1029,35 +1029,7 @@ export function PropertySummaryActions({
 
         rehabY -= overallNoteLines.length * 10 + 6;
       }
-
-      cursorY = rehabY - 10;
     }
-
-    const footerDividerY = Math.min(62, cursorY - 10);
-
-    pageCommands.push(
-      makeLine(
-        marginX,
-        footerDividerY,
-        marginX + contentWidth,
-        footerDividerY,
-        "0.90 0.93 0.96",
-      ),
-    );
-
-    const disclaimerY = footerDividerY - 14;
-
-    pageCommands.push(makeText("Planning estimate - verify before making offers.", marginX, disclaimerY, {
-      size: 7,
-      color: "0.45 0.52 0.63",
-    }));
-    pageCommands.push(
-      makeText("Property Pipeline CRM", marginX + contentWidth - 92, disclaimerY, {
-        font: "F2",
-        size: 7,
-        color: "0.60 0.67 0.78",
-      }),
-    );
 
     const content = pageCommands.join("\n");
     const objects: Array<Uint8Array[]> = [
