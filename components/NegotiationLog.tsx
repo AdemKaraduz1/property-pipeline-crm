@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   parseNegotiationRounds,
+  negotiationResultLabel,
   type NegotiationRound,
   type NegotiationResult,
 } from "@/lib/negotiation";
@@ -25,13 +26,6 @@ function formatCurrency(value: number) {
     maximumFractionDigits: 0,
   }).format(Number.isFinite(value) ? value : 0);
 }
-
-const resultLabel: Record<NegotiationResult, string> = {
-  pending: "Pending",
-  countered: "Countered",
-  rejected: "Rejected",
-  accepted: "Accepted",
-};
 
 const resultBadgeClass: Record<NegotiationResult, string> = {
   pending: "bg-slate-100 text-slate-700",
@@ -285,7 +279,7 @@ export function NegotiationLog({
                       <span
                         className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${resultBadgeClass[round.result]}`}
                       >
-                        {resultLabel[round.result]}
+                        {negotiationResultLabel[round.result]}
                       </span>
                     </div>
 

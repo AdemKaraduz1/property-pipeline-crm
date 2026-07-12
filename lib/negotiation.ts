@@ -12,6 +12,13 @@ export type NegotiationRound = {
   notes: string;
 };
 
+export const negotiationResultLabel: Record<NegotiationResult, string> = {
+  pending: "Pending",
+  countered: "Countered",
+  rejected: "Rejected",
+  accepted: "Accepted",
+};
+
 function isNegotiationResult(value: unknown): value is NegotiationResult {
   return (
     value === "pending" ||

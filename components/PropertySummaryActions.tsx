@@ -118,6 +118,29 @@ export function PropertySummaryActions({
     };
   }
 
+  function parseItemEntriesWithNotes(lines: string[]) {
+    const entries: Array<{ label: string; value: string; note?: string }> = [];
+
+    lines.forEach((line) => {
+      const [label, value] = splitLabelValue(line);
+
+      if (label.endsWith(" Note")) {
+        const baseLabel = label.slice(0, -" Note".length);
+        const target = entries.find((entry) => entry.label === baseLabel);
+
+        if (target) {
+          target.note = value;
+        }
+
+        return;
+      }
+
+      entries.push({ label, value });
+    });
+
+    return entries;
+  }
+
   function parseSummarySections() {
     const lines = summary.split("\n").map((line) => line.trim());
     const title = lines[0] || "Property Pipeline CRM Deal Summary";
@@ -162,8 +185,6 @@ export function PropertySummaryActions({
       return lines.slice(startIndex + 1, endIndex).filter(Boolean);
     }
 
-    const note = noteIndex === -1 ? "" : lines[noteIndex];
-
     return {
       title,
       address: propertyLines[0] || "Untitled Property",
@@ -177,7 +198,6 @@ export function PropertySummaryActions({
       additionalIncomeLines: getSectionLines("Additional Income"),
       diligenceLines: getSectionLines("Key Diligence Before Offer"),
       unitLines: getSectionLines("Units"),
-      note,
     };
   }
 
@@ -474,6 +494,7 @@ export function PropertySummaryActions({
       sections.investmentLines,
       "Maximum purchase price",
     );
+    const latestOffer = getLineValue(sections.investmentLines, "Latest offer");
     const vacancy = getLineValue(sections.noiBridgeLines, "Vacancy");
     const additionalIncomeBridge = getLineValue(
       sections.noiBridgeLines,
@@ -514,6 +535,7 @@ export function PropertySummaryActions({
         !line.toLowerCase().startsWith("common area rehab total:") &&
         !line.toLowerCase().startsWith("rehab notes:"),
     );
+    const commonRehabEntries = parseItemEntriesWithNotes(commonRehabItemLines);
 
     // ---- Header ----
     const headerHeight = 156;
@@ -666,8 +688,8 @@ export function PropertySummaryActions({
 
     // ---- Investment Position / Return Summary ----
     const boxesTop = heroY - 34 - 16;
-    const investmentBoxHeight = 84;
-    const returnBoxHeight = 110;
+    const investmentBoxHeight = latestOffer !== "-" ? 112 : 97;
+    const returnBoxHeight = 127;
     const boxColumnWidth = (contentWidth - 24) / 2;
 
     pageCommands.push(
@@ -683,7 +705,7 @@ export function PropertySummaryActions({
       makeSectionHeading(
         "Investment Position",
         marginX + 14,
-        boxesTop - 14,
+        boxesTop - 20,
         boxColumnWidth - 28,
       ),
     );
@@ -693,9 +715,10 @@ export function PropertySummaryActions({
           `Asking price: ${askingPrice}`,
           `Starting offer: ${startingOfferPrice}`,
           `Maximum price: ${maximumPrice}`,
+          ...(latestOffer !== "-" ? [`Latest offer: ${latestOffer}`] : []),
         ],
         marginX + 14,
-        boxesTop - 34,
+        boxesTop - 40,
         {
           width: boxColumnWidth - 28,
           labelWidth: 104,
@@ -717,7 +740,7 @@ export function PropertySummaryActions({
       makeSectionHeading(
         "Return Summary",
         returnBoxX + 14,
-        boxesTop - 14,
+        boxesTop - 20,
         boxColumnWidth - 28,
       ),
     );
@@ -731,7 +754,7 @@ export function PropertySummaryActions({
           `Financing: ${financingAssumption}`,
         ],
         returnBoxX + 14,
-        boxesTop - 34,
+        boxesTop - 40,
         {
           width: boxColumnWidth - 28,
           labelWidth: 112,
@@ -859,7 +882,7 @@ export function PropertySummaryActions({
     let cursorY = unitRowY - 3;
 
     const hasCommonRehabContent =
-      commonRehabItemLines.length > 0 || commonRehabNotes !== "-";
+      commonRehabEntries.length > 0 || commonRehabNotes !== "-";
 
     if (hasCommonRehabContent) {
       const rehabHeadingY = cursorY - 14;
@@ -868,66 +891,84 @@ export function PropertySummaryActions({
         makeSectionHeading("Common Area Rehab", marginX, rehabHeadingY, 524),
       );
 
-      let rehabSummaryY = rehabHeadingY - 22;
+      let rehabY = rehabHeadingY - 22;
 
-      if (commonRehabItemLines.length > 0) {
-        const rehabColumns = 2;
-        const rehabColumnWidth = 262;
-        const rehabRowHeight = 14;
-        const rehabContentY = rehabHeadingY - 22;
-
-        commonRehabItemLines.slice(0, 10).forEach((line, index) => {
-          const [label, value] = splitLabelValue(line);
-          const column = index % rehabColumns;
-          const row = Math.floor(index / rehabColumns);
-          const x = marginX + column * rehabColumnWidth;
-          const y = rehabContentY - row * rehabRowHeight;
-
+      if (commonRehabEntries.length > 0) {
+        commonRehabEntries.slice(0, 8).forEach((entry) => {
           pageCommands.push(
-            makeText(label, x, y, {
+            makeText(entry.label, marginX, rehabY, {
               font: "F2",
               size: 8,
-              color: "0.35 0.42 0.53",
+              color: "0.20 0.25 0.34",
             }),
           );
           pageCommands.push(
-            makeText(value, x + 170, y, {
+            makeText(entry.value, marginX + 220, rehabY, {
               font: "F2",
               size: 8,
               color: "0.08 0.11 0.18",
             }),
           );
-        });
 
-        const rehabRowsUsed = Math.ceil(
-          Math.min(commonRehabItemLines.length, 10) / rehabColumns,
-        );
-        rehabSummaryY = rehabContentY - rehabRowsUsed * rehabRowHeight - 8;
+          const noteLines = entry.note
+            ? wrapSummaryLine(entry.note, 100).slice(0, 2)
+            : [];
+
+          noteLines.forEach((noteLine, noteIndex) => {
+            pageCommands.push(
+              makeText(noteLine, marginX, rehabY - 11 - noteIndex * 10, {
+                size: 7.5,
+                color: "0.45 0.52 0.63",
+              }),
+            );
+          });
+
+          const rowAdvance = 16 + noteLines.length * 10;
+
+          pageCommands.push(
+            makeLine(
+              marginX,
+              rehabY - rowAdvance + 6,
+              marginX + contentWidth,
+              rehabY - rowAdvance + 6,
+              "0.94 0.96 0.98",
+            ),
+          );
+
+          rehabY -= rowAdvance;
+        });
 
         pageCommands.push(
           makeText(
             `Contingency: ${commonRehabContingency}   |   Common Area Rehab Total: ${commonRehabTotal}`,
             marginX,
-            rehabSummaryY,
+            rehabY - 4,
             { font: "F2", size: 8.5, color: "0.08 0.11 0.18" },
           ),
         );
+
+        rehabY -= 18;
       }
 
       if (commonRehabNotes !== "-") {
-        wrapSummaryLine(commonRehabNotes, 100)
-          .slice(0, 2)
-          .forEach((line, index) => {
-            pageCommands.push(
-              makeText(line, marginX, rehabSummaryY - 14 - index * 10, {
-                size: 7.5,
-                color: "0.42 0.49 0.60",
-              }),
-            );
-          });
+        const overallNoteLines = wrapSummaryLine(commonRehabNotes, 100).slice(
+          0,
+          2,
+        );
+
+        overallNoteLines.forEach((line, index) => {
+          pageCommands.push(
+            makeText(line, marginX, rehabY - index * 10, {
+              size: 7.5,
+              color: "0.42 0.49 0.60",
+            }),
+          );
+        });
+
+        rehabY -= overallNoteLines.length * 10 + 6;
       }
 
-      cursorY = rehabSummaryY - (commonRehabNotes !== "-" ? 40 : 16);
+      cursorY = rehabY - 10;
     }
 
     if (additionalIncomeItemLines.length > 0) {
@@ -1008,18 +1049,7 @@ export function PropertySummaryActions({
       ),
     );
 
-    const noteBaseY = footerDividerY - 14;
-
-    if (sections.note) {
-      wrapSummaryLine(sections.note, 102).slice(0, 2).forEach((line, index) => {
-        pageCommands.push(makeText(line, marginX, noteBaseY - index * 10, {
-          size: 7,
-          color: "0.45 0.52 0.63",
-        }));
-      });
-    }
-
-    const disclaimerY = sections.note ? noteBaseY - 20 : noteBaseY;
+    const disclaimerY = footerDividerY - 14;
 
     pageCommands.push(makeText("Planning estimate - verify before making offers.", marginX, disclaimerY, {
       size: 7,

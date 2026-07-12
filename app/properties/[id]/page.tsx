@@ -31,6 +31,10 @@ import {
 import { calculateChicagoFmr } from "@/lib/fmr";
 import { getNeighborhoodFromExtractedFields } from "@/lib/neighborhoods";
 import { MONTH_TO_MONTH_LABEL } from "@/lib/lease";
+import {
+  parseNegotiationRounds,
+  negotiationResultLabel,
+} from "@/lib/negotiation";
 
 type PageProps = {
   params: Promise<{
@@ -883,6 +887,32 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   );
   const commonRehab = asRecord(propertyMetadata.common_area_rehab);
   const commonRehabItems = asRecord(commonRehab.items);
+  const walkthroughCommonItems = asRecord(
+    asRecord(propertyMetadata.walkthrough).common,
+  );
+  const negotiationRounds = parseNegotiationRounds(
+    propertyMetadata.negotiation_log,
+  );
+  const latestNegotiationRound =
+    negotiationRounds[negotiationRounds.length - 1] ?? null;
+  const latestOfferSummary = latestNegotiationRound
+    ? (() => {
+        const parsedDate = new Date(`${latestNegotiationRound.date}T00:00:00`);
+        const shortDate = Number.isNaN(parsedDate.getTime())
+          ? latestNegotiationRound.date
+          : parsedDate.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            });
+
+        return `${formatCurrency(latestNegotiationRound.price)} - ${negotiationResultLabel[latestNegotiationRound.result]}, ${shortDate}`;
+      })()
+    : null;
+
+  function getWalkthroughItemNote(itemId: string) {
+    const notes = asRecord(walkthroughCommonItems[itemId]).notes;
+    return typeof notes === "string" ? notes.trim() : "";
+  }
   const commonRehabContingency = toFiniteNumber(
     commonRehab.contingency_percent,
     10,
@@ -1193,6 +1223,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     `Analyzed purchase price: ${formatCurrency(projectedPurchasePrice)}`,
     `Starting offer price: ${formatCurrency(startingOfferPrice)}`,
     `Maximum purchase price: ${formatCurrency(maximumPurchasePrice)}`,
+    latestOfferSummary ? `Latest offer: ${latestOfferSummary}` : null,
     `Primary risk: ${primaryRiskText}`,
     "",
     "Property Details",
@@ -1212,11 +1243,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     "",
     "Common Area Rehab",
     ...COMMON_REHAB_ITEMS.filter(
-      (item) => toFiniteNumber(commonRehabItems[item.id]) > 0,
-    ).map(
       (item) =>
+        toFiniteNumber(commonRehabItems[item.id]) > 0 ||
+        getWalkthroughItemNote(item.id).length > 0,
+    ).flatMap((item) => {
+      const note = getWalkthroughItemNote(item.id);
+
+      return [
         `${item.label}: ${formatCurrency(toFiniteNumber(commonRehabItems[item.id]))}`,
-    ),
+        note ? `${item.label} Note: ${note}` : null,
+      ];
+    }),
     `Contingency: ${commonRehabContingency}%`,
     `Common area rehab total: ${formatCurrency(commonRehabTotal)}`,
     commonRehabNotes ? `Rehab notes: ${commonRehabNotes}` : null,
