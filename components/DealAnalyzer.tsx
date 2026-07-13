@@ -762,11 +762,12 @@ export function DealAnalyzer({
                 <Input
                   id="analysis-price"
                   type="number"
+                  inputMode="decimal"
                   min="0"
-                  value={purchasePrice}
+                  value={purchasePrice || ""}
                   className={analysisInputClass}
                   onChange={(event) =>
-                    setPurchasePrice(Number(event.target.value))
+                    setPurchasePrice(Number(event.target.value) || 0)
                   }
                 />
               </div>

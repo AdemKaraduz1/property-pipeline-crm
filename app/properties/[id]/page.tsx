@@ -1487,14 +1487,18 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           {[
             ["#overview", "Overview"],
             ["#building", "Building"],
-            ["#operating-expenses", "Expenses"],
-            ["#analysis", "Analysis"],
-            ["#diligence", "Verdict"],
-            ["#stabilization", "Stabilization"],
+            ["#broker-remarks", "Notes"],
             ["#units", `Units (${unitCount})`],
             ["#income", "Income"],
+            ["#operating-expenses", "Expenses"],
             ["#rehab", "Rehab"],
             ["#programs", "Programs"],
+            ["#current-financials", "Current"],
+            ["#projected-financials", "Projected"],
+            ["#analysis", "Analysis"],
+            ["#diligence", "Verdict"],
+            ["#negotiation", "Negotiation"],
+            ["#stabilization", "Stabilization"],
           ].map(([href, label]) => (
             <a
               key={href}
@@ -1506,62 +1510,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
           ))}
         </div>
       </nav>
-
-      <details open className={sectionCardClass}>
-        <summary className={disclosureSummaryClass}>
-          <div>
-            <h3 className={sectionTitleClass}>Current Financials</h3>
-            <p className={sectionDescriptionClass}>
-              Based on the current asking price, rents, and operating results.
-            </p>
-          </div>
-
-          <span className={disclosureIndicatorClass}>+</span>
-        </summary>
-
-        <div className={`${disclosureBodyClass} grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4`}>
-          <div>
-            <p className="text-sm text-slate-500">Current Asking Price</p>
-            <p className="text-xl font-bold text-slate-950">
-              {formatCurrency(askingPrice)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-slate-500">Current Annual Rent</p>
-            <p className="text-xl font-bold text-slate-950">
-              {formatCurrency(annualCurrentRent)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-slate-500">Current NOI</p>
-            <p className="text-xl font-bold text-slate-950">
-              {formatCurrency(currentNoi)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-slate-500">Current Cap Rate</p>
-            <p className="text-xl font-bold text-slate-950">
-              {currentCapRate !== null
-                ? `${(currentCapRate * 100).toFixed(2)}%`
-                : "Not entered"}
-            </p>
-          </div>
-        </div>
-      </details>
-
-      <ProjectedFinancials
-        propertyId={id}
-        annualProjectedRent={annualProjectedRent}
-        projectedOperatingExpenses={projectedOperatingExpenses}
-        projectedNoi={projectedNoi}
-        purchasePrice={projectedPurchasePrice}
-        annualDebtService={projectedAnnualDebtService}
-        annualCapexReserve={projectedCapexReserve}
-        isFinanced={projectedIsFinanced}
-      />
 
       {hasBuildingDetails && (
         <details id="building" open className={sectionCardClass}>
@@ -1691,210 +1639,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </details>
       )}
 
-      <details id="operating-expenses" open className={sectionCardClass}>
-        <summary className={disclosureSummaryClass}>
-          <div>
-            <h3 className={sectionTitleClass}>Operating Expenses</h3>
-            <p className={sectionDescriptionClass}>
-              Enter annual expenses. Utilities are calculated from the
-              owner-paid selections in each unit.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
-                Annual Opex
-              </p>
-              <p className="text-lg font-bold text-slate-950 sm:text-xl">
-                {formatCurrency(projectedItemizedOperatingExpenses)}
-              </p>
-            </div>
-            <span className={disclosureIndicatorClass}>+</span>
-          </div>
-        </summary>
-
-        <div className={disclosureBodyClass}>
-        <AutoSaveForm
-          action={updateOperatingExpenses}
-          draftKey={`property-pipeline:autosave:${id}:operating-expenses`}
-          statusClassName="mt-3 text-right text-xs text-slate-500"
-        >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="block">
-              <span className={detailLabelClass}>Property Taxes</span>
-              <input
-                name="property_taxes"
-                type="number"
-                min="0"
-                step="1"
-                defaultValue={
-                  hasValue(taxesAnnual) ? Number(taxesAnnual) : ""
-                }
-                className={compactMoneyInputClass}
-              />
-            </label>
-
-            <label className="block">
-              <span className={detailLabelClass}>Insurance Premiums</span>
-              <input
-                name="insurance_premiums"
-                type="number"
-                min="0"
-                step="1"
-                defaultValue={
-                  hasValue(insuranceAnnual) ? Number(insuranceAnnual) : ""
-                }
-                className={compactMoneyInputClass}
-              />
-            </label>
-
-            <label className="block">
-              <span className={detailLabelClass}>Cleaning</span>
-              <input
-                name="cleaning"
-                type="number"
-                min="0"
-                step="1"
-                defaultValue={annualCleaning || ""}
-                className={compactMoneyInputClass}
-              />
-            </label>
-
-            <label className="block">
-              <span className={detailLabelClass}>Lawn</span>
-              <input
-                name="lawn"
-                type="number"
-                min="0"
-                step="1"
-                defaultValue={annualLawn || ""}
-                className={compactMoneyInputClass}
-              />
-            </label>
-
-            <label className="block">
-              <span className={detailLabelClass}>
-                Repairs and Maintenance %
-              </span>
-              <input
-                name="repairs_maintenance_rate"
-                type="number"
-                min="0"
-                step="0.1"
-                defaultValue={repairsMaintenanceRate}
-                className={compactMoneyInputClass}
-              />
-              <span className="mt-1 block text-xs text-slate-500">
-                {formatCurrency(projectedRepairsMaintenance)} at projected rent
-              </span>
-            </label>
-
-            <label className="block">
-              <span className={detailLabelClass}>Property Management %</span>
-              <input
-                name="property_management_rate"
-                type="number"
-                min="0"
-                step="0.1"
-                defaultValue={propertyManagementRate}
-                className={compactMoneyInputClass}
-              />
-              <span className="mt-1 block text-xs text-slate-500">
-                {formatCurrency(projectedPropertyManagement)} at projected rent
-              </span>
-            </label>
-
-            <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2 lg:col-span-3">
-              <p className={detailLabelClass}>
-                Utilities from Unit Selections
-              </p>
-              <p className="mt-1 text-xl font-bold text-slate-950">
-                {formatCurrency(annualUtilities)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Water, gas, and electric marked as owner-paid in the Units
-                section.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className={detailLabelClass}>
-                Total Annual Operating Expenses
-              </p>
-              <p className="text-2xl font-bold text-slate-950">
-                {formatCurrency(projectedItemizedOperatingExpenses)}
-              </p>
-            </div>
-          </div>
-        </AutoSaveForm>
-        </div>
-      </details>
-
-      <div id="analysis" className="scroll-mt-24">
-        <DealAnalyzer
-          propertyId={id}
-          askingPrice={askingPrice}
-          taxesAnnual={taxesAnnual}
-          insuranceAnnual={insuranceAnnual}
-          operatingExpensesAnnual={projectedItemizedOperatingExpenses}
-          projectedMonthlyRent={projectedMonthlyRent}
-          totalRehab={totalRehab}
-          ownerPaidUtilitiesAnnual={annualUtilities}
-          additionalIncomeAnnual={additionalIncomeAnnual}
-          initialSettings={dealAnalyzerSettings}
-        />
-      </div>
-
-      <DealVerdict
-        action={updateUnderwritingDiligence}
-        annualCurrentRent={annualCurrentRent}
-        annualProjectedRent={annualProjectedRent}
-        annualDebtService={projectedAnnualDebtService}
-        currentNoi={currentNoi}
-        annualFixedOperatingExpenses={annualFixedOperatingExpenses}
-        repairsMaintenanceRate={repairsMaintenanceRate}
-        propertyManagementRate={propertyManagementRate}
-        projectedNoi={projectedNoi}
-        projectedOperatingExpenses={projectedOperatingExpenses}
-        projectedInterestRate={projectedInterestRate}
-        projectedLoanAmount={projectedLoanAmount}
-        projectedLoanTermYears={projectedLoanTermYears}
-        projectedPurchasePrice={projectedPurchasePrice}
-        annualCapexReserve={projectedCapexReserve}
-        additionalIncomeAnnual={additionalIncomeAnnual}
-        taxesAnnual={taxesAnnual}
-        totalRehab={totalRehab}
-        underwriting={underwritingDiligence}
-        vacancyRate={operatingVacancyRate}
-        propertyId={id}
-        annualOwnerPaidUtilities={annualUtilities}
-        inferredRecordedUnitCount={inferredRecordedUnitCount}
-        propertyType={property.property_type || null}
-        units={verdictUnits}
-      />
-
-      <NegotiationLog
-        propertyId={id}
-        initialLog={propertyMetadata.negotiation_log}
-        startingOfferPrice={startingOfferPrice}
-        maximumPurchasePrice={maximumPurchasePrice}
-      />
-
-      <StabilizationPlan
-        propertyId={id}
-        units={stabilizationUnits}
-        annualFixedOperatingExpenses={annualFixedOperatingExpenses}
-        repairsMaintenanceRate={repairsMaintenanceRate}
-        propertyManagementRate={propertyManagementRate}
-        annualDebtService={projectedAnnualDebtService}
-        savedPlan={propertyMetadata.stabilization_plan}
-      />
-
       {property.broker_remarks && (
-        <details className={sectionCardClass}>
+        <details id="broker-remarks" className={sectionCardClass}>
           <summary className={disclosureSummaryClass}>
             <div>
               <h3 className={sectionTitleClass}>Broker Remarks</h3>
@@ -2588,6 +2334,148 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         </div>
       </details>
 
+      <details id="operating-expenses" open className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
+          <div>
+            <h3 className={sectionTitleClass}>Operating Expenses</h3>
+            <p className={sectionDescriptionClass}>
+              Enter annual expenses. Utilities are calculated from the
+              owner-paid selections in each unit.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-slate-100 px-3 py-2 text-left sm:px-4 sm:text-right">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:text-xs">
+                Annual Opex
+              </p>
+              <p className="text-lg font-bold text-slate-950 sm:text-xl">
+                {formatCurrency(projectedItemizedOperatingExpenses)}
+              </p>
+            </div>
+            <span className={disclosureIndicatorClass}>+</span>
+          </div>
+        </summary>
+
+        <div className={disclosureBodyClass}>
+        <AutoSaveForm
+          action={updateOperatingExpenses}
+          draftKey={`property-pipeline:autosave:${id}:operating-expenses`}
+          statusClassName="mt-3 text-right text-xs text-slate-500"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block">
+              <span className={detailLabelClass}>Property Taxes</span>
+              <input
+                name="property_taxes"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={
+                  hasValue(taxesAnnual) ? Number(taxesAnnual) : ""
+                }
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Insurance Premiums</span>
+              <input
+                name="insurance_premiums"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={
+                  hasValue(insuranceAnnual) ? Number(insuranceAnnual) : ""
+                }
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Cleaning</span>
+              <input
+                name="cleaning"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={annualCleaning || ""}
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Lawn</span>
+              <input
+                name="lawn"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={annualLawn || ""}
+                className={compactMoneyInputClass}
+              />
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>
+                Repairs and Maintenance %
+              </span>
+              <input
+                name="repairs_maintenance_rate"
+                type="number"
+                min="0"
+                step="0.1"
+                defaultValue={repairsMaintenanceRate}
+                className={compactMoneyInputClass}
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                {formatCurrency(projectedRepairsMaintenance)} at projected rent
+              </span>
+            </label>
+
+            <label className="block">
+              <span className={detailLabelClass}>Property Management %</span>
+              <input
+                name="property_management_rate"
+                type="number"
+                min="0"
+                step="0.1"
+                defaultValue={propertyManagementRate}
+                className={compactMoneyInputClass}
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                {formatCurrency(projectedPropertyManagement)} at projected rent
+              </span>
+            </label>
+
+            <div className="rounded-lg bg-slate-50 p-3 sm:col-span-2 lg:col-span-3">
+              <p className={detailLabelClass}>
+                Utilities from Unit Selections
+              </p>
+              <p className="mt-1 text-xl font-bold text-slate-950">
+                {formatCurrency(annualUtilities)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Water, gas, and electric marked as owner-paid in the Units
+                section.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className={detailLabelClass}>
+                Total Annual Operating Expenses
+              </p>
+              <p className="text-2xl font-bold text-slate-950">
+                {formatCurrency(projectedItemizedOperatingExpenses)}
+              </p>
+            </div>
+          </div>
+        </AutoSaveForm>
+        </div>
+      </details>
+
       <details id="rehab" className={sectionCardClass}>
         <summary className={disclosureSummaryClass}>
           <div className="min-w-0 flex-1">
@@ -2734,6 +2622,124 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         />
         </div>
       </details>
+
+      <details id="current-financials" open className={sectionCardClass}>
+        <summary className={disclosureSummaryClass}>
+          <div>
+            <h3 className={sectionTitleClass}>Current Financials</h3>
+            <p className={sectionDescriptionClass}>
+              Based on the current asking price, rents, and operating results.
+            </p>
+          </div>
+
+          <span className={disclosureIndicatorClass}>+</span>
+        </summary>
+
+        <div className={`${disclosureBodyClass} grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4`}>
+          <div>
+            <p className="text-sm text-slate-500">Current Asking Price</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(askingPrice)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-500">Current Annual Rent</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(annualCurrentRent)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-500">Current NOI</p>
+            <p className="text-xl font-bold text-slate-950">
+              {formatCurrency(currentNoi)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-500">Current Cap Rate</p>
+            <p className="text-xl font-bold text-slate-950">
+              {currentCapRate !== null
+                ? `${(currentCapRate * 100).toFixed(2)}%`
+                : "Not entered"}
+            </p>
+          </div>
+        </div>
+      </details>
+
+      <div id="projected-financials" className="scroll-mt-24">
+        <ProjectedFinancials
+          propertyId={id}
+          annualProjectedRent={annualProjectedRent}
+          projectedOperatingExpenses={projectedOperatingExpenses}
+          projectedNoi={projectedNoi}
+          purchasePrice={projectedPurchasePrice}
+          annualDebtService={projectedAnnualDebtService}
+          annualCapexReserve={projectedCapexReserve}
+          isFinanced={projectedIsFinanced}
+        />
+      </div>
+
+      <div id="analysis" className="scroll-mt-24">
+        <DealAnalyzer
+          propertyId={id}
+          askingPrice={askingPrice}
+          taxesAnnual={taxesAnnual}
+          insuranceAnnual={insuranceAnnual}
+          operatingExpensesAnnual={projectedItemizedOperatingExpenses}
+          projectedMonthlyRent={projectedMonthlyRent}
+          totalRehab={totalRehab}
+          ownerPaidUtilitiesAnnual={annualUtilities}
+          additionalIncomeAnnual={additionalIncomeAnnual}
+          initialSettings={dealAnalyzerSettings}
+        />
+      </div>
+
+      <DealVerdict
+        action={updateUnderwritingDiligence}
+        annualCurrentRent={annualCurrentRent}
+        annualProjectedRent={annualProjectedRent}
+        annualDebtService={projectedAnnualDebtService}
+        currentNoi={currentNoi}
+        annualFixedOperatingExpenses={annualFixedOperatingExpenses}
+        repairsMaintenanceRate={repairsMaintenanceRate}
+        propertyManagementRate={propertyManagementRate}
+        projectedNoi={projectedNoi}
+        projectedOperatingExpenses={projectedOperatingExpenses}
+        projectedInterestRate={projectedInterestRate}
+        projectedLoanAmount={projectedLoanAmount}
+        projectedLoanTermYears={projectedLoanTermYears}
+        projectedPurchasePrice={projectedPurchasePrice}
+        annualCapexReserve={projectedCapexReserve}
+        additionalIncomeAnnual={additionalIncomeAnnual}
+        taxesAnnual={taxesAnnual}
+        totalRehab={totalRehab}
+        underwriting={underwritingDiligence}
+        vacancyRate={operatingVacancyRate}
+        propertyId={id}
+        annualOwnerPaidUtilities={annualUtilities}
+        inferredRecordedUnitCount={inferredRecordedUnitCount}
+        propertyType={property.property_type || null}
+        units={verdictUnits}
+      />
+
+      <NegotiationLog
+        propertyId={id}
+        initialLog={propertyMetadata.negotiation_log}
+        startingOfferPrice={startingOfferPrice}
+        maximumPurchasePrice={maximumPurchasePrice}
+      />
+
+      <StabilizationPlan
+        propertyId={id}
+        units={stabilizationUnits}
+        annualFixedOperatingExpenses={annualFixedOperatingExpenses}
+        repairsMaintenanceRate={repairsMaintenanceRate}
+        propertyManagementRate={propertyManagementRate}
+        annualDebtService={projectedAnnualDebtService}
+        savedPlan={propertyMetadata.stabilization_plan}
+      />
 
     </AppShell>
   );

@@ -147,7 +147,10 @@ export function NegotiationLog({
     startingOfferPrice !== null || maximumPurchasePrice !== null;
 
   return (
-    <details className="group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+    <details
+      id="negotiation"
+      className="group mb-6 scroll-mt-24 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+    >
       <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
         <div>
           <h3 className="text-base font-semibold text-slate-950 sm:text-lg">
